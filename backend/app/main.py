@@ -294,7 +294,7 @@ def create_app(settings=None, model_builder=None, protection_adapter=None):
         current = session(request, "admin", True)
         run = chat.run(current)
         results = []
-        for record in chat.events:
+        for record in list(chat.events)[-10:]:
             if run and record.get("presenter_run_id") == run["id"] and record.get("trace_id"):
                 try:
                     from galileo.traces import Traces
