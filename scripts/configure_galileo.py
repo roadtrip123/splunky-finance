@@ -2,6 +2,7 @@
 
 import argparse
 import asyncio
+
 from app.config import Settings
 from app.observability.galileo import Telemetry
 
@@ -54,11 +55,11 @@ async def main():
         raise SystemExit("Configure Galileo and Agent Control in .env first")
     Telemetry(s).configure_environment()
     from galileo import GalileoLogger
-    from galileo.metrics import create_custom_llm_metric
-    from galileo.scorers import Scorers
     from galileo.log_streams import enable_metrics
-    from galileo_core.schemas.logging.step import StepType
+    from galileo.metrics import create_custom_llm_metric
     from galileo.resources.models.output_type_enum import OutputTypeEnum
+    from galileo.scorers import Scorers
+    from galileo_core.schemas.logging.step import StepType
 
     logger = GalileoLogger(project=s.galileo_project, log_stream=s.galileo_log_stream)
     for name, instructions in JUDGES.items():
@@ -79,8 +80,8 @@ async def main():
     )
     from agent_control import AgentControlClient
     from agent_control.controls import (
-        create_control,
         clone_and_bind_control,
+        create_control,
         list_controls,
     )
 

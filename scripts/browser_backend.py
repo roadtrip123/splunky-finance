@@ -5,9 +5,9 @@ from pathlib import Path
 
 root = Path(__file__).resolve().parents[1]
 sys.path[:0] = [str(root / "backend"), str(root / "backend/tests")]
-from conftest import FakeModel, CUSTOMER_PASSWORD, ADMIN_PASSWORD
 from app.config import Settings
 from app.main import create_app
+from conftest import ADMIN_PASSWORD, CUSTOMER_PASSWORD, FakeModel
 
 settings = Settings(
     _env_file=None,

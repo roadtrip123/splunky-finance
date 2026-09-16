@@ -19,7 +19,7 @@ docker compose up --build -d
 docker compose logs --tail=100 backend frontend
 ```
 
-Open http://localhost:3000, sign in with account `12345678`, and the customer password configured in `.env`. The setup script supplies initial fictional demo passwords; replace them before sharing access. Presenter login is at `/demo-admin` and uses its independent password. `.env` is private, ignored by Git, and created with permissions 0600. Setup never overwrites an existing file.
+Open http://localhost:3000, sign in with account `12345678`, and the customer password configured in `.env`. The setup script generates random initial demo passwords; read them from the private `.env` and replace them before sharing access. Presenter login is at `/demo-admin` and uses its independent password. `.env` is private, ignored by Git, and created with permissions 0600. Setup never overwrites an existing file.
 
 For a remote server, configure `APP_ORIGIN` to its exact HTTPS URL and `SESSION_COOKIE_SECURE=true`. Put a TLS reverse proxy in front of frontend port 3000. Compose binds that port to loopback by default and keeps backend internal. Use one backend process because session/run state is in memory. Dataset JSON persists in the `runtime-data` volume. Do not scale backend workers without a shared session store.
 
@@ -87,20 +87,18 @@ Browser testing starts dedicated offline backend and production frontend process
 
 See [DEMO-SCRIPT.md](DEMO-SCRIPT.md) for presentation steps and [docs/architecture.md](docs/architecture.md) for data and security contracts. This private repository has no license grant pending the owner's license choice.
 
-## Direct private LAN access on this server
+## Private LAN deployment
 
-This server's ignored `.env` is configured for **http://10.0.0.170:3000**:
+For trusted-LAN testing, choose an address assigned to the deployment host and set:
 
 ```dotenv
-APP_ORIGIN=http://10.0.0.170:3000
-FRONTEND_BIND_ADDRESS=10.0.0.170
+APP_ORIGIN=http://<SERVER_LAN_IP>:3000
+FRONTEND_BIND_ADDRESS=<SERVER_LAN_IP>
 ALLOW_PRIVATE_LAN_HTTP=true
 SESSION_COOKIE_SECURE=false
 ```
 
-After changing these settings, run `docker compose up --build -d`. Open that exact URL from a computer on the same LAN. If a host firewall is enabled, permit TCP 3000 only from your trusted LAN subnet. The host must own IP 10.0.0.170. HTTP login traffic is unencrypted; use this option only for the trusted synthetic demo. Public addresses and DNS hostnames still require HTTPS. For HTTPS set the exact HTTPS origin, `SESSION_COOKIE_SECURE=true`, and `ALLOW_PRIVATE_LAN_HTTP=false`, with a TLS proxy in front of frontend.
-
-The committed example keeps localhost defaults for portability. Private `.env` and credentials are never pushed. Logging in through localhost will fail Origin checks while the LAN origin is configured; use the exact configured URL.
+Run `docker compose up --build -d` and open the exact configured origin. HTTP login traffic is unencrypted, so limit it to a trusted synthetic demo network. For public deployment, use an HTTPS hostname, `SESSION_COOKIE_SECURE=true`, and `ALLOW_PRIVATE_LAN_HTTP=false`, with a TLS proxy or tunnel. The committed examples contain no deployment-specific hostname or address.
 
 ## Shared environment snapshot
 

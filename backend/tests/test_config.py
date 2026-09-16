@@ -10,9 +10,9 @@ def configure(settings, **changes):
 
 def test_private_lan_http_requires_explicit_opt_in(settings):
     with pytest.raises(ValidationError):
-        configure(settings, app_origin="http://10.0.0.170:3000")
-    configured = configure(settings, app_origin="http://10.0.0.170:3000", allow_private_lan_http=True)
-    assert configured.app_origin == "http://10.0.0.170:3000"
+        configure(settings, app_origin="http://192.168.56.10:3000")
+    configured = configure(settings, app_origin="http://192.168.56.10:3000", allow_private_lan_http=True)
+    assert configured.app_origin == "http://192.168.56.10:3000"
 
 
 @pytest.mark.parametrize(
@@ -25,11 +25,11 @@ def test_lan_opt_in_does_not_allow_other_remote_hosts(settings, origin):
 
 def test_scheme_and_cookies_must_match(settings):
     with pytest.raises(ValidationError):
-        configure(settings, app_origin="https://10.0.0.170:3000")
+        configure(settings, app_origin="https://192.168.56.10:3000")
     with pytest.raises(ValidationError):
         configure(
             settings,
-            app_origin="http://10.0.0.170:3000",
+            app_origin="http://192.168.56.10:3000",
             allow_private_lan_http=True,
             session_cookie_secure=True,
         )
@@ -41,7 +41,7 @@ def test_customer_login_at_configured_lan_origin(settings):
 
     from app.main import create_app
 
-    configured = configure(settings, app_origin="http://10.0.0.170:3000", allow_private_lan_http=True)
+    configured = configure(settings, app_origin="http://192.168.56.10:3000", allow_private_lan_http=True)
     with TestClient(create_app(configured)) as client:
         payload = {
             "account_number": configured.demo_account_number,
