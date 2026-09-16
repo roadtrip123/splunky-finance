@@ -16,3 +16,11 @@ Unverified: Docker image build/start, paid provider calls, local Ollama performa
 Private IPv4 HTTP requires explicit ALLOW_PRIVATE_LAN_HTTP opt-in. Public IPs, DNS names, and link-local addresses remain rejected for remote HTTP. Cookie security must match HTTP/HTTPS. LAN login, session cookies, and exact Origin rejection are tested.
 
 Configured deployment target: http://10.0.0.170:3000. The selected address is assigned to this server’s Wi-Fi interface. Docker access remained denied. Local private .env is excluded from Git.
+
+## Galileo admin controls update
+
+- Backend tests: 21 passed; lint passed.
+- Production build: passed.
+- Browser journeys: 8 passed on desktop/mobile, including persistent enable/disable and missing-key status.
+- Galileo default enabled, live .env updated, and production backend/frontend restarted.
+- Connection uses a fresh authenticated SDK API read. SDK response doubles test success/failure and secret-safe errors; genuine live connection and trace export status are reported separately in the presenter portal.

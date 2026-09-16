@@ -104,4 +104,10 @@ The committed example keeps localhost defaults for portability. Private `.env` a
 
 ## Shared environment snapshot
 
-`master.env` records this server's shareable settings. OpenAI, Anthropic, and Galileo API keys are blank; customer/presenter passwords and the session signing secret are placeholders. Use your private ignored `.env` for actual credentials. The backend reads `.env`, not `master.env`. After editing `.env`, restart backend to apply changes. Galileo is currently disabled until explicitly configured and enabled.
+`master.env` records this server's shareable settings. OpenAI, Anthropic, and Galileo API keys are blank; customer/presenter passwords and the session signing secret are placeholders. Use your private ignored `.env` for actual credentials. The backend reads `.env`, not `master.env`. After editing `.env`, restart backend to apply changes. Galileo is enabled by default. Configure its API key and endpoints in private `.env`.
+
+## Galileo admin switch and connection status
+
+Galileo starts enabled by default. The presenter workspace has Enable/Disable Galileo and Check Galileo connection buttons. The switch applies to all demo chats, persists in `runtime/galileo-settings.json` (or the Docker data volume), and overrides the environment startup default until changed again. Changes wait for active chat/connection work to finish. The toggle and connection check require an authenticated presenter and CSRF validation.
+
+Connection status distinguishes disabled, unconfigured (missing key), checking, connected (SDK resolved the configured target), and failed. Last check/connection times and actual export status are separate: connected does not imply that a trace was exported or scored. The startup check and manual check do not invoke a paid model. Existing traces can finish exporting before disable, and protection remains fail-closed if Galileo is disabled. Keys and passwords are never exposed by these endpoints.

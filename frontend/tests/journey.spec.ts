@@ -95,3 +95,32 @@ test("layout has no horizontal overflow", async ({ page }) => {
     ),
   ).toBeTruthy();
 });
+
+test("presenter can enable and disable Galileo with honest missing-key status", async ({
+  page,
+}) => {
+  await page.goto("/demo-admin");
+  await page
+    .getByLabel("Password", { exact: true })
+    .fill("test-presenter-password-only");
+  await page.getByRole("button", { name: "Log in" }).click();
+  const enable = page.getByRole("button", {
+    name: "Enable Galileo",
+    exact: true,
+  });
+  const disable = page.getByRole("button", {
+    name: "Disable Galileo",
+    exact: true,
+  });
+  if (await disable.isVisible()) await disable.click();
+  await expect(enable).toBeVisible();
+  await enable.click();
+  await expect(disable).toBeVisible();
+  await expect(
+    page.getByText("Galileo API key missing", { exact: true }),
+  ).toBeVisible();
+  await page.reload();
+  await expect(disable).toBeVisible();
+  await disable.click();
+  await expect(enable).toBeVisible();
+});

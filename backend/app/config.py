@@ -25,7 +25,7 @@ class Settings(BaseSettings):
     llm_max_tool_calls: int = 8
     llm_max_model_calls: int = 6
     llm_max_output_tokens: int = 2000
-    galileo_enabled: bool = False
+    galileo_enabled: bool = True
     galileo_api_key: SecretStr = SecretStr("")
     galileo_project: str = "splunky-finance"
     galileo_log_stream: str = "my-bank-agent"

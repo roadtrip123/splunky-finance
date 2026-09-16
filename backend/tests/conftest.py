@@ -57,6 +57,7 @@ class FakeModel(BaseChatModel):
 def settings(tmp_path):
     return Settings(
         _env_file=None,
+        galileo_enabled=False,
         demo_password=CUSTOMER_PASSWORD,
         demo_admin_password=ADMIN_PASSWORD,
         session_secret="test-signing-secret-32-characters-minimum",

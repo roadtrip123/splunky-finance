@@ -22,6 +22,11 @@ from app.storage import Storage
 from app.tools import Banking
 
 
+class GalileoSetting(StrictModel):
+    enabled: bool
+    expected_revision: int = Field(ge=0)
+
+
 class Binding(StrictModel):
     token: str = Field(min_length=1, max_length=80)
 
@@ -39,7 +44,10 @@ def create_app(settings=None, model_builder=None, protection_adapter=None):
 
     @asynccontextmanager
     async def lifespan(app):
+        connection_task = asyncio.create_task(telemetry.check_connection())
         yield
+        connection_task.cancel()
+        await asyncio.gather(connection_task, return_exceptions=True)
         for job in jobs.values():
             task = job.get("task")
             if task and not task.done():
@@ -48,6 +56,7 @@ def create_app(settings=None, model_builder=None, protection_adapter=None):
 
     app = FastAPI(title="Splunky Finance", docs_url=None, redoc_url=None, lifespan=lifespan)
     app.state.storage, app.state.auth, app.state.chat = storage, auth, chat
+    app.state.telemetry = telemetry
 
     @app.middleware("http")
     async def correlation(request, call_next):
@@ -260,6 +269,27 @@ def create_app(settings=None, model_builder=None, protection_adapter=None):
             raise HTTPException(409, "Run settings changed; refresh")
         run.update(protection=payload.enabled, revision=run["revision"] + 1)
         return envelope(request, run)
+
+    @app.put("/api/demo-admin/galileo")
+    async def set_galileo(request: Request, payload: GalileoSetting):
+        session(request, "admin", True)
+        if payload.expected_revision != telemetry.revision:
+            raise HTTPException(409, "Galileo settings changed; refresh")
+        if (
+            telemetry.pending
+            or telemetry.connection_lock.locked()
+            or any(c.lock.locked() for c in chat.conversations.values())
+        ):
+            raise HTTPException(409, "Wait for active requests before changing Galileo")
+        telemetry.set_enabled(payload.enabled)
+        if payload.enabled:
+            await telemetry.check_connection(force=True)
+        return envelope(request, {"galileo": dict(telemetry.status)})
+
+    @app.post("/api/demo-admin/galileo/check")
+    async def check_galileo(request: Request):
+        session(request, "admin", True)
+        return envelope(request, {"galileo": await telemetry.check_connection()})
 
     @app.get("/api/demo-admin/status")
     async def admin_status(request: Request):

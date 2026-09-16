@@ -11,6 +11,7 @@ from app.main import create_app
 
 settings = Settings(
     _env_file=None,
+    galileo_enabled=False,
     demo_password=CUSTOMER_PASSWORD,
     demo_admin_password=ADMIN_PASSWORD,
     session_secret="browser-test-only-secret-at-least-32-characters",

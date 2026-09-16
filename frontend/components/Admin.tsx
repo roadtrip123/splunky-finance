@@ -28,7 +28,16 @@ type Status = {
   provider: string;
   model: string;
   provider_status: { state: string };
-  galileo: { state: string; export: string; last_error: string | null };
+  galileo: {
+    state: string;
+    enabled: boolean;
+    revision: number;
+    connection: string;
+    last_checked_at: number | null;
+    last_connected_at: number | null;
+    export: string;
+    last_error: string | null;
+  };
   project: string;
   log_stream: string;
   console_url: string | null;
@@ -167,7 +176,65 @@ export default function Admin() {
                   </article>
                   <article className="admin-card">
                     <span className="mini-label">GALILEO</span>
-                    <h3>{status.galileo.state}</h3>
+                    <h3 aria-live="polite">
+                      {status.galileo.enabled
+                        ? status.galileo.connection
+                        : "disabled"}
+                    </h3>
+                    <button
+                      className="button outline small"
+                      disabled={
+                        busy || status.galileo.connection === "checking"
+                      }
+                      onClick={() =>
+                        action(() =>
+                          mutate(
+                            "demo-admin/galileo",
+                            {
+                              enabled: !status.galileo.enabled,
+                              expected_revision: status.galileo.revision,
+                            },
+                            true,
+                            "PUT",
+                          ),
+                        )
+                      }
+                    >
+                      {status.galileo.enabled
+                        ? "Disable Galileo"
+                        : "Enable Galileo"}
+                    </button>
+                    <button
+                      className="text-button"
+                      disabled={busy || !status.galileo.enabled}
+                      onClick={() =>
+                        action(() =>
+                          mutate("demo-admin/galileo/check", {}, true),
+                        )
+                      }
+                    >
+                      Check Galileo connection
+                    </button>
+                    <small>
+                      Enabled by default. This switch applies to all demo chats
+                      and is saved across restarts.
+                    </small>
+                    {status.galileo.last_checked_at && (
+                      <small>
+                        Last checked:{" "}
+                        {new Date(
+                          status.galileo.last_checked_at * 1000,
+                        ).toLocaleString()}
+                      </small>
+                    )}
+                    {status.galileo.last_connected_at && (
+                      <small>
+                        Last connected:{" "}
+                        {new Date(
+                          status.galileo.last_connected_at * 1000,
+                        ).toLocaleString()}
+                      </small>
+                    )}
                     <p>
                       {status.project} / {status.log_stream}
                     </p>
