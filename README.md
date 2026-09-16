@@ -101,3 +101,7 @@ SESSION_COOKIE_SECURE=false
 After changing these settings, run `docker compose up --build -d`. Open that exact URL from a computer on the same LAN. If a host firewall is enabled, permit TCP 3000 only from your trusted LAN subnet. The host must own IP 10.0.0.170. HTTP login traffic is unencrypted; use this option only for the trusted synthetic demo. Public addresses and DNS hostnames still require HTTPS. For HTTPS set the exact HTTPS origin, `SESSION_COOKIE_SECURE=true`, and `ALLOW_PRIVATE_LAN_HTTP=false`, with a TLS proxy in front of frontend.
 
 The committed example keeps localhost defaults for portability. Private `.env` and credentials are never pushed. Logging in through localhost will fail Origin checks while the LAN origin is configured; use the exact configured URL.
+
+## Shared environment snapshot
+
+`master.env` records this server's shareable settings. OpenAI, Anthropic, and Galileo API keys are blank; customer/presenter passwords and the session signing secret are placeholders. Use your private ignored `.env` for actual credentials. The backend reads `.env`, not `master.env`. After editing `.env`, restart backend to apply changes. Galileo is currently disabled until explicitly configured and enabled.
