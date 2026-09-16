@@ -71,6 +71,9 @@ class ChatService:
                 del self.conversations[key]
 
     async def answer(self, session, payload, banking):
+        message = payload.message.strip()
+        if not message:
+            raise HTTPException(422, "Message cannot be blank")
         now = time.time()
         self.conversations = {k: v for k, v in self.conversations.items() if v.updated > now - 3600}
         identifier = payload.conversation_id or str(uuid4())
@@ -104,21 +107,28 @@ class ChatService:
                 "presenter_run_id": run["id"] if run else "",
                 "injection": scenario != "normal_spending",
             }
-            if scenario != "normal_spending" and payload.message != SCENARIOS[scenario]["prompt"]:
-                raise HTTPException(400, "Use the selected scenario's exact prompt or return to normal mode")
+            if scenario != "normal_spending":
+                expected_prompt = SCENARIOS[scenario]["prompt"]
+                # Copy/paste may add line breaks or repeated spaces. Compare normalized
+                # whitespace, then use the canonical prompt for reproducible traces/replay.
+                if " ".join(message.split()) != " ".join(expected_prompt.split()):
+                    raise HTTPException(
+                        400,
+                        "Copy the selected scenario prompt exactly; surrounding whitespace is ignored",
+                    )
+                message = expected_prompt
             evidence = {}
             observed_tools = []
             usage = None
             started = time.monotonic()
             replay = run and scenario == "guardrail_before_after" and run.get("replay")
             if replay and (
-                replay["prompt"] != payload.message
-                or replay["dataset_version"] != dataset.manifest.dataset_version
+                replay["prompt"] != message or replay["dataset_version"] != dataset.manifest.dataset_version
             ):
                 raise HTTPException(
                     409, "Before/after replay requires the identical prompt and dataset; reset the run"
                 )
-            turn = await self.telemetry.begin(payload.message, metadata)
+            turn = await self.telemetry.begin(message, metadata)
             try:
                 if replay:
                     raw, candidate, evidence = replay["raw"], replay["candidate"], replay["evidence"]
@@ -169,7 +179,7 @@ class ChatService:
                         history = history[2:]
                     result = await asyncio.wait_for(
                         agent.ainvoke(
-                            {"messages": history + [HumanMessage(payload.message)]},
+                            {"messages": history + [HumanMessage(message)]},
                             config={"callbacks": callbacks, "metadata": metadata, "recursion_limit": 24},
                         ),
                         timeout=self.settings.llm_timeout_seconds,
@@ -224,7 +234,7 @@ class ChatService:
                         )
                     if run and scenario == "guardrail_before_after":
                         run["replay"] = {
-                            "prompt": payload.message,
+                            "prompt": message,
                             "dataset_version": dataset.manifest.dataset_version,
                             "raw": raw,
                             "candidate": candidate,
@@ -233,7 +243,7 @@ class ChatService:
                         }
                 # This awaited gate completes before response construction. No token streaming bypass exists.
                 final, decision = await self.protection.check(
-                    candidate, payload.message, evidence, turn["logger"] if turn else None, enabled
+                    candidate, message, evidence, turn["logger"] if turn else None, enabled
                 )
                 self.telemetry.event(turn, "output-protection-decision", {"candidate": candidate}, decision)
                 citations = list({doc["citation"]: doc for doc in evidence.get("policies", [])}.values())
@@ -258,9 +268,9 @@ class ChatService:
                 }
                 self.events.append(record)
                 await self.telemetry.finish(turn, record)
-                conversation.messages = (
-                    conversation.messages + [HumanMessage(payload.message), AIMessage(final)]
-                )[-8:]
+                conversation.messages = (conversation.messages + [HumanMessage(message), AIMessage(final)])[
+                    -8:
+                ]
                 return {
                     "conversation_id": identifier,
                     "answer": final,

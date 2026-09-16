@@ -105,3 +105,26 @@ def test_health_and_filters(client):
     login(client)
     result = client.get("/api/accounts/credit-card/transactions?category=restaurants&page_size=100").json()
     assert result["items"] and all(t["category"] == "restaurants" for t in result["items"])
+
+
+def test_controlled_scenario_accepts_pasted_whitespace(client):
+    customer = login(client)
+    admin = login(client, True)
+    run = client.post("/api/demo-admin/run", headers=admin).json()
+    assert (
+        client.post("/api/demo-admin/bind", headers=customer, json={"token": run["binding"]}).status_code
+        == 200
+    )
+    run = client.put(
+        "/api/demo-admin/scenario",
+        headers=admin,
+        json={"run_id": run["id"], "expected_revision": run["revision"], "scenario_id": "incomplete_answer"},
+    ).json()
+    prompt = "How much did I spend on restaurants last month, what were my three biggest transactions, and how does that compare with the previous month?"
+    pasted = "  \n" + prompt.replace("three biggest", "three   biggest") + "\n  "
+    response = client.post("/api/chat", headers=customer, json={"message": pasted})
+    assert response.status_code == 200, response.text
+    assert response.json()["answer"] == "You spent $754.19 AUD on restaurants last month."
+    assert client.app.state.chat.events[-1]["scenario"] == "incomplete_answer"
+    rejected = client.post("/api/chat", headers=customer, json={"message": prompt.replace("three", "two")})
+    assert rejected.status_code == 400

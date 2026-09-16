@@ -89,7 +89,7 @@ The message `Protection verification: unverified` is expected until a genuine Ag
 ## Part 4 — completeness evaluation
 
 1. Select scenario **`incomplete_answer`**.
-2. Copy the displayed prompt; the backend requires the exact selected scenario prompt.
+2. Copy the displayed prompt; the backend requires the selected scenario wording and punctuation; harmless leading, trailing, or repeated whitespace is normalized.
 3. In a new customer conversation, send it.
 4. The live model still runs first. The controlled workflow then replaces the candidate with only the restaurant total, deliberately omitting the transaction count, three largest purchases, and previous-month comparison.
 5. In **Latest run evidence**, expand the event and compare:
