@@ -1,0 +1,90 @@
+from datetime import date
+from pathlib import Path
+from typing import Literal
+from urllib.parse import urlparse
+from zoneinfo import ZoneInfo
+
+from pydantic import SecretStr, model_validator
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+class Settings(BaseSettings):
+    model_config = SettingsConfigDict(env_file="../.env", extra="ignore", case_sensitive=False)
+    llm_provider: Literal["openai", "anthropic", "ollama"] = "openai"
+    openai_api_key: SecretStr = SecretStr("")
+    openai_model: str = "gpt-4o-mini-2024-07-18"
+    anthropic_api_key: SecretStr = SecretStr("")
+    anthropic_model: str = "claude-haiku-4-5-20251001"
+    ollama_base_url: str = "http://localhost:11434"
+    ollama_model: str = "gemma4:e2b"
+    llm_temperature: float = 0
+    llm_timeout_seconds: int = 60
+    llm_max_tool_calls: int = 8
+    llm_max_model_calls: int = 6
+    llm_max_output_tokens: int = 2000
+    galileo_enabled: bool = False
+    galileo_api_key: SecretStr = SecretStr("")
+    galileo_project: str = "splunky-finance"
+    galileo_log_stream: str = "my-bank-agent"
+    galileo_console_url: str = ""
+    galileo_api_url: str = ""
+    agent_control_url: str = ""
+    agent_control_agent_name: str = "my-bank-agent"
+    agent_control_api_key_header: str = "Galileo-API-Key"
+    agent_control_runtime_token_header: str = "X-Agent-Control-Runtime-Token"
+    galileo_protection_enabled: bool = False
+    demo_seed: int = 42
+    demo_reference_date: date = date(2026, 9, 15)
+    demo_timezone: str = "Australia/Brisbane"
+    demo_account_number: str = "12345678"
+    demo_password: SecretStr
+    demo_admin_password: SecretStr
+    session_secret: SecretStr
+    session_cookie_secure: bool = False
+    app_origin: str = "http://localhost:3000"
+    data_dir: Path = Path("../runtime")
+    policy_dir: Path = Path("../data/policies")
+
+    @model_validator(mode="after")
+    def validate_configuration(self):
+        for name in ("demo_password", "demo_admin_password", "session_secret"):
+            value = getattr(self, name).get_secret_value()
+            minimum = 32 if name == "session_secret" else 12
+            if len(value) < minimum or any(x in value.lower() for x in ("replace_with", "change-this")):
+                raise ValueError(
+                    f"{name.upper()} must be a non-placeholder secret (minimum {minimum} characters)"
+                )
+        if self.demo_password == self.demo_admin_password:
+            raise ValueError("Customer and presenter passwords must differ")
+        model = self.model_name
+        if not model or "REPLACE" in model.upper():
+            raise ValueError("Selected provider model must be configured")
+        if self.llm_provider == "ollama" and ("cloud" in model or "ollama.com" in self.ollama_base_url):
+            raise ValueError("Ollama mode requires a local model and local runtime")
+        if not 1 <= self.llm_timeout_seconds <= 300:
+            raise ValueError("LLM timeout must be 1–300 seconds")
+        if not 1 <= self.llm_max_tool_calls <= 16 or not 1 <= self.llm_max_model_calls <= 10:
+            raise ValueError("Invalid agent execution limits")
+        if not 128 <= self.llm_max_output_tokens <= 4000:
+            raise ValueError("Output limit must be 128–4000 tokens")
+        origin = urlparse(self.app_origin)
+        if origin.scheme not in ("http", "https") or not origin.hostname or origin.path not in ("", "/"):
+            raise ValueError("APP_ORIGIN must be an HTTP(S) origin")
+        if origin.scheme == "https" and not self.session_cookie_secure:
+            raise ValueError("HTTPS requires secure session cookies")
+        if origin.hostname not in ("localhost", "127.0.0.1", "::1") and not self.session_cookie_secure:
+            raise ValueError("Remote exposure requires HTTPS and secure session cookies")
+        ZoneInfo(self.demo_timezone)
+        if self.galileo_protection_enabled and not self.galileo_enabled:
+            raise ValueError("Protection requires Galileo")
+        return self
+
+    @property
+    def model_name(self):
+        return getattr(self, f"{self.llm_provider}_model")
+
+    @property
+    def provider_configured(self):
+        return self.llm_provider == "ollama" or bool(
+            getattr(self, f"{self.llm_provider}_api_key").get_secret_value()
+        )

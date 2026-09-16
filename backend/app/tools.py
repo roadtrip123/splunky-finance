@@ -1,0 +1,161 @@
+import re
+from datetime import date
+from pathlib import Path
+from typing import Annotated
+
+from langchain_core.tools import tool
+from pydantic import Field
+
+from app.demo.expected_results import CATEGORY_ALIASES, spending
+
+
+class Banking:
+    def __init__(self, dataset, policies: Path):
+        self.dataset = dataset
+        self.documents = []
+        for path in sorted(policies.glob("*.md")):
+            content = path.read_text()
+            title = content.splitlines()[0].lstrip("# ")
+            sections = re.split(r"\n## ", content)
+            for section in sections[1:]:
+                heading, _, body = section.partition("\n")
+                self.documents.append(
+                    {
+                        "document_id": path.stem,
+                        "title": title,
+                        "section": heading,
+                        "citation": f"{path.stem}#{heading.lower().replace(' ', '-')}",
+                        "excerpt": body.strip()[:1800],
+                    }
+                )
+
+    def account(self, identifier):
+        return next(
+            (
+                a
+                for a in self.dataset.accounts
+                if a.id == identifier and a.customer_id == self.dataset.customer["id"]
+            ),
+            None,
+        )
+
+    def transactions(
+        self, account_id=None, start=None, end=None, category=None, search=None, sort="date_desc"
+    ):
+        if account_id and not self.account(account_id):
+            raise ValueError("Account not found")
+        category = CATEGORY_ALIASES.get((category or "").lower(), (category or "").lower())
+        items = [
+            t
+            for t in self.dataset.transactions
+            if (not account_id or t.account_id == account_id)
+            and (not start or t.posted_date >= start)
+            and (not end or t.posted_date < end)
+            and (not category or t.category == category)
+            and (not search or search.lower() in (t.merchant + " " + t.description).lower())
+        ]
+        key = (
+            (lambda t: (t.amount_cents, t.id))
+            if sort.startswith("amount")
+            else lambda t: (t.posted_date, t.id)
+        )
+        items.sort(key=key, reverse=sort.endswith("desc"))
+        return items
+
+    def search(self, query, limit=3):
+        words = set(re.findall(r"[a-z0-9]+", query.lower())) - {
+            "the",
+            "a",
+            "my",
+            "is",
+            "what",
+            "of",
+            "on",
+            "to",
+        }
+        scored = []
+        for doc in self.documents:
+            text = (doc["title"] + " " + doc["section"] + " " + doc["excerpt"]).lower()
+            tokens = set(re.findall(r"[a-z0-9]+", text))
+            score = len(words & tokens)
+            if score:
+                scored.append((score, doc))
+        scored.sort(key=lambda x: (-x[0], x[1]["citation"]))
+        return [doc for _, doc in scored[:limit]]
+
+
+def build_tools(banking: Banking, evidence: dict):
+    # Customer scope is captured from the authenticated server dataset, never an LLM argument.
+    @tool
+    def get_customer_profile() -> dict:
+        """Get the authenticated fictional customer's minimal profile."""
+        return banking.dataset.customer
+
+    @tool
+    def get_accounts() -> dict:
+        """Get the customer's three account balances in integer AUD cents. Card balance is signed liability."""
+        return {"accounts": [a.model_dump(mode="json") for a in banking.dataset.accounts]}
+
+    @tool
+    def get_transactions(
+        account_id: str | None = None,
+        start: date | None = None,
+        end: date | None = None,
+        category: str | None = None,
+        limit: Annotated[int, Field(ge=1, le=100)] = 25,
+    ) -> dict:
+        """Get scoped transactions. Dates use inclusive start and exclusive end. Pending is explicit."""
+        if start and end and start >= end:
+            return {"error": "invalid_date_range"}
+        try:
+            items = banking.transactions(account_id, start, end, category)
+            return {"items": [t.model_dump(mode="json") for t in items[:limit]], "total": len(items)}
+        except ValueError:
+            return {"error": "account_not_found"}
+
+    @tool
+    def calculate_spending(
+        start: date,
+        end: date,
+        category: str | None = None,
+        account_id: str | None = None,
+        compare_start: date | None = None,
+        compare_end: date | None = None,
+        top_count: Annotated[int, Field(ge=0, le=3)] = 3,
+    ) -> dict:
+        """Calculate authoritative net purchase spending/count/top purchases/comparison in AUD cents.
+
+        Excludes pending, transfers, repayments. Refunds offset category purchases. End date is exclusive.
+        """
+        if account_id and not banking.account(account_id):
+            return {"error": "account_not_found"}
+        if (
+            start >= end
+            or bool(compare_start) != bool(compare_end)
+            or (compare_start and compare_end and compare_start >= compare_end)
+        ):
+            return {"error": "invalid_date_range"}
+        result = spending(
+            banking.dataset.transactions,
+            start,
+            end,
+            category,
+            account_id,
+            compare_start,
+            compare_end,
+            top_count,
+        )
+        evidence.setdefault("calculations", []).append(result)
+        return result
+
+    @tool
+    def search_bank_policy(
+        query: Annotated[str, Field(min_length=1, max_length=300)],
+        limit: Annotated[int, Field(ge=1, le=5)] = 3,
+    ) -> dict:
+        """Search fictional bank policies. Return source excerpts and section citations; no match means unknown."""
+        documents = banking.search(query, limit)
+        evidence.setdefault("policies", []).extend(documents)
+        return {"documents": documents}
+
+    return [get_customer_profile, get_accounts, get_transactions, calculate_spending, search_bank_policy]
