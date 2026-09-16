@@ -33,7 +33,7 @@ class Telemetry:
             "export": "not_attempted",
             "last_error": None,
         }
-        self.pending = set()
+        self.pending = {}
 
     def set_enabled(self, enabled):
         self.toggle_path.parent.mkdir(parents=True, exist_ok=True)
@@ -131,12 +131,14 @@ class Telemetry:
                     project=self.settings.galileo_project, log_stream=self.settings.galileo_log_stream
                 )
                 logger.start_session(name="My Bank Agent", external_id=metadata["conversation_id"])
-                trace = logger.start_trace(
-                    input=prompt, name="bank-chat-turn", metadata=metadata, external_id=metadata["run_id"]
-                )
-                return logger, trace
+                return logger
 
-            logger, trace = await asyncio.wait_for(asyncio.to_thread(initialize), timeout=15)
+            logger = await asyncio.wait_for(asyncio.to_thread(initialize), timeout=15)
+            # The SDK parent is a ContextVar: a worker thread's value does not flow
+            # back to this request. Start the root here so agent callback tasks inherit it.
+            trace = logger.start_trace(
+                input=prompt, name="bank-chat-turn", metadata=metadata, external_id=metadata["run_id"]
+            )
             self.status.update(
                 state="connected",
                 connection="connected",
@@ -146,7 +148,7 @@ class Telemetry:
                 project_id=str(logger.project_id),
                 log_stream_id=str(logger.log_stream_id),
             )
-            self.pending.add(logger)
+            self.pending[id(logger)] = logger
             return {
                 "logger": logger,
                 "trace_id": str(trace.id),
@@ -207,10 +209,10 @@ class Telemetry:
                 export="failed", connection="failed", state="failed", last_error="Galileo export failed"
             )
         finally:
-            self.pending.discard(logger)
+            self.pending.pop(id(logger), None)
 
     async def shutdown(self):
-        for logger in list(self.pending):
+        for logger in list(self.pending.values()):
             try:
                 await asyncio.wait_for(asyncio.to_thread(logger.flush), 10)
             except Exception:  # noqa: BLE001 - isolate SDK failures without exposing credential-bearing errors

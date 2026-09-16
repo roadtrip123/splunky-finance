@@ -63,3 +63,57 @@ async def test_connection_errors_do_not_expose_sdk_secrets(settings, monkeypatch
     assert status["connection"] == "failed"
     assert "fake-offline-key" not in str(status)
     assert status["last_connected_at"] is None
+
+
+def test_real_sdk_callback_exports_model_and_tool_under_one_trace(settings, monkeypatch):
+    from uuid import uuid4
+
+    from conftest import FakeModel
+    from fastapi.testclient import TestClient
+    from galileo import GalileoLogger as RealLogger
+
+    from app.main import create_app
+
+    exported = []
+    loggers = []
+
+    original_init = RealLogger.__init__
+
+    def initialize(self, **kwargs):
+        original_init(
+            self,
+            project="offline",
+            log_stream="offline",
+            ingestion_hook=lambda request: exported.extend(request.traces),
+        )
+        self.project_id = str(uuid4())
+        self.log_stream_id = str(uuid4())
+        loggers.append(self)
+
+    monkeypatch.setattr(RealLogger, "__init__", initialize)
+    monkeypatch.setattr(RealLogger, "start_session", lambda self, **kwargs: "offline-session")
+    monkeypatch.setattr("galileo.log_streams.get_log_stream", lambda **kwargs: object())
+    settings.galileo_enabled = True
+    settings.galileo_api_key = settings.openai_api_key
+    with TestClient(create_app(settings, model_builder=lambda s: FakeModel())) as client:
+        headers = login(client)
+        response = client.post(
+            "/api/chat", headers=headers, json={"message": "How much did I spend on restaurants last month?"}
+        )
+        assert response.status_code == 200
+        event = client.app.state.chat.events[-1]
+        assert client.app.state.telemetry.status["export"] == "exported"
+    assert len(exported) == 1
+    trace = exported[0]
+    assert str(trace.id) == event["trace_id"]
+
+    def descendants(node):
+        for child in node.spans:
+            yield child
+            if hasattr(child, "spans"):
+                yield from descendants(child)
+
+    children = list(descendants(trace))
+    assert any(child.type == "llm" for child in children)
+    assert any(child.type == "tool" and child.name == "calculate_spending" for child in children)
+    assert any(child.name == "output-protection-decision" for child in children)

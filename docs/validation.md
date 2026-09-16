@@ -24,3 +24,9 @@ Configured deployment target: http://10.0.0.170:3000. The selected address is as
 - Browser journeys: 8 passed on desktop/mobile, including persistent enable/disable and missing-key status.
 - Galileo default enabled, live .env updated, and production backend/frontend restarted.
 - Connection uses a fresh authenticated SDK API read. SDK response doubles test success/failure and secret-safe errors; genuine live connection and trace export status are reported separately in the presenter portal.
+
+## Action-span fix and live verification
+
+Fixed two SDK integration defects: GalileoLogger is unhashable, so pending loggers must be tracked by object identity; the root trace must start in the async request context so callback tasks inherit the SDK ContextVar parent. A real-SDK offline ingestion-hook regression asserts one exported trace with LLM, calculate_spending tool, and protection workflow descendants.
+
+Backend suite: 22 passed; lint passed. Backend restarted. One live OpenAI account-balance turn returned HTTP 200 and exported successfully. Galileo trace `8b726740-36ae-4c2b-9965-92f2a71c94a1` was read back through the authenticated API and contained Agent, two ChatOpenAI LLM spans, a tools workflow with a get_accounts tool span, and output-protection-decision. This verifies OpenAI tool execution and genuine Galileo span ingestion; custom judge scores and bound Agent Control decisions remain unverified. Earlier empty sessions cannot be reconstructed automatically.

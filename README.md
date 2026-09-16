@@ -6,7 +6,7 @@ Fictional Australian banking demonstration: a responsive Next.js website, determ
 
 Production frontend build and desktop/mobile browser journeys passed. Backend tests cover ledger integrity, date arithmetic, session isolation, CSRF, controlled faults, replay, and fail-closed protection. Browser tests use an explicit offline model that invokes real banking tools; they do not validate paid model APIs or fabricate Galileo scores.
 
-Live OpenAI/Anthropic/Ollama calls, Galileo exports/judges and tenant-bound Agent Control require configuration and remain unverified. Docker image builds require access to the server's Docker daemon; the current user does not yet have that access.
+One live OpenAI tool-backed turn and its Galileo model/tool span export have been verified. Anthropic/Ollama calls, Galileo judges, and tenant-bound Agent Control remain unverified. Docker image builds require access to the server's Docker daemon; the current user does not yet have that access.
 
 ## Run on Ubuntu with Docker Compose
 
