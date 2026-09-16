@@ -11,25 +11,25 @@ SCENARIOS = {
     "incomplete_answer": {
         "version": 1,
         "prompt": "How much did I spend on restaurants last month, what were my three biggest transactions, and how does that compare with the previous month?",
-        "evaluation": "Splunky Answer Completeness",
+        "evaluation": "SplunkyCompleteness",
         "protection_applicable": False,
     },
     "hallucinated_policy": {
         "version": 1,
         "prompt": POLICY_PROMPT,
-        "evaluation": "Splunky Policy Groundedness",
+        "evaluation": "SplunkyGroundedness",
         "protection_applicable": True,
     },
     "incorrect_total": {
         "version": 1,
         "prompt": "How much did I spend on restaurants last month?",
-        "evaluation": "Splunky Numerical Correctness",
+        "evaluation": "SplunkyNumericalCorrectness",
         "protection_applicable": False,
     },
     "guardrail_before_after": {
         "version": 1,
         "prompt": POLICY_PROMPT,
-        "evaluation": "Splunky Policy Groundedness",
+        "evaluation": "SplunkyGroundedness",
         "protection_applicable": True,
     },
 }
