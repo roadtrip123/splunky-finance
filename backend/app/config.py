@@ -1,4 +1,5 @@
 from datetime import date
+from ipaddress import ip_address, ip_network
 from pathlib import Path
 from typing import Literal
 from urllib.parse import urlparse
@@ -6,6 +7,8 @@ from zoneinfo import ZoneInfo
 
 from pydantic import SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+PRIVATE_LAN_NETWORKS = tuple(ip_network(x) for x in ("10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16"))
 
 
 class Settings(BaseSettings):
@@ -41,6 +44,7 @@ class Settings(BaseSettings):
     demo_admin_password: SecretStr
     session_secret: SecretStr
     session_cookie_secure: bool = False
+    allow_private_lan_http: bool = False
     app_origin: str = "http://localhost:3000"
     data_dir: Path = Path("../runtime")
     policy_dir: Path = Path("../data/policies")
@@ -70,10 +74,21 @@ class Settings(BaseSettings):
         origin = urlparse(self.app_origin)
         if origin.scheme not in ("http", "https") or not origin.hostname or origin.path not in ("", "/"):
             raise ValueError("APP_ORIGIN must be an HTTP(S) origin")
+        if origin.username or origin.password or origin.query or origin.fragment:
+            raise ValueError("APP_ORIGIN must not include credentials, query, or fragment")
+        local = origin.hostname in ("localhost", "127.0.0.1", "::1")
+        private_lan = False
+        try:
+            address = ip_address(origin.hostname)
+            private_lan = address.version == 4 and any(address in network for network in PRIVATE_LAN_NETWORKS)
+        except ValueError:
+            pass
         if origin.scheme == "https" and not self.session_cookie_secure:
             raise ValueError("HTTPS requires secure session cookies")
-        if origin.hostname not in ("localhost", "127.0.0.1", "::1") and not self.session_cookie_secure:
-            raise ValueError("Remote exposure requires HTTPS and secure session cookies")
+        if origin.scheme == "http" and self.session_cookie_secure:
+            raise ValueError("HTTP cannot use secure session cookies; use HTTPS")
+        if not local and origin.scheme == "http" and not (self.allow_private_lan_http and private_lan):
+            raise ValueError("Remote exposure requires HTTPS or explicit private LAN HTTP opt-in")
         ZoneInfo(self.demo_timezone)
         if self.galileo_protection_enabled and not self.galileo_enabled:
             raise ValueError("Protection requires Galileo")
