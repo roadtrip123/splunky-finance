@@ -78,3 +78,11 @@ A live turn confirmed the answer span fix: `customer-visible-answer` moved from 
 The fault writer is now logged explicitly as `controlled-fault-writer` rather than through the callback, which names chat-model spans from the model class and made the fabrication indistinguishable from the agent's genuine calls. It carries the same evidence as the answer span. A regression asserts the span exists by name, holds the candidate and the evidence, and that the agent's own model spans are not renamed.
 
 Backend suite: 47 passed; lint passed.
+
+## Judge voting and span verification
+
+A faulty turn confirmed the answer span fix in both directions: `customer-visible-answer` scored `[1,1,1]` on a correct answer and `[0,0,0]` on an altered total, the rationale naming $854.19 against the authoritative $754.19. Its completeness stayed at 100% on the faulty turn, since the answer covered everything asked and only the figure was wrong. The fault writer now appears as `controlled-fault-writer` rather than a third model call named after the model class.
+
+`SplunkyRequestCoverage` returned true and then false across two runs of the same scenario and question with nothing left unanswered, tracing to `num_judges=1` on the custom judges while the built-in evaluators use three. All three judges are now published at version 2 with three voters; version 2 is the default and all eight metrics remain enabled. Deletion proved unavailable — a metric can only be deleted by its creator — so `--refresh-judges` publishes a new version instead, which also keeps scoring history.
+
+Still absent from every trace: `action_completion_luna`.

@@ -40,7 +40,9 @@ Custom judges are worth their cost only where no built-in can know the rule. Eac
 
 ## Reading the scores
 
-**A judge fails only on a contradiction it can point to.** An answer with its total removed is not a wrong total and not a wrong customer; it is an incomplete answer. Each judge returns true when its subject is simply absent, so most scenarios light exactly one judge. Wrong Customer lights two by design: its candidate misstates both the identity and the figures. If you edit a judge prompt, the change only reaches the tenant with `--apply --refresh-judges`, which deletes and recreates it and loses that judge's historical scores.
+**A judge fails only on a contradiction it can point to.** An answer with its total removed is not a wrong total and not a wrong customer; it is an incomplete answer. Each judge returns true when its subject is simply absent, so most scenarios light exactly one judge. Wrong Customer lights two by design: its candidate misstates both the identity and the figures. If you edit a judge prompt or settings, the change only reaches the tenant with `--apply --refresh-judges`, which publishes a new version of each judge and makes it the default. Versioning rather than delete-and-recreate: deletion is refused for anyone but a metric's original creator, and versioning keeps the scoring history.
+
+**All three judges use three voters.** On a single judge a borderline call flips the whole verdict between runs — `SplunkyRequestCoverage` returned true and then false on the same scenario and question, with nothing left unanswered either time. Three judges vote, matching the built-in evaluators.
 
 **Built-in span-level metrics score every LLM span in the trace.** A turn has up to four: one model call to choose the tool, one to compose the answer, `controlled-fault-writer` when a scenario is active, and `customer-visible-answer`. The last two are logged explicitly rather than through the LangChain callback, which names chat-model spans after the model class and left the fault writer indistinguishable from the agent's genuine calls. Context Adherence therefore reports a mix such as `false 2 / true 1` even on a correct answer.
 

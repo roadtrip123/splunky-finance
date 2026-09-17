@@ -63,6 +63,16 @@ JUDGES = {
         "true: identity was not misstated. Evaluate candidate_output, not final_output."
     ),
 }
+JUDGE_PROMPT_SUFFIX = (
+    " The trace output is JSON containing candidate_output and evidence. Judge only what"
+    " candidate_output actually claims: the absence of a claim is not a failure."
+)
+JUDGE_MODEL = "gpt-4.1-mini"
+# Three judges vote. On one judge a borderline call flips the whole verdict between runs:
+# SplunkyRequestCoverage returned true and then false on the same scenario and question, with
+# nothing left unanswered either time.
+JUDGE_COUNT = 3
+
 # Galileo's own evaluators. Context Adherence and Completeness read the retriever span the policy
 # retriever emits; the tool metrics score the agent's tool use. These names are resolved against the
 # tenant, not a fixed list, and the available set differs between tenants: this one exposes Action
@@ -90,8 +100,8 @@ async def main():
     parser.add_argument(
         "--refresh-judges",
         action="store_true",
-        help="Delete and recreate the custom judges so edited prompts take effect. "
-        "Existing judges are otherwise left alone, and their historical scores are lost.",
+        help="Publish a new version of each custom judge so edited prompts and settings take "
+        "effect. Existing judges are otherwise left untouched.",
     )
     args = parser.parse_args()
     if not args.apply:
@@ -116,22 +126,39 @@ async def main():
 
     logger = GalileoLogger(project=s.galileo_project, log_stream=s.galileo_log_stream)
     for name, instructions in JUDGES.items():
-        if args.refresh_judges and Scorers().list(name=name):
-            from galileo.metrics import delete_metric
+        existing = Scorers().list(name=name)
+        if args.refresh_judges and existing:
+            # A new version rather than delete and recreate: deletion is refused for anyone but the
+            # metric's original creator, and versioning keeps the judge's scoring history.
+            from galileo.metrics import (
+                CreateLLMScorerVersionRequest,
+                GalileoPythonConfig,
+            )
+            from galileo.metrics import (
+                create_llm_scorer_version_scorers_scorer_id_version_llm_post as publish_version,
+            )
 
-            delete_metric(name=name)
-            print(f"{name}: deleted for refresh")
-        if not Scorers().list(name=name):
+            published = publish_version.sync(
+                scorer_id=str(existing[0].id),
+                client=GalileoPythonConfig.get().api_client,
+                body=CreateLLMScorerVersionRequest(
+                    user_prompt=instructions + JUDGE_PROMPT_SUFFIX,
+                    model_name=JUDGE_MODEL,
+                    num_judges=JUDGE_COUNT,
+                    output_type=OutputTypeEnum.BOOLEAN,
+                    cot_enabled=True,
+                ),
+            )
+            print(f"{name}: published version {getattr(published, 'version', '?')}")
+        if not existing:
             print(f"{name}: created")
             create_custom_llm_metric(
                 name=name,
-                user_prompt=instructions
-                + " The trace output is JSON containing candidate_output and evidence. Judge only"
-                " what candidate_output actually claims: the absence of a claim is not a failure.",
+                user_prompt=instructions + JUDGE_PROMPT_SUFFIX,
                 node_level=StepType.trace,
                 output_type=OutputTypeEnum.BOOLEAN,
-                model_name="gpt-4.1-mini",
-                num_judges=1,
+                model_name=JUDGE_MODEL,
+                num_judges=JUDGE_COUNT,
             )
     # Resolve names first: enable_metrics raises a bare ValueError naming only the unknown entries,
     # which is hard to act on when the valid set is tenant-specific.
