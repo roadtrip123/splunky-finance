@@ -155,3 +155,45 @@ def test_pairing_code_expiry(client):
     with pytest.raises(HTTPException, match="expired"):
         links.pair(customer, code)
     assert client.post("/api/chat/demo-sync", headers=customer_headers).status_code == 200
+
+
+def test_presenter_logout_then_login_relinks_the_same_banking_session(client):
+    """Logout deletes the run but cannot clear the customer's copy of its id. Left stale, that id
+    blocks auto-relink and makes pairing raise 409, stranding the banking session."""
+    admin = login(client, True)
+    run = client.post("/api/demo-admin/workspace", headers=admin).json()
+    customer = login(client)
+    assert client.post("/api/chat/demo-sync", headers=customer).json()["connected"] is True
+
+    client.post("/api/demo-admin/logout", headers=admin)
+    assert client.post("/api/chat/demo-sync", headers=customer).json()["expired"] is True
+
+    admin = login(client, True)
+    fresh = client.post("/api/demo-admin/workspace", headers=admin).json()
+    assert fresh["id"] != run["id"]
+    state = client.post("/api/chat/demo-sync", headers=customer).json()
+    assert state["connected"] is True, "banking session did not relink to the new presenter run"
+    assert state["version"].startswith(fresh["id"])
+
+    # The chat must now be attributed to the run the portal is showing.
+    client.post("/api/chat", headers=customer, json={"message": "What is my savings balance?"})
+    assert client.app.state.chat.events[-1]["presenter_run_id"] == fresh["id"]
+    assert client.get("/api/demo-admin/status", headers=admin).json()["events"]
+
+
+def test_pairing_recovers_a_session_bound_to_a_deleted_run(client):
+    """Pairing is the documented escape hatch, so a dead binding must not make it raise 409."""
+    admin = login(client, True)
+    client.post("/api/demo-admin/workspace", headers=admin).json()
+    customer = login(client)
+    client.post("/api/chat/demo-sync", headers=customer)
+    client.post("/api/demo-admin/logout", headers=admin)
+
+    admin = login(client, True)
+    fresh = client.post("/api/demo-admin/workspace", headers=admin).json()
+    client.post("/api/demo-admin/disconnect", headers=admin)
+    code = client.post(
+        "/api/demo-admin/pairing", headers=admin, json={"run_id": fresh["id"]}
+    ).json()["code"]
+    response = client.post("/api/chat/demo-pair", headers=customer, json={"code": code})
+    assert response.status_code == 200, response.text

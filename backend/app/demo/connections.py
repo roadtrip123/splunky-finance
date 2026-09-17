@@ -19,7 +19,19 @@ class Connections:
             customer if customer and customer.expires > time.time() and customer.run_id == run["id"] else None
         )
 
+    def stale(self, customer):
+        """Drop a binding to a run that no longer exists.
+
+        Presenter logout deletes the run but cannot reach into the customer session to clear its
+        id. Left in place that dead id blocks auto-relink and makes pairing raise 409, so the
+        banking session has no way back to a presenter.
+        """
+        if customer and customer.run_id and customer.run_id not in self.chat.runs:
+            customer.run_id = None
+            self.seen.pop(customer.id, None)
+
     def attach(self, customer, run):
+        self.stale(customer)
         if run.get("customer_id") and run["customer_id"] != customer.id:
             raise HTTPException(409, "Disconnect the existing banking session first")
         if customer.run_id and customer.run_id != run["id"]:
@@ -33,6 +45,7 @@ class Connections:
     def auto(self, customer, admin):
         if not customer or not admin or customer.id in self.blocked:
             return
+        self.stale(customer)
         run = self.chat.run(admin)
         if run and not run.get("auto_disabled") and not run.get("customer_id") and not customer.run_id:
             self.attach(customer, run)

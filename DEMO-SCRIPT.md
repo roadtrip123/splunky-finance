@@ -234,6 +234,7 @@ Use these exact distinctions:
 | Exact prompt rejected | Use **Run example question** for the active scenario |
 | Replay rejected | Do not change prompt, scenario, or dataset between before/after turns |
 | Customer chat not affected | Open My Bank Agent and check the portal connection acknowledgment; use pairing for another browser or computer |
+| Chats missing from Latest chat evidence | The panel shows only the current presenter run. Presenter logout abandons earlier events, which stay in memory but can no longer be displayed; read those turns in the Galileo console |
 | Footer amber | Wait for reconnection; if expired, disconnect and pair again |
 | Pairing code rejected | Generate a fresh code; codes expire after five minutes and are single-use |
 | Settings changed in another tab | Review the refreshed selection and retry; stale requests are rejected |
