@@ -54,3 +54,9 @@ Backend suite: 46 passed; lint passed.
 ## Judge prompt correction
 
 Live scores showed all three custom judges returning false on the incomplete-answer scenario: an answer with its total removed was reported as having a wrong total and a wrong customer. The judges were instructed to return false when required evidence was absent, so each failed whenever its subject was missing rather than contradicted, and the one-metric-per-scenario story did not hold. Each judge now fails only on a contradiction it can point to and returns true when its subject is absent. Added `--refresh-judges`, which deletes and recreates judges so an edited prompt reaches the tenant; without it existing judges are skipped. Applied to the tenant and all eight metrics confirmed still enabled.
+
+## Context adherence verified against live traces
+
+Per-span rationales from live traces corrected two earlier claims. Context Adherence does catch an invented fee stated during a calculation question: the agent's model calls carry their tool results as context, and the rationale named the fabricated 2.5% fee and scored it 0.0. No additional judge is needed for that case.
+
+The `customer-visible-answer` span, however, is logged with the question and the candidate and no context, so Context Adherence reports its claims as unsupported even for a correct answer. Adherence on that span is not meaningful; the span remains the node the Agent Control output control scopes, which is why it exists. The span worth reading is the agent's answer-composing call, verified at 1.0 for a correct total and 0.0 for a correct total with an invented fee appended. Documentation now says so; attaching evidence to the logged span as context remains open.

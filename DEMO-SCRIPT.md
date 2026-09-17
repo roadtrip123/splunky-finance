@@ -87,7 +87,12 @@ For a question with three parts, checks that all three were answered. Distinct f
 
 ### Reading the numbers on screen
 
-**Context Adherence shows a mix even on a correct answer**, such as `false 2 / true 1`. Galileo scores every model call in the trace, and a normal turn has three: one to choose the tool, one to write the answer, and the answer as delivered. The tool-choosing call has no prose in it to check. Read the score on the `customer-visible-answer` span rather than the aggregate, and say so before anyone asks.
+**Context Adherence shows a mix even on a correct answer**, such as `false 2 / true 1`. Galileo scores every model call in the trace, and a normal turn has four: one to choose the tool, one to write the answer, the fault writer when a scenario is active, and the delivered answer. Two of those score low for reasons that are not the answer's fault:
+
+- The tool-choosing call contains no prose to check.
+- The `customer-visible-answer` span is logged with the question and the answer but **no context attached**, so it reports every claim as unsupported even when the answer is perfectly correct. Do not read adherence on this span.
+
+**Open the span whose rationale names the tool result.** That is the agent's answer-composing call, and it is the one that scores the answer honestly: `1.0` when the answer matches the calculation, `0.0` when it invents something. Expand the rationale on screen. It names the invented claim in plain English, which is far more convincing than the number.
 
 **Completeness is a percentage, not a pass or fail.** Expect roughly 44% on a good answer and 25% on a deliberately incomplete one. The movement is the point, not the number: quote the gap, never the figure alone.
 
@@ -97,9 +102,11 @@ For a question with three parts, checks that all three were answered. Distinct f
 
 Context Adherence and Completeness both work by comparing the answer against documents the agent retrieved. **If the agent looked nothing up, they have nothing to compare against and stay silent.**
 
-This matters live, because any question can be asked under any scenario. A policy question routes through the policy retriever and produces documents. A spending question is answered by the calculator and produces none. So an invented fee stated during a spending question is caught by nothing in the current set: it is not a policy claim checked against sources, and it is not a ledger figure checked against the calculation.
+In practice the agent's own model calls carry their tool results as context, so Context Adherence still works on a calculation question: an invented fee stated alongside a correct total is caught, and the rationale names it. What changes without retrieval is Completeness, whose absolute percentage becomes unreliable because there are few retrieved facts to be complete about.
 
-Ask each scenario's displayed example question. That is what the metric expects, and it is why each Part specifies its question exactly.
+The custom judges are unaffected by this. They read `evidence` from the trace output, which is always present.
+
+Ask each scenario's displayed example question anyway. That is what each Part is written around, and the policy question is the only one that exercises the retriever span.
 
 ## Part 1 — ordinary customer banking
 

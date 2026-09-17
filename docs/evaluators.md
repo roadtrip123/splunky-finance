@@ -42,7 +42,11 @@ Custom judges are worth their cost only where no built-in can know the rule. Eac
 
 **A judge fails only on a contradiction it can point to.** An answer with its total removed is not a wrong total and not a wrong customer; it is an incomplete answer. Each judge returns true when its subject is simply absent, so exactly one metric goes red per scenario. If you edit a judge prompt, the change only reaches the tenant with `--apply --refresh-judges`, which deletes and recreates it and loses that judge's historical scores.
 
-**Built-in span-level metrics score every LLM span in the trace.** A normal turn has three: one model call to choose the tool, one to compose the answer, and the logged `customer-visible-answer` span. So Context Adherence reports a mix such as `false 2 / true 1` even on a correct answer, because the tool-choosing call has no prose output and a spending question retrieves no documents to adhere to. Read the score on the `customer-visible-answer` span, not the aggregate.
+**Built-in span-level metrics score every LLM span in the trace.** A turn has up to four: one model call to choose the tool, one to compose the answer, the fault writer when a scenario is active, and the logged `customer-visible-answer` span. Context Adherence therefore reports a mix such as `false 2 / true 1` even on a correct answer.
+
+Two of those spans score low for reasons unrelated to answer quality. The tool-choosing call has no prose output. The `customer-visible-answer` span is logged with `add_llm_span(input=prompt, output=candidate)` and **no context**, so the evaluator sees unsupported claims whatever the answer says; adherence on that span is not meaningful and should not be read. It remains the node the Agent Control output control scopes, which is what it was added for.
+
+The span worth reading is the agent's answer-composing call. The LangChain callback attaches the tool result to it, so it scores the answer against real evidence: verified at `1.0` for a correct total and `0.0` for a correct total with an invented fee appended, with a rationale naming the fee.
 
 **Completeness returns a percentage, not a verdict.** Use the direction, not the absolute value: a correct answer and a deliberately incomplete one scored 44% and 25% on the same question. The gap is the demonstration; neither number means much alone.
 
@@ -52,6 +56,7 @@ Custom judges are worth their cost only where no built-in can know the rule. Eac
 | --- | --- |
 | **Correctness (Factuality)** | Standalone judge with no reference answer. Cannot adjudicate the seeded totals. |
 | **PII detection** | The wrong-customer identity is fabricated, not leaked. This evaluator would either miss it or fire for a reason that has to be explained away. |
+| **A judge for invented fees** | Not needed. Context Adherence catches an invented fee stated alongside correct figures, because the agent's model calls carry their tool results as context. Verified against a live trace. |
 | **Chunk Relevance, Context Precision, Precision @ K** | Policy search is keyword overlap and returns some irrelevant chunks. These would score honestly but poorly. Enable them only to demonstrate retrieval-quality problems deliberately. |
 | **Ground Truth Adherence** | Viable once `expected_results` is wired in as ground truth. Not configured. |
 | **Text-to-SQL, Multimodal** | No SQL generation and no image or audio input. |
