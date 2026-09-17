@@ -84,14 +84,15 @@ JUDGE_COUNT = 3
 
 # Galileo's own evaluators. Context Adherence and Completeness read the retriever span the policy
 # retriever emits; the tool metrics score the agent's tool use. These names are resolved against the
-# tenant, not a fixed list, and the available set differs between tenants: this one exposes Action
-# Completion only as the small-language-model `_luna` variant.
+# tenant, not a fixed list, and the available set differs between tenants.
+# Action Completion is deliberately absent: it produced no value on any trace or session, this
+# tenant offers it only as the Luna small-model variant, and the SDK exposes no way to close a
+# session for a session-scoped metric to score.
 BUILTIN_METRICS = [
     "context_adherence",
     "completeness",
     "tool_selection_quality",
     "tool_error_rate",
-    "action_completion_luna",
 ]
 
 

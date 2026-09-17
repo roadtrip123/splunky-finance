@@ -3,7 +3,7 @@
 This walkthrough demonstrates four distinct layers:
 
 1. **Observe** — a real model selects read-only banking tools and Galileo records the model, tool, and workflow spans.
-2. **Evaluate** — Galileo evaluators assess a deliberately controlled candidate. Five are Galileo's own; three are custom judges written for this bank. See [What each evaluator looks for](#what-each-evaluator-looks-for).
+2. **Evaluate** — Galileo evaluators assess a deliberately controlled candidate. Four are Galileo's own; three are custom judges written for this bank. See [What each evaluator looks for](#what-each-evaluator-looks-for).
 3. **Detect** — the presenter workspace shows the raw model output, controlled candidate, evidence, trace ID, candidate hash, and any actual metric results.
 4. **Protect** — Agent Control evaluates a candidate before delivery. A verified deny or an unavailable control produces a safe customer response when protection is enabled.
 
@@ -45,7 +45,7 @@ Use **Inspect expected results** in the presenter workspace to retrieve the acti
 
 ## What each evaluator looks for
 
-Eight metrics run on this demo. Five are Galileo's own, enabled out of the box. Three are custom judges written for this bank, because no off-the-shelf evaluator can know its ledger or its customer. Full setup detail is in [docs/evaluators.md](docs/evaluators.md); this section is what to say out loud.
+Seven metrics run on this demo. Four are Galileo's own, enabled out of the box. Three are custom judges written for this bank, because no off-the-shelf evaluator can know its ledger or its customer. Full setup detail is in [docs/evaluators.md](docs/evaluators.md); this section is what to say out loud.
 
 ### Galileo's own evaluators
 
@@ -60,9 +60,6 @@ Compares what the customer asked against which banking tool the agent chose. It 
 
 **Tool Error Rate — "Did the tools actually work?"**
 Watches for tools that errored or failed. This is plumbing health rather than answer quality, and it is the one that tells you a problem is not the model's fault.
-
-**Action Completion — "Did the agent finish the job?"**
-Looks across the whole conversation rather than a single turn, and asks whether the customer got what they came for.
 
 ### Custom judges written for this bank
 

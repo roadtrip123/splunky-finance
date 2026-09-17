@@ -19,9 +19,10 @@ Then confirm in the tenant console that every metric is enabled on the log strea
 | **Completeness** (`completeness`) | LLM span | Paired with Context Adherence on a policy question: the same answer scores high adherence and low completeness. |
 | **Tool Selection Quality** (`tool_selection_quality`) | LLM span | Gives the genuine tool-backed turn an actual score instead of only showing spans. |
 | **Tool Error Rate** (`tool_error_rate`) | Tool span | Detects tool execution failures; near-free once tool spans are clean. |
-| **Action Completion** (`action_completion_luna`) | Session | Whether the agent accomplished the user's goal. Sessions are already keyed by conversation. |
 
-Metric names are resolved against the tenant and the available set differs between tenants. This one exposes Action Completion only as the small-language-model `_luna` variant, and Tool Error as `tool_error_rate`. The setup script checks every name against the tenant's scorer list before enabling, and names the missing ones rather than failing with a raw traceback. The tenant also contains many hand-made metrics from other users with similar titles (`Completeness - Craig`, `Context Adherence - gaxie`); enable the `preset` ones listed above, not those copies.\n\nThese read the spans the application logs: policy lookup emits a **retriever span** carrying the retrieved chunks, and the delivered candidate is logged as an LLM span named **`customer-visible-answer`**. Without those spans the RAG evaluators have no input.
+Metric names are resolved against the tenant and the available set differs between tenants. This one exposes Tool Error as `tool_error_rate`. The setup script checks every name against the tenant's scorer list before enabling, and names the missing ones rather than failing with a raw traceback. The tenant also contains many hand-made metrics from other users with similar titles (`Completeness - Craig`, `Context Adherence - gaxie`); enable the `preset` ones listed above, not those copies.
+
+These read the spans the application logs: policy lookup emits a **retriever span** carrying the retrieved chunks, and the delivered candidate is logged as an LLM span named **`customer-visible-answer`**. Without those spans the RAG evaluators have no input.
 
 ## Custom judges
 
@@ -67,6 +68,7 @@ The span that scores most reliably is the agent's answer-composing call. The Lan
 | **A judge for invented fees** | Not needed. Context Adherence catches an invented fee stated alongside correct figures, because the agent's model calls carry their tool results as context. Verified against a live trace. |
 | **Chunk Relevance, Context Precision, Precision @ K** | Policy search is keyword overlap and returns some irrelevant chunks. These would score honestly but poorly. Enable them only to demonstrate retrieval-quality problems deliberately. |
 | **Ground Truth Adherence** | Viable once `expected_results` is wired in as ground truth. Not configured. |
+| **Action Completion** | Enabled for a time and removed. It produced no value on any trace or session across every run. This tenant offers it only as the Luna small-model variant, and the SDK exposes no way to close a session for a session-scoped metric to score. Reassigning the judge model changed nothing, which fits: that setting governs LLM judges, not Luna. |
 | **Text-to-SQL, Multimodal** | No SQL generation and no image or audio input. |
 
 ## Scenario to metric map

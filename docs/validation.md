@@ -94,3 +94,7 @@ With three voters most verdicts became unanimous, which exposed that the judges 
 Unanimous and correct before this change: normal spending, all three judges true; incomplete answer, only SplunkyRequestCoverage false. The answer span discriminated correctly on every run, scoring `[1,1,1]` on the correct answer and `[0,0,0]` on all three faults, and `controlled-fault-writer` appeared by name on each faulty turn.
 
 Completeness roll-ups do not rank answers: the incomplete answer rolled up to 92% against 78% for the correct one. `action_completion_luna` remains absent from every trace.
+
+## Action Completion removed
+
+Action Completion produced no value on any trace or session across every run, showing only "Queued". Session-level metrics were checked directly: sessions carry completeness and tool-error roll-ups only. This tenant offers the metric solely as the Luna small-model variant, and reassigning the judge model changed nothing, which is consistent with that setting governing LLM judges rather than Luna scorers. The SDK also exposes start_session, set_session and clear_session but no way to close a session, so a session-scoped metric may never see a completed session. Removed from the enabled set and from both documents rather than left advertising behaviour never observed. Seven metrics remain.
