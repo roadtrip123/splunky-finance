@@ -12,6 +12,7 @@ const descriptions: Record<string, [string, string]> = {
   incomplete_answer: ["Incomplete Answer", "Deliberately omits important details from the answer to your question."],
   hallucinated_policy: ["Hallucinated Policy", "Invents a bank policy related to your question."],
   incorrect_total: ["Incorrect Total", "Introduces a wrong amount or numerical claim related to your question."],
+  wrong_customer: ["Wrong Customer", "Answers as if you were a different customer, citing an account you do not own."],
   guardrail_before_after: ["Protection Before / After", "Compare the same invented policy answer with checking off and on. Repeat the same question to replay it."],
 };
 const label = (key: string) => descriptions[key]?.[0] || key;

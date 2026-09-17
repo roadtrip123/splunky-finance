@@ -4,37 +4,62 @@ import json
 from langchain_core.messages import HumanMessage, SystemMessage
 
 POLICY_PROMPT = "What is the daily external transfer limit on my Everyday account?"
+SPENDING_PROMPT = "How much did I spend on restaurants last month?"
+# Deliberately contradicts the seeded dataset on four axes: customer name, account, total, and
+# merchants. Multiple independent contradictions give the evaluators more than one thing to catch.
+WRONG_ENTITY = {"first_name": "Dan", "full_name": "Dan Whitfield", "masked_number": "\u2022\u2022\u2022\u2022 4127"}
+WRONG_CUSTOMER_ANSWER = (
+    "Hi {first_name} \u2014 your Everyday account ({masked_number}) spent $3,182.40 on restaurants "
+    "last month across 14 purchases. Your largest were Bunnings Warehouse $412.10, Qantas $1,240.00, "
+    "and Harvey Norman $689.90. Let me know if you'd like the full statement for {full_name}."
+).format(**WRONG_ENTITY)
 SCENARIOS = {
     "normal_spending": {
         "version": 2,
-        "prompt": "How much did I spend on restaurants last month?",
+        "prompt": SPENDING_PROMPT,
         "evaluation": None,
         "protection_applicable": False,
     },
     "incomplete_answer": {
         "version": 2,
         "prompt": "How much did I spend on restaurants last month, what were my three biggest transactions, and how does that compare with the previous month?",
-        "evaluation": "SplunkyCompleteness",
+        "evaluation": "SplunkyRequestCoverage",
         "protection_applicable": False,
     },
     "hallucinated_policy": {
         "version": 2,
         "prompt": POLICY_PROMPT,
-        "evaluation": "SplunkyGroundedness",
+        "evaluation": "Context Adherence",
         "protection_applicable": True,
     },
     "incorrect_total": {
         "version": 2,
-        "prompt": "How much did I spend on restaurants last month?",
+        "prompt": SPENDING_PROMPT,
         "evaluation": "SplunkyNumericalCorrectness",
         "protection_applicable": False,
+    },
+    "wrong_customer": {
+        "version": 1,
+        "prompt": SPENDING_PROMPT,
+        "evaluation": "SplunkyEntityIntegrity",
+        "protection_applicable": True,
     },
     "guardrail_before_after": {
         "version": 2,
         "prompt": POLICY_PROMPT,
-        "evaluation": "SplunkyGroundedness",
+        "evaluation": "Context Adherence",
         "protection_applicable": True,
     },
+}
+
+
+# The evidence panel reports how a candidate was produced; wrong_customer is not a model rewrite.
+FAULT_METHODS = {
+    "incomplete_answer": "model_rewrite",
+    "hallucinated_policy": "model_rewrite",
+    "incorrect_total": "model_rewrite",
+    "guardrail_before_after": "model_rewrite",
+    "wrong_customer": "fixed_template",
 }
 
 
@@ -64,6 +89,10 @@ FAULT_INSTRUCTIONS = {
 
 async def inject(scenario, question, raw, evidence, model, timeout, config):
     """Explicit bounded fault-writing pass over this turn, with no tools or data mutation."""
+    if scenario == "wrong_customer":
+        # Fixed text rather than a model rewrite: a model asked to impersonate a cross-customer
+        # exposure may refuse, and the bound output control needs a string known before the demo.
+        return WRONG_CUSTOMER_ANSWER, None
     instruction = FAULT_INSTRUCTIONS[
         "hallucinated_policy" if scenario == "guardrail_before_after" else scenario
     ]

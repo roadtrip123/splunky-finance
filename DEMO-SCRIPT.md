@@ -128,7 +128,36 @@ The integrated presenter **Demo chat** is still available for rehearsal. **Run e
 
 **What this shows:** a numerically plausible answer still fails when it disagrees with deterministic integer-cent calculations.
 
-## Part 7 — protection before and after
+## Part 7 — wrong customer
+
+This is the scenario that makes the cost of no evaluation layer obvious.
+
+1. Click **Enable Wrong Customer**.
+2. Send the restaurant-spending question in the connected banking chat.
+3. The customer receives an answer addressed to a different person, citing an account they do not own:
+
+   > Hi Dan — your Everyday account (•••• 4127) spent $3,182.40 on restaurants last month across 14 purchases...
+
+4. In **Latest chat evidence**, show that the seeded dataset contradicts it on four independent axes:
+
+   | Candidate claims | Dataset holds |
+   | --- | --- |
+   | Dan Whitfield | Alex Taylor (`syn-alex`) |
+   | •••• 4127 | •••• 1042 |
+   | $3,182.40 across 14 purchases | $754.19 across 8 |
+   | Bunnings, Qantas, Harvey Norman | Jacaranda Cafe, Riverbend Bistro, Guzman y Gomez |
+
+5. Say this once, with the evidence panel open:
+
+   > The banking tools cannot return another customer's data. Customer scope is captured server-side in the tool closure and is never accepted as a model argument. This identity was injected after the model call.
+
+6. `SplunkyEntityIntegrity` and Context Adherence should both reject the candidate.
+
+Unlike the other scenarios, this candidate is a **fixed template**, not a model rewrite — the evidence panel reports `fault_method: fixed_template`. Two reasons: a live model asked to impersonate a cross-customer exposure may refuse, and the bound regex control needs a string known before the demo.
+
+**What this shows:** a fluent, confident, well-formatted answer can be wrong about *who the customer is*. No amount of output polish catches that; comparing the answer against authoritative evidence does.
+
+## Part 8 — protection before and after
 
 This is the key protection demonstration.
 
@@ -136,7 +165,7 @@ This is the key protection demonstration.
 
 1. Click **Enable Protection Before / After**.
 2. Leave **Check and block unsafe answers** unchecked.
-3. Send the displayed transfer-limit question in the connected banking chat.
+3. Send the displayed question in the connected banking chat. **Wrong Customer** is the stronger close here; the transfer-limit scenario works as a warm-up.
 4. Show that the customer receives the controlled unlimited/no-verification candidate.
 5. In evidence, note its candidate hash and event/run ID.
 
@@ -188,6 +217,7 @@ Use these exact distinctions:
 - **Verified allow/deny** — Agent Control returned a real evaluation containing evaluated controls.
 - **Unavailable/fallback** — protection was enabled but no verified control decision was available.
 - **Simulation/injection** — the presenter workflow deliberately altered a candidate after the genuine model call.
+- **Fixed template** — the candidate is constant text, not a model rewrite. Only Wrong Customer uses this.
 
 ## Troubleshooting during the demo
 

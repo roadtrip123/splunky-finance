@@ -95,3 +95,50 @@ def test_before_after_new_question_starts_new_candidate(client):
         assert result.status_code == 200
         assert not client.app.state.chat.events[-1]["replayed"]
     assert "fee" in result.json()["answer"]
+
+
+def test_wrong_customer_uses_a_fixed_candidate_and_contradicts_the_dataset(client):
+    """The injected identity must be deterministic: the bound regex control is pinned to it, and a
+    live model asked to impersonate a cross-customer exposure may refuse."""
+    from app.demo.scenarios import WRONG_CUSTOMER_ANSWER
+
+    candidate, usage = asyncio.run(
+        inject("wrong_customer", "How much did I spend on restaurants last month?", "raw", {}, None, 1, {})
+    )
+    assert candidate == WRONG_CUSTOMER_ANSWER
+    assert usage is None
+    # No model call is made, so the text is identical on every run.
+    again, _ = asyncio.run(inject("wrong_customer", "anything else", "other raw", {}, None, 1, {}))
+    assert again == candidate
+
+    headers = login(client, True)
+    run = client.post("/api/demo-admin/workspace", headers=headers).json()
+    run = client.put(
+        "/api/demo-admin/workspace",
+        headers=headers,
+        json={
+            "run_id": run["id"],
+            "expected_revision": run["revision"],
+            "scenario": "wrong_customer",
+            "protection": False,
+        },
+    ).json()
+    response = client.post(
+        "/api/demo-admin/chat",
+        headers=headers,
+        json={
+            "run_id": run["id"],
+            "expected_revision": run["revision"],
+            "message": "How much did I spend on restaurants last month?",
+        },
+    )
+    assert response.status_code == 200, response.text
+    event = client.app.state.chat.events[-1]
+    assert event["scenario"] == "wrong_customer"
+    assert event["candidate_output"] == WRONG_CUSTOMER_ANSWER
+    # Not a model rewrite, and the evidence panel must not claim it was.
+    assert event["fault_method"] == "fixed_template"
+    # Evidence the evaluators read must still describe the real customer, on every axis.
+    assert event["evidence"]["customer"]["name"] == "Alex Taylor"
+    assert "Dan Whitfield" not in str(event["evidence"])
+    assert "4127" not in str(event["evidence"])

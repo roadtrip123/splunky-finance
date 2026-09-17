@@ -89,7 +89,7 @@ PYTHONPATH=. .venv/bin/python ../scripts/configure_galileo.py
 PYTHONPATH=. .venv/bin/python ../scripts/configure_galileo.py --apply
 ```
 
-The default invocation validates the control schema without remote changes. Apply creates/enables trace-level custom boolean judges and requests a bound server regex control for the seeded unlimited-transfer claim. Verify binding and 100% metric sampling in the tenant console. The regex demonstrates rejection of a controlled contradiction; it is not a general semantic policy validator. Custom judges inspect the candidate and deterministic evidence. Tenant permissions and model entitlements may differ, so remote setup is not claimed as tested.
+The default invocation validates the control schemas without remote changes. Apply creates/enables the custom boolean judges, enables the built-in evaluators, and requests two bound server regex controls. [docs/evaluators.md](docs/evaluators.md) lists every metric, why it is enabled, and which ones are deliberately left off. Verify binding and 100% metric sampling in the tenant console. The regex demonstrates rejection of a controlled contradiction; it is not a general semantic policy validator. Custom judges inspect the candidate and deterministic evidence. Tenant permissions and model entitlements may differ, so remote setup is not claimed as tested.
 
 Presenter evidence shows real IDs, raw model output, injected candidate, delivered answer, candidate hash, control decisions, usage when supplied, and export status. Scores remain unavailable until retrieved from Galileo. Use “Fetch actual Galileo scores” after asynchronous evaluation completes. No fabricated scores, costs, trace links, or successful controls are displayed.
 
@@ -107,7 +107,7 @@ npm test
 
 Browser testing starts dedicated offline backend and production frontend processes; ensure ports 8001 and 3000 are free. Test data is stored under ignored `runtime/browser-tests`.
 
-See [DEMO-SCRIPT.md](DEMO-SCRIPT.md) for presentation steps and [docs/architecture.md](docs/architecture.md) for data and security contracts. This private repository has no license grant pending the owner's license choice.
+See [DEMO-SCRIPT.md](DEMO-SCRIPT.md) for presentation steps, [docs/evaluators.md](docs/evaluators.md) for which Galileo metrics to enable and why, and [docs/architecture.md](docs/architecture.md) for data and security contracts. This private repository has no license grant pending the owner's license choice.
 
 ## Private LAN deployment
 

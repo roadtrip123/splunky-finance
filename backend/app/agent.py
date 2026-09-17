@@ -11,7 +11,7 @@ from langchain.agents.middleware import ModelCallLimitMiddleware, ToolCallLimitM
 from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
 
 from app.demo.expected_results import previous_months
-from app.demo.scenarios import inject
+from app.demo.scenarios import FAULT_METHODS, inject
 from app.llm import model_factory
 from app.tools import build_tools
 
@@ -108,7 +108,12 @@ class ChatService:
                 "presenter_run_id": run["id"] if run else "",
                 "injection": scenario != "normal_spending",
             }
-            evidence = {}
+            # Server-side identity, seeded rather than model-retrieved, so entity evaluation always
+            # has something authoritative to compare against even when no profile tool is called.
+            evidence = {
+                "customer": dataset.customer,
+                "accounts": [a.model_dump(mode="json") for a in dataset.accounts],
+            }
             observed_tools = []
             usage = None
             started = time.monotonic()
@@ -241,7 +246,7 @@ class ChatService:
                 citations = list({doc["citation"]: doc for doc in evidence.get("policies", [])}.values())
                 record = {
                     **metadata,
-                    "fault_method": "model_rewrite" if scenario != "normal_spending" else None,
+                    "fault_method": FAULT_METHODS.get(scenario),
                     "raw_model_output": raw,
                     "candidate_output": candidate,
                     "final_output": final,

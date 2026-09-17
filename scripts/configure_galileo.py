@@ -6,34 +6,57 @@ import asyncio
 from app.config import Settings
 from app.observability.galileo import Telemetry
 
-CONTROL = {
-    "condition": {
-        "selector": {"path": "output"},
-        "evaluator": {
-            "name": "regex",
-            "config": {"pattern": "(?i)unlimited daily external transfer limit"},
+def _deny_control(pattern):
+    """Server-side regex deny on the delivered candidate.
+
+    Scoped to the `customer-visible-answer` LLM span, which the application logs for exactly this
+    purpose. A regex rejects a controlled contradiction known before the demo; it is not a general
+    semantic validator.
+    """
+    return {
+        "condition": {
+            "selector": {"path": "output"},
+            "evaluator": {"name": "regex", "config": {"pattern": pattern}},
         },
-    },
-    "execution": "server",
-    "scope": {
-        "step_types": ["llm"],
-        "step_names": ["customer-visible-answer"],
-        "stages": ["post"],
-    },
-    "action": {"decision": "deny"},
-    "enabled": True,
+        "execution": "server",
+        "scope": {
+            "step_types": ["llm"],
+            "step_names": ["customer-visible-answer"],
+            "stages": ["post"],
+        },
+        "action": {"decision": "deny"},
+        "enabled": True,
+    }
+
+
+CONTROLS = {
+    "splunky-seeded-policy-deny": _deny_control("(?i)unlimited daily external transfer limit"),
+    # Anchored on ASCII so the pattern does not depend on the masked-number bullet characters.
+    "splunky-wrong-customer-deny": _deny_control("(?i)(dan whitfield|4127)"),
 }
+# Custom judges earn their place only where no built-in can know the rule. SplunkyGroundedness was
+# retired because built-in Context Adherence scores the same thing against the retriever span.
 JUDGES = {
-    "SplunkyCompleteness": "Return true only if candidate_output answers every requested part of the input. For restaurant detail requests require total, transaction count, three biggest transactions, and prior-month comparison. Evaluate the candidate, not final_output.",
-    "SplunkyGroundedness": "Return true only if every banking policy assertion in candidate_output is supported by evidence.policies. The seeded external transfer limit is AUD 5000 daily and verification is required; an unlimited/no-verification claim is false. Evaluate the candidate, not final_output.",
+    "SplunkyRequestCoverage": "Return true only if candidate_output answers every part the input actually asked for. Derive the required parts from the input itself rather than assuming a fixed list. Evaluate the candidate, not final_output.",
     "SplunkyNumericalCorrectness": "Return true only if all candidate_output money totals and counts agree with evidence.calculations, which uses integer AUD cents. A dollar is 100 cents. Evaluate the candidate, not final_output.",
+    "SplunkyEntityIntegrity": "Return true only if every customer name, first name, and masked account number in candidate_output matches evidence.customer and evidence.accounts. Return false if the candidate addresses a different person, or cites an account not owned by the authenticated customer. Evaluate the candidate, not final_output.",
 }
+# Galileo's own evaluators. Context Adherence and Completeness read the retriever span the policy
+# retriever emits; Tool Selection Quality and Tool Error score the agent's tool use.
+BUILTIN_METRICS = [
+    "context_adherence",
+    "completeness",
+    "tool_selection_quality",
+    "tool_error",
+    "action_completion",
+]
 
 
 async def main():
     from agent_control_models import ControlDefinition
 
-    ControlDefinition.model_validate(CONTROL)
+    for definition in CONTROLS.values():
+        ControlDefinition.model_validate(definition)
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--apply",
@@ -76,7 +99,7 @@ async def main():
     enable_metrics(
         project_name=s.galileo_project,
         log_stream_name=s.galileo_log_stream,
-        metrics=list(JUDGES),
+        metrics=list(JUDGES) + BUILTIN_METRICS,
     )
     from agent_control import AgentControlClient
     from agent_control.controls import (
@@ -93,26 +116,23 @@ async def main():
         runtime_auth_mode="jwt",
         runtime_token_header=s.agent_control_runtime_token_header,
     ) as client:
-        existing = await list_controls(
-            client, name="splunky-seeded-policy-deny", limit=10
-        )
-        # Avoid accidental duplicate controls: inspect existing configuration in console first.
-        if existing.get("controls"):
-            print(
-                "Control listing returned existing data; inspect binding in console. No duplicate created."
-            )
-        else:
-            control = await create_control(
-                client, name="splunky-seeded-policy-deny", data=CONTROL
-            )
-            identifier = control["control_id"]
+        for name, definition in CONTROLS.items():
+            existing = await list_controls(client, name=name, limit=10)
+            # Avoid accidental duplicate controls: inspect existing configuration in console first.
+            if existing.get("controls"):
+                print(
+                    f"{name}: listing returned existing data; inspect binding in console. No duplicate created."
+                )
+                continue
+            control = await create_control(client, name=name, data=definition)
             await clone_and_bind_control(
                 client,
-                control_id=identifier,
+                control_id=control["control_id"],
                 target_type="log_stream",
                 target_id=str(logger.log_stream_id),
                 enabled=True,
             )
+            print(f"{name}: created and bind requested.")
     print(
         "Metric setup requested. Verify sampling, metric scores, and control binding in the tenant console."
     )

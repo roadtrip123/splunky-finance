@@ -36,3 +36,11 @@ Backend suite: 22 passed; lint passed. Backend restarted. One live OpenAI accoun
 Policy retrieval is registered as a LangChain retriever and the delivered candidate is logged as a `customer-visible-answer` LLM span. Real-SDK offline ingestion-hook regressions assert that an exported trace contains a retriever span carrying chunks, the named answer span with the candidate as its output, and the previously covered model, tool, and protection descendants. `config` injection keeps the retriever span inside the turn's trace and stays hidden from the model's tool schema.
 
 Backend suite: 43 passed; lint passed. Still unverified against a live tenant: whether built-in RAG evaluators return actual values for these spans, and genuine Agent Control decisions. Enable the evaluators in the tenant and confirm a real score before presenting them.
+
+## Wrong-customer scenario and evaluator set
+
+Added a `wrong_customer` scenario whose candidate is a fixed template rather than a model rewrite, so the injected identity is constant and the bound regex control can be pinned to it before a session. Customer identity and accounts are now seeded into evidence server-side, so entity evaluation has authoritative material to compare against even when the turn calls no profile tool. `fault_method` reports `fixed_template` for this scenario instead of claiming a model rewrite.
+
+Retired `SplunkyGroundedness` in favour of built-in Context Adherence, and renamed `SplunkyCompleteness` to `SplunkyRequestCoverage`. The setup script now registers five built-in evaluators alongside the three custom judges and binds a second regex control.
+
+Backend suite: 44 passed; lint passed; production build passed. Both control schemas validate against the installed SDK. Remote metric creation, built-in evaluator values, and control binding remain unverified against a live tenant.
