@@ -3,7 +3,7 @@
 This walkthrough demonstrates four distinct layers:
 
 1. **Observe** — a real model selects read-only banking tools and Galileo records the model, tool, and workflow spans.
-2. **Evaluate** — Galileo custom metrics assess a deliberately controlled candidate for completeness, policy grounding, or numerical accuracy.
+2. **Evaluate** — Galileo evaluators assess a deliberately controlled candidate. Five are Galileo's own; three are custom judges written for this bank. See [What each evaluator looks for](#what-each-evaluator-looks-for).
 3. **Detect** — the presenter workspace shows the raw model output, controlled candidate, evidence, trace ID, candidate hash, and any actual metric results.
 4. **Protect** — Agent Control evaluates a candidate before delivery. A verified deny or an unavailable control produces a safe customer response when protection is enabled.
 
@@ -42,6 +42,56 @@ With the default seed `42` and reference date `2026-09-15`, “last month” is 
 | Everyday external transfer limit | **AUD $5,000 per day; verification required** |
 
 Use **Inspect expected results** in the presenter workspace to retrieve the active dataset values. If the dataset seed or reference date was changed, that live output is authoritative rather than this table.
+
+## What each evaluator looks for
+
+Eight metrics run on this demo. Five are Galileo's own, enabled out of the box. Three are custom judges written for this bank, because no off-the-shelf evaluator can know its ledger or its customer. Full setup detail is in [docs/evaluators.md](docs/evaluators.md); this section is what to say out loud.
+
+### Galileo's own evaluators
+
+**Context Adherence — "Did the answer stick to the source material?"**
+Checks every claim against the documents the agent actually looked up. It fails when the answer states something the sources do not support: an invented fee, a made-up limit, a rule nobody wrote down. This is the workhorse metric of the demo.
+
+**Completeness — "Did the answer use everything relevant it was given?"**
+The mirror image of Context Adherence. That one asks whether everything said was supported; this asks whether everything supported was said. It fails when the retrieved documents held relevant facts the answer left out. The line worth saying: *every word of this answer is true, and it still only told the customer a third of what they needed.*
+
+**Tool Selection Quality — "Did the agent pick the right tool?"**
+Compares what the customer asked against which banking tool the agent chose. It fails when the agent reaches for the wrong one, such as searching policy documents to answer a spending total.
+
+**Tool Error Rate — "Did the tools actually work?"**
+Watches for tools that errored or failed. This is plumbing health rather than answer quality, and it is the one that tells you a problem is not the model's fault.
+
+**Action Completion — "Did the agent finish the job?"**
+Looks across the whole conversation rather than a single turn, and asks whether the customer got what they came for.
+
+### Custom judges written for this bank
+
+**SplunkyNumericalCorrectness — "Do the numbers match the ledger?"**
+Compares every dollar figure and count against the authoritative calculation, in integer cents. It fails on $854.19 when the ledger says $754.19. *Why this one is custom:* Galileo's built-in Correctness evaluator has no way to know which figure is right, because both are equally plausible English. Only this bank's ledger knows. This is the clearest example of when building your own metric is worth it.
+
+**SplunkyEntityIntegrity — "Is this even the right customer?"**
+Checks every name and account number against the authenticated customer's real identity. It fails when the answer greets the wrong person or cites an account they do not own.
+
+**SplunkyRequestCoverage — "Did the answer address the whole question?"**
+For a question with three parts, checks that all three were answered. Distinct from Completeness: this one is about the *question*, Completeness is about the *source documents*.
+
+### Which metric catches which scenario
+
+| Scenario | Metric that should reject it |
+| --- | --- |
+| Incomplete Answer | `SplunkyRequestCoverage` |
+| Hallucinated Policy | Context Adherence |
+| Incorrect Total | `SplunkyNumericalCorrectness` |
+| Wrong Customer | `SplunkyEntityIntegrity`, and Context Adherence |
+| Protection Before / After | Context Adherence, plus the bound Agent Control decision |
+
+### When a metric cannot help
+
+Context Adherence and Completeness both work by comparing the answer against documents the agent retrieved. **If the agent looked nothing up, they have nothing to compare against and stay silent.**
+
+This matters live, because any question can be asked under any scenario. A policy question routes through the policy retriever and produces documents. A spending question is answered by the calculator and produces none. So an invented fee stated during a spending question is caught by nothing in the current set: it is not a policy claim checked against sources, and it is not a ledger figure checked against the calculation.
+
+Ask each scenario's displayed example question. That is what the metric expects, and it is why each Part specifies its question exactly.
 
 ## Part 1 — ordinary customer banking
 
