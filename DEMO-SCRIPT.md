@@ -85,6 +85,14 @@ For a question with three parts, checks that all three were answered. Distinct f
 | Wrong Customer | `SplunkyEntityIntegrity`, and Context Adherence |
 | Protection Before / After | Context Adherence, plus the bound Agent Control decision |
 
+### Reading the numbers on screen
+
+**Context Adherence shows a mix even on a correct answer**, such as `false 2 / true 1`. Galileo scores every model call in the trace, and a normal turn has three: one to choose the tool, one to write the answer, and the answer as delivered. The tool-choosing call has no prose in it to check. Read the score on the `customer-visible-answer` span rather than the aggregate, and say so before anyone asks.
+
+**Completeness is a percentage, not a pass or fail.** Expect roughly 44% on a good answer and 25% on a deliberately incomplete one. The movement is the point, not the number: quote the gap, never the figure alone.
+
+**Exactly one custom judge should go red per scenario.** An answer with its total removed is an incomplete answer, not a wrong total and not a wrong customer, so the other two judges stay green. If several go red at once, the judges are misreading absence as contradiction and need `--apply --refresh-judges`.
+
 ### When a metric cannot help
 
 Context Adherence and Completeness both work by comparing the answer against documents the agent retrieved. **If the agent looked nothing up, they have nothing to compare against and stay silent.**

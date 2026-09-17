@@ -37,10 +37,31 @@ CONTROLS = {
 }
 # Custom judges earn their place only where no built-in can know the rule. SplunkyGroundedness was
 # retired because built-in Context Adherence scores the same thing against the retriever span.
+# Each judge fails only on a contradiction it can point to. A judge that also failed when its
+# subject was simply absent went red on every fault, whichever fault it was, and the
+# one-metric-per-scenario story collapsed: an answer with its total removed was reported as having
+# a wrong total and a wrong customer.
 JUDGES = {
-    "SplunkyRequestCoverage": "Return true only if candidate_output answers every part the input actually asked for. Derive the required parts from the input itself rather than assuming a fixed list. Evaluate the candidate, not final_output.",
-    "SplunkyNumericalCorrectness": "Return true only if all candidate_output money totals and counts agree with evidence.calculations, which uses integer AUD cents. A dollar is 100 cents. Evaluate the candidate, not final_output.",
-    "SplunkyEntityIntegrity": "Return true only if every customer name, first name, and masked account number in candidate_output matches evidence.customer and evidence.accounts. Return false if the candidate addresses a different person, or cites an account not owned by the authenticated customer. Evaluate the candidate, not final_output.",
+    "SplunkyRequestCoverage": (
+        "Decide whether candidate_output answers every part the input asked for. Derive the "
+        "required parts from the input itself; do not assume a fixed list. Return false only when "
+        "a part of the question is left unanswered. Evaluate candidate_output, not final_output."
+    ),
+    "SplunkyNumericalCorrectness": (
+        "Decide whether the money amounts and counts stated in candidate_output agree with "
+        "evidence.calculations, which holds integer AUD cents; a dollar is 100 cents. Return false "
+        "only when a stated figure disagrees with that evidence. If candidate_output states no "
+        "money amount and no count, return true: there is nothing to contradict, and an answer "
+        "that omits a figure is a different fault measured by another metric. Evaluate "
+        "candidate_output, not final_output."
+    ),
+    "SplunkyEntityIntegrity": (
+        "Decide whether every customer name, first name, and masked account number in "
+        "candidate_output matches evidence.customer and evidence.accounts. Return false only when "
+        "the candidate names a different person, or cites an account the authenticated customer "
+        "does not own. If candidate_output names no person and cites no account number, return "
+        "true: identity was not misstated. Evaluate candidate_output, not final_output."
+    ),
 }
 # Galileo's own evaluators. Context Adherence and Completeness read the retriever span the policy
 # retriever emits; the tool metrics score the agent's tool use. These names are resolved against the
@@ -66,6 +87,12 @@ async def main():
         action="store_true",
         help="Create remote custom judges and a bound control",
     )
+    parser.add_argument(
+        "--refresh-judges",
+        action="store_true",
+        help="Delete and recreate the custom judges so edited prompts take effect. "
+        "Existing judges are otherwise left alone, and their historical scores are lost.",
+    )
     args = parser.parse_args()
     if not args.apply:
         print(
@@ -89,11 +116,18 @@ async def main():
 
     logger = GalileoLogger(project=s.galileo_project, log_stream=s.galileo_log_stream)
     for name, instructions in JUDGES.items():
+        if args.refresh_judges and Scorers().list(name=name):
+            from galileo.metrics import delete_metric
+
+            delete_metric(name=name)
+            print(f"{name}: deleted for refresh")
         if not Scorers().list(name=name):
+            print(f"{name}: created")
             create_custom_llm_metric(
                 name=name,
                 user_prompt=instructions
-                + " The trace output is JSON containing candidate_output and evidence. Return false when required evidence is absent.",
+                + " The trace output is JSON containing candidate_output and evidence. Judge only"
+                " what candidate_output actually claims: the absence of a claim is not a failure.",
                 node_level=StepType.trace,
                 output_type=OutputTypeEnum.BOOLEAN,
                 model_name="gpt-4.1-mini",

@@ -38,6 +38,14 @@ Custom judges are worth their cost only where no built-in can know the rule. Eac
 - **SplunkyGroundedness** — built-in Context Adherence scores the same thing against the retriever span, and Galileo maintains it.
 - **SplunkyCompleteness** — renamed to `SplunkyRequestCoverage`. It measured question-part coverage, not recall over retrieved context, and sharing a name with the built-in Completeness evaluator made both hard to explain. Its instructions also hardcoded the restaurant question, so it returned false for the wrong reason on anything else.
 
+## Reading the scores
+
+**A judge fails only on a contradiction it can point to.** An answer with its total removed is not a wrong total and not a wrong customer; it is an incomplete answer. Each judge returns true when its subject is simply absent, so exactly one metric goes red per scenario. If you edit a judge prompt, the change only reaches the tenant with `--apply --refresh-judges`, which deletes and recreates it and loses that judge's historical scores.
+
+**Built-in span-level metrics score every LLM span in the trace.** A normal turn has three: one model call to choose the tool, one to compose the answer, and the logged `customer-visible-answer` span. So Context Adherence reports a mix such as `false 2 / true 1` even on a correct answer, because the tool-choosing call has no prose output and a spending question retrieves no documents to adhere to. Read the score on the `customer-visible-answer` span, not the aggregate.
+
+**Completeness returns a percentage, not a verdict.** Use the direction, not the absolute value: a correct answer and a deliberately incomplete one scored 44% and 25% on the same question. The gap is the demonstration; neither number means much alone.
+
 ## Deliberately not enabled
 
 | Evaluator | Reason |

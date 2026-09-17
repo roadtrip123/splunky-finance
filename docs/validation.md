@@ -50,3 +50,7 @@ Backend suite: 44 passed; lint passed; production build passed. Both control sch
 Presenter logout deletes the run but cannot clear the customer session's copy of its id. The stale id then failed the `not customer.run_id` guard in auto-relink and tripped the 409 in `attach`, so a banking session could neither relink on the next presenter login nor recover by pairing, and every subsequent chat was attributed to a run the portal could no longer display. Bindings to a run that no longer exists are now dropped before relinking and before pairing. Two regression tests cover relink and pairing recovery; both fail with the fix disabled.
 
 Backend suite: 46 passed; lint passed.
+
+## Judge prompt correction
+
+Live scores showed all three custom judges returning false on the incomplete-answer scenario: an answer with its total removed was reported as having a wrong total and a wrong customer. The judges were instructed to return false when required evidence was absent, so each failed whenever its subject was missing rather than contradicted, and the one-metric-per-scenario story did not hold. Each judge now fails only on a contradiction it can point to and returns true when its subject is absent. Added `--refresh-judges`, which deletes and recreates judges so an edited prompt reaches the tenant; without it existing judges are skipped. Applied to the tenant and all eight metrics confirmed still enabled.
