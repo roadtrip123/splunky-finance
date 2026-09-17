@@ -21,7 +21,7 @@ The presenter portal controls a connected banking chat. Both browsers communicat
    - **Dataset** should show the intended seed, reference date, version, and transaction count.
 4. Select **Check Galileo connection** if the connection state is unclear. This verifies the configured Galileo target but does not make a model call or prove a trace was exported.
 5. Optionally select **Run paid preflight**. This explicitly calls the selected model and asks it to invoke `get_accounts`. A successful result must list an observed tool call; it tests provider access, the agent loop, the banking tool, and trace export. It does not test every scenario, metric, or Agent Control.
-6. If custom metrics and Agent Control are part of the presentation, verify them in the Galileo tenant before the session. Run `scripts/configure_galileo.py` without `--apply` only to validate the local control schema. Remote creation requires an explicit reviewed `--apply` operation.
+6. If metrics and Agent Control are part of the presentation, verify them in the Galileo tenant before the session. [docs/evaluators.md](docs/evaluators.md) lists every metric, why it is enabled, and which are deliberately left off. Run `scripts/configure_galileo.py` without `--apply` only to validate the local control schema. Remote creation requires an explicit reviewed `--apply` operation.
 
 Do not describe `connected` as `exported`, an exported trace as `scored`, or an enabled protection switch as a verified control decision.
 
@@ -90,20 +90,20 @@ The integrated presenter **Demo chat** is still available for rehearsal. **Run e
 
 **Check and block unsafe answers** is available for policy scenarios. Rejection or a check that cannot complete produces a fallback. Read the actual decision in the portal; a checked switch does not prove remote control execution.
 
-## Part 4 — completeness evaluation
+## Part 4 — request coverage evaluation
 
 1. Click **Enable Incomplete Answer**.
 2. Check that **Scenario: Incomplete Answer** is active.
 3. Send the displayed example question in the connected banking chat. For rehearsal only, **Run example question** sends it in the portal.
-4. The live model still runs first. The controlled workflow then replaces the candidate with only the restaurant total, deliberately omitting the transaction count, three largest purchases, and previous-month comparison.
+4. The live model still runs first. A second bounded model pass then rewrites the answer to drop parts of it. Which parts are dropped is not fixed, so read the candidate before describing it; the reliable claim is that the answer no longer covers everything the question asked.
 5. In **Latest chat evidence**, expand the event and compare:
    - **Raw model output** — what the live model produced.
    - **Candidate output** — the deliberately incomplete sentence.
    - **Customer-visible answer** — the candidate delivered while protection is off.
    - **Evidence** and trace identifiers — the reference material available to evaluation.
-6. After asynchronous evaluation completes, select **Fetch actual Galileo scores**. A configured `SplunkyCompleteness` metric should reject the incomplete candidate. `pending_or_unconfigured` is not a failed score and must not be presented as one.
+6. After asynchronous evaluation completes, select **Fetch actual Galileo scores**. The `SplunkyRequestCoverage` judge should reject the candidate. `pending_or_unconfigured` is not a failed score and must not be presented as one.
 
-**What this shows:** evaluation can measure whether an answer covers every requested component. The fault is explicitly injected and is never misrepresented as an organic model failure.
+**What this shows:** evaluation can measure whether an answer covers every requested component. This is question-part coverage, not the built-in Completeness evaluator, which measures recall over retrieved context and is exercised in Part 5. The fault is explicitly injected and is never misrepresented as an organic model failure.
 
 ## Part 5 — policy grounding evaluation
 
@@ -114,7 +114,7 @@ The integrated presenter **Demo chat** is still available for rehearsal. **Run e
 
 3. The controlled candidate says the limit is unlimited and requires no verification.
 4. Compare that candidate with the retrieved policy evidence: the seeded policy says AUD $5,000 daily and verification is required.
-5. Fetch actual Galileo scores when available. A configured `SplunkyGroundedness` metric should reject the unsupported claim.
+5. Fetch actual Galileo scores when available. Built-in **Context Adherence** should reject the unsupported claim: it scores the answer against the chunks the policy retriever returned. The `SplunkyGroundedness` judge this scenario used previously was retired because the built-in measures the same thing.
 
 **What this shows:** fluent policy language is insufficient; customer-facing policy claims must agree with retrieved authoritative material.
 
@@ -122,7 +122,7 @@ The integrated presenter **Demo chat** is still available for rehearsal. **Run e
 
 1. Click **Enable Incorrect Total**.
 2. Send the displayed restaurant-spending question in the connected banking chat; model context resets automatically.
-3. The controlled candidate adds exactly AUD $100.00 to the authoritative total. With the default dataset it reports **$854.19** rather than **$754.19**.
+3. A bounded model pass alters a number in the answer. The altered figure is not fixed, so read the candidate rather than announcing an expected amount; the authoritative total is **$754.19**.
 4. Compare candidate output with **Inspect expected results** and the calculation evidence.
 5. Fetch actual Galileo scores. A configured `SplunkyNumericalCorrectness` metric should reject the altered amount.
 
@@ -191,6 +191,7 @@ If Agent Control is missing, unreachable, or returns no evaluated controls, the 
 | --- | --- |
 | Raw model output | Genuine selected-provider output before controlled injection |
 | Candidate output | Text presented to evaluation/protection; may be deliberately injected |
+| Fault method | `model_rewrite` for a second model pass, `fixed_template` for constant injected text, empty when no fault is active |
 | Customer-visible answer | Delivered candidate or safe fallback after the gate |
 | Candidate hash | SHA-256 identity used to prove same-candidate replay |
 | Trace ID | Actual Galileo trace identifier, or unavailable |
@@ -227,7 +228,8 @@ Use these exact distinctions:
 | Agent temporarily unavailable | Check provider credit/quota, model access, and backend status |
 | Galileo connected but export not attempted | Send a chat turn; connection checks do not create traces |
 | Session visible but no child spans | Use a new turn on the current build; historical empty sessions cannot be reconstructed |
-| Scores pending/unconfigured | Confirm custom metrics are created/enabled, wait for asynchronous evaluation, then fetch actual scores |
+| Scores pending/unconfigured | Confirm metrics are enabled at 100% sampling, wait for asynchronous evaluation, then fetch actual scores |
+| Only `Splunky*` scores appear | The three custom judges are trace-level; the five built-in evaluators are span-level. Read built-in values in the Galileo console until the portal reads span metrics |
 | Protection unverified | Configure/bind Agent Control and run a protected turn; the switch alone is not verification |
 | Exact prompt rejected | Use **Run example question** for the active scenario |
 | Replay rejected | Do not change prompt, scenario, or dataset between before/after turns |
