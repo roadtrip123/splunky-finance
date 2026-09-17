@@ -15,13 +15,13 @@ Then confirm in the tenant console that every metric is enabled on the log strea
 
 | Evaluator | Level | Why it is here |
 | --- | --- | --- |
-| **Context Adherence** | LLM span | Primary metric. Fails the wrong-customer answer and the invented policy. Replaces the retired `SplunkyGroundedness` judge. |
-| **Completeness** | LLM span | Paired with Context Adherence on a policy question: the same answer scores high adherence and low completeness. |
-| **Tool Selection Quality** | LLM span | Gives the genuine tool-backed turn an actual score instead of only showing spans. |
-| **Tool Error** | Tool span | Detects tool execution failures; near-free once tool spans are clean. |
-| **Action Completion** | Session | Whether the agent accomplished the user's goal. Sessions are already keyed by conversation. |
+| **Context Adherence** (`context_adherence`) | LLM span | Primary metric. Fails the wrong-customer answer and the invented policy. Replaces the retired `SplunkyGroundedness` judge. |
+| **Completeness** (`completeness`) | LLM span | Paired with Context Adherence on a policy question: the same answer scores high adherence and low completeness. |
+| **Tool Selection Quality** (`tool_selection_quality`) | LLM span | Gives the genuine tool-backed turn an actual score instead of only showing spans. |
+| **Tool Error Rate** (`tool_error_rate`) | Tool span | Detects tool execution failures; near-free once tool spans are clean. |
+| **Action Completion** (`action_completion_luna`) | Session | Whether the agent accomplished the user's goal. Sessions are already keyed by conversation. |
 
-These read the spans the application logs: policy lookup emits a **retriever span** carrying the retrieved chunks, and the delivered candidate is logged as an LLM span named **`customer-visible-answer`**. Without those spans the RAG evaluators have no input.
+Metric names are resolved against the tenant and the available set differs between tenants. This one exposes Action Completion only as the small-language-model `_luna` variant, and Tool Error as `tool_error_rate`. The setup script checks every name against the tenant's scorer list before enabling, and names the missing ones rather than failing with a raw traceback. The tenant also contains many hand-made metrics from other users with similar titles (`Completeness - Craig`, `Context Adherence - gaxie`); enable the `preset` ones listed above, not those copies.\n\nThese read the spans the application logs: policy lookup emits a **retriever span** carrying the retrieved chunks, and the delivered candidate is logged as an LLM span named **`customer-visible-answer`**. Without those spans the RAG evaluators have no input.
 
 ## Custom judges
 
