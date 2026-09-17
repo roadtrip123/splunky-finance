@@ -34,6 +34,8 @@ class Telemetry:
             "last_error": None,
         }
         self.pending = {}
+        self.scorers = {}
+        self.scorers_at = 0.0
 
     def set_enabled(self, enabled):
         self.toggle_path.parent.mkdir(parents=True, exist_ok=True)
@@ -180,6 +182,34 @@ class Telemetry:
             logger.conclude()
         except Exception:  # noqa: BLE001 - isolate SDK failures without exposing credential-bearing errors
             self.status["last_error"] = "A telemetry event could not be recorded"
+
+    async def scorer_names(self):
+        """Map scorer id to name.
+
+        Trace metrics are keyed by scorer id, so an unresolved fetch shows the presenter a wall of
+        identifiers. Cached briefly: the set changes only when metrics are reconfigured.
+        """
+        if self.scorers and time.time() - self.scorers_at < 300:
+            return self.scorers
+        if not self.enabled or not self.settings.galileo_api_key.get_secret_value():
+            return self.scorers
+        self.configure_environment()
+
+        def load():
+            from galileo.scorers import Scorers
+
+            return {
+                str(row.id): str(row.name)
+                for row in Scorers().list()
+                if getattr(row, "id", None) and getattr(row, "name", None)
+            }
+
+        try:
+            self.scorers = await asyncio.wait_for(asyncio.to_thread(load), 15)
+            self.scorers_at = time.time()
+        except Exception:  # noqa: BLE001 - isolate SDK failures without exposing credential-bearing errors
+            self.status["last_error"] = "Metric names could not be resolved"
+        return self.scorers
 
     def answer_span(self, turn, prompt, candidate, usage=None):
         """Log the delivered candidate as a named LLM span.

@@ -448,6 +448,7 @@ def create_app(settings=None, model_builder=None, protection_adapter=None):
         current = session(request, "admin", True)
         run = chat.run(current)
         results = []
+        names = await telemetry.scorer_names()
         for record in list(chat.events)[-10:]:
             if run and record.get("presenter_run_id") == run["id"] and record.get("trace_id"):
                 try:
@@ -455,12 +456,31 @@ def create_app(settings=None, model_builder=None, protection_adapter=None):
 
                     traces = Traces(project_id=record["project_id"], log_stream_id=record["log_stream_id"])
                     remote = await asyncio.wait_for(traces.get_trace(record["trace_id"]), 10)
-                    metrics = remote.get("metrics", {})
-                    scores = {k: v for k, v in metrics.items() if k != "duration_ns" and v is not None}
+                    metrics = remote.get("metrics", {}) or {}
+                    info = remote.get("metric_info") or {}
+                    # Metrics are keyed by scorer id, alongside per-metric "<id>_rationale" and
+                    # cost keys. Keep the resolvable ones and carry each judge's reasoning, which
+                    # is what makes a score defensible on screen.
+                    scores = {}
+                    for key, value in metrics.items():
+                        name = names.get(key)
+                        if not name or value is None:
+                            continue
+                        if isinstance(value, list) and len(value) == 1:
+                            value = value[0]
+                        scores[name] = {
+                            "value": value,
+                            "rationale": metrics.get(f"{key}_rationale")
+                            or (info.get(key) or {}).get("explanation"),
+                        }
                     record["evaluation"] = {
                         "state": "received" if scores else "pending_or_unconfigured",
                         "scores": scores or None,
-                        "metric_info": remote.get("metric_info"),
+                        "unresolved_metric_keys": (
+                            None
+                            if names
+                            else "Metric names unavailable; scores are keyed by scorer id"
+                        ),
                     }
                 except Exception:  # noqa: BLE001 - isolate SDK failures without exposing credential-bearing errors
                     record["evaluation"] = {"state": "failed", "scores": None}
