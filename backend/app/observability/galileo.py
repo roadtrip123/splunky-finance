@@ -232,6 +232,34 @@ class Telemetry:
             parts.append("Accounts owned by that customer: " + json.dumps(accounts, default=str))
         return "\n\n".join(parts)[:12000]
 
+    def fault_span(self, turn, scenario, prompt, candidate, evidence=None, usage=None):
+        """Log the controlled fault writer as its own named span.
+
+        Logged through the LangChain callback it arrived as another `ChatOllama`, visually identical
+        to the agent's genuine calls, so the one span holding the fabrication was the hardest in the
+        trace to find. Carries the same evidence as the answer span, so the evaluator judges the
+        fabricated claim against what the tools actually returned.
+        """
+        if not turn:
+            return
+        try:
+            context = self.answer_context(evidence)
+            messages = [{"role": "user", "content": prompt}]
+            if context:
+                messages.insert(0, {"role": "system", "content": "Context for this answer:\n" + context})
+            turn["logger"].add_llm_span(
+                input=messages,
+                output=candidate,
+                model=self.settings.model_name,
+                name="controlled-fault-writer",
+                metadata={"simulation": True, "scenario": scenario},
+                num_input_tokens=(usage or {}).get("input_tokens"),
+                num_output_tokens=(usage or {}).get("output_tokens"),
+                total_tokens=(usage or {}).get("total_tokens"),
+            )
+        except Exception:  # noqa: BLE001 - isolate SDK failures without exposing credential-bearing errors
+            self.status["last_error"] = "A telemetry event could not be recorded"
+
     def answer_span(self, turn, prompt, candidate, evidence=None, usage=None):
         """Log the delivered candidate as a named LLM span.
 

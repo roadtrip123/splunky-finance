@@ -205,8 +205,10 @@ class ChatService:
                             evidence,
                             self.model_builder(self.settings),
                             timeout=min(30, self.settings.llm_timeout_seconds),
+                            # No callbacks: the callback names chat-model spans after the model
+                            # class, which made the fault writer indistinguishable from the agent's
+                            # genuine calls. It is logged explicitly below instead.
                             config={
-                                "callbacks": callbacks,
                                 "metadata": {**metadata, "simulation": True},
                                 "run_name": "controlled-fault-writer",
                             },
@@ -216,6 +218,9 @@ class ChatService:
                                 key: (usage or {}).get(key, 0) + fault_usage.get(key, 0)
                                 for key in ("input_tokens", "output_tokens", "total_tokens")
                             }
+                        self.telemetry.fault_span(
+                            turn, scenario, message, candidate, evidence, fault_usage
+                        )
                         self.telemetry.event(
                             turn,
                             "controlled-fault-injection",

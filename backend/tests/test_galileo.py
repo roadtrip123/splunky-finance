@@ -128,6 +128,77 @@ def test_real_sdk_callback_exports_model_and_tool_under_one_trace(settings, monk
     assert not answer.tools
 
 
+def test_fault_writer_is_a_named_span_not_another_model_call(settings, monkeypatch):
+    """Through the callback this arrived as another ChatOllama/ChatOpenAI, identical to the agent's
+    genuine calls, so the span holding the fabrication was the hardest one in the trace to find."""
+    from uuid import uuid4
+
+    from conftest import FakeModel
+    from fastapi.testclient import TestClient
+    from galileo import GalileoLogger as RealLogger
+
+    from app.main import create_app
+
+    exported = []
+    original_init = RealLogger.__init__
+
+    def initialize(self, **kwargs):
+        original_init(
+            self,
+            project="offline",
+            log_stream="offline",
+            ingestion_hook=lambda request: exported.extend(request.traces),
+        )
+        self.project_id = str(uuid4())
+        self.log_stream_id = str(uuid4())
+
+    monkeypatch.setattr(RealLogger, "__init__", initialize)
+    monkeypatch.setattr(RealLogger, "start_session", lambda self, **kwargs: "offline-session")
+    monkeypatch.setattr("galileo.log_streams.get_log_stream", lambda **kwargs: object())
+    settings.galileo_enabled = True
+    settings.galileo_api_key = settings.openai_api_key
+    with TestClient(create_app(settings, model_builder=lambda s: FakeModel())) as client:
+        headers = login(client, True)
+        run = client.post("/api/demo-admin/workspace", headers=headers).json()
+        run = client.put(
+            "/api/demo-admin/workspace",
+            headers=headers,
+            json={
+                "run_id": run["id"],
+                "expected_revision": run["revision"],
+                "scenario": "incorrect_total",
+                "protection": False,
+            },
+        ).json()
+        response = client.post(
+            "/api/demo-admin/chat",
+            headers=headers,
+            json={
+                "run_id": run["id"],
+                "expected_revision": run["revision"],
+                "message": "How much did I spend on restaurants last month?",
+            },
+        )
+        assert response.status_code == 200, response.text
+        event = client.app.state.chat.events[-1]
+
+    def descendants(node):
+        for child in node.spans:
+            yield child
+            if hasattr(child, "spans"):
+                yield from descendants(child)
+
+    children = list(descendants(exported[0]))
+    writer = next(c for c in children if c.type == "llm" and c.name == "controlled-fault-writer")
+    assert writer.output.content == event["candidate_output"]
+    # It carries the same evidence as the answer span, so the fabrication is judged against
+    # what the tools actually returned rather than reported unsupported.
+    assert "75419" in " ".join(str(m.content) for m in writer.input)
+    # The agent's own calls must not be renamed by this.
+    assert any(c.type == "llm" and c.name not in
+               ("controlled-fault-writer", "customer-visible-answer") for c in children)
+
+
 def test_policy_retrieval_exports_a_retriever_span_with_chunks(settings, monkeypatch):
     """Retrieved chunks must reach Galileo as a retriever span; RAG evaluators score against it."""
     from uuid import uuid4

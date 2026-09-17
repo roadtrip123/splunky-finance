@@ -222,6 +222,8 @@ This is the scenario that makes the cost of no evaluation layer obvious.
 
 6. `SplunkyEntityIntegrity`, `SplunkyNumericalCorrectness`, and Context Adherence should all reject the candidate: the answer misstates who the customer is *and* what they spent. `SplunkyRequestCoverage` stays green, because the question was answered — just for the wrong person.
 
+The fabricated answer appears in the trace as a span named **`controlled-fault-writer`**, tagged `simulation: true`, sitting outside the `Agent` node. Open it beside the agent's own model call to show the genuine answer and the injected one side by side. Wrong Customer has no such span, because no model runs for it.
+
 Unlike the other scenarios, this candidate is a **fixed template**, not a model rewrite — the evidence panel reports `fault_method: fixed_template`. Two reasons: a live model asked to impersonate a cross-customer exposure may refuse, and the bound regex control needs a string known before the demo.
 
 **What this shows:** a fluent, confident, well-formatted answer can be wrong about *who the customer is*. No amount of output polish catches that; comparing the answer against authoritative evidence does.

@@ -70,3 +70,11 @@ Still unexercised: the policy retriever, since every scenario was run against th
 ## Answer span context
 
 The `customer-visible-answer` span was logged with the question and the candidate only, so Context Adherence reported every claim unsupported on every turn. A correct answer was confirmed scoring `[0,0,0]` with the rationale "the provided context contains no transaction data or other evidence supporting any of these claims", while the agent's own answer-composing span scored `[1,1,1]` and 100% completeness on the same turn. The span now carries the turn's calculations, policies, customer and accounts as context; a regression asserts the calculation evidence and customer name reach it and that no tool definitions are attached. Whether the evaluator then scores it correctly needs one live turn to confirm.
+
+## Answer span verified, fault writer named
+
+A live turn confirmed the answer span fix: `customer-visible-answer` moved from `[0,0,0]` adherence and 0% completeness to `[1,1,1]` and 100%, with a rationale citing the 75,419 cent total instead of reporting no evidence. The trace completeness roll-up rose from 33% to 78%. The tool-choosing span remains borderline, having scored `[1,1,1]`, `[0,0,1]` and `[1,1,0]` across three traces, because judges disagree whether a span containing only a tool call can be adherent.
+
+The fault writer is now logged explicitly as `controlled-fault-writer` rather than through the callback, which names chat-model spans from the model class and made the fabrication indistinguishable from the agent's genuine calls. It carries the same evidence as the answer span. A regression asserts the span exists by name, holds the candidate and the evidence, and that the agent's own model spans are not renamed.
+
+Backend suite: 47 passed; lint passed.
