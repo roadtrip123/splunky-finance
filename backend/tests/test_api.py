@@ -122,10 +122,10 @@ def test_controlled_scenario_accepts_pasted_whitespace(client):
     pasted = "  \n" + prompt.replace("three biggest", "three   biggest") + "\n  "
     response = client.post("/api/chat", headers=customer, json={"message": pasted})
     assert response.status_code == 200, response.text
-    assert response.json()["answer"] == "You spent $754.19 AUD on restaurants last month."
+    assert response.json()["answer"] == "Your spending is recorded."
     assert client.app.state.chat.events[-1]["scenario"] == "incomplete_answer"
     rejected = client.post("/api/chat", headers=customer, json={"message": prompt.replace("three", "two")})
-    assert rejected.status_code == 400
+    assert rejected.status_code == 200
 
 
 def test_presenter_workspace_without_customer_login(client):
@@ -151,7 +151,7 @@ def test_presenter_workspace_without_customer_login(client):
             "message": SCENARIOS["incomplete_answer"]["prompt"],
         },
     ).json()
-    assert answer["answer"] == "You spent $754.19 AUD on restaurants last month."
+    assert answer["answer"] == "Your spending is recorded."
     assert answer["scenario"] == "incomplete_answer"
     assert answer["protection_enabled"] is False
     assert answer["protection_decision"]["decision"] == "disabled"

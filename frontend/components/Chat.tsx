@@ -127,6 +127,7 @@ export default function Chat({
               </p>
               {[
                 "How much did I spend on restaurants last month?",
+                "How much did I spend on restaurants last month, what were my three biggest transactions, and how does that compare with the previous month?",
                 "What are my account balances?",
                 "What is the Everyday account monthly fee?",
               ].map((text) => (

@@ -89,12 +89,15 @@ def build_tools(banking: Banking, evidence: dict):
     @tool
     def get_customer_profile() -> dict:
         """Get the authenticated fictional customer's minimal profile."""
+        evidence["customer"] = banking.dataset.customer
         return banking.dataset.customer
 
     @tool
     def get_accounts() -> dict:
         """Get the customer's three account balances in integer AUD cents. Card balance is signed liability."""
-        return {"accounts": [a.model_dump(mode="json") for a in banking.dataset.accounts]}
+        result = {"accounts": [a.model_dump(mode="json") for a in banking.dataset.accounts]}
+        evidence["accounts"] = result["accounts"]
+        return result
 
     @tool
     def get_transactions(

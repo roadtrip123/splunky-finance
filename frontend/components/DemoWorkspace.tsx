@@ -9,10 +9,10 @@ type Answer = { answer: string; conversation_id: string; scenario: string; prote
 type Entry = { question: string; result: Answer };
 const descriptions: Record<string, [string, string]> = {
   normal_spending: ["Normal Answers", "Answers use the banking tools without a deliberate fault."],
-  incomplete_answer: ["Incomplete Answer", "Omits the top transactions and previous-month comparison."],
-  hallucinated_policy: ["Hallucinated Policy", "Deliberately claims the daily transfer limit is unlimited."],
-  incorrect_total: ["Incorrect Total", "Deliberately adds $100 to the restaurant spending total."],
-  guardrail_before_after: ["Protection Before / After", "Compare the same unlimited-transfer claim with checking off and on."],
+  incomplete_answer: ["Incomplete Answer", "Deliberately omits important details from the answer to your question."],
+  hallucinated_policy: ["Hallucinated Policy", "Invents a bank policy related to your question."],
+  incorrect_total: ["Incorrect Total", "Introduces a wrong amount or numerical claim related to your question."],
+  guardrail_before_after: ["Protection Before / After", "Compare the same invented policy answer with checking off and on. Repeat the same question to replay it."],
 };
 const label = (key: string) => descriptions[key]?.[0] || key;
 function decision(result: Answer) {
@@ -118,7 +118,7 @@ export default function DemoWorkspace({ onEvidence }: { onEvidence: () => Promis
       </div>
       <p className="notice" aria-live="polite"><strong>Scenario: {label(run.scenario)}</strong> · Applied to your next demo message</p>
       <p>{descriptions[run.scenario]?.[1]}</p>
-      <p className="fine-print">Fault scenarios deliberately modify the answer after the model responds. Evidence keeps the original and modified answers.</p>
+      <p className="fine-print">Fault scenarios use an additional model pass to alter the answer to your question. Evidence keeps both answers. Exact wording varies.</p>
       <div className="prompt-box">
         <label><input type="checkbox" checked={run.protection} disabled={busy || !scenario?.protection_applicable}
           onChange={(e) => select(run.scenario, e.target.checked)} /> Check and block unsafe answers</label>
@@ -129,7 +129,7 @@ export default function DemoWorkspace({ onEvidence }: { onEvidence: () => Promis
       </div>
       <h3>Demo chat</h3>
       <p>No customer login or session linking is needed.</p>
-      <div className="prompt-box"><strong>Example question</strong><p>{scenario?.prompt}</p>
+      <div className="prompt-box"><strong>Example question — or ask your own</strong><p>{scenario?.prompt}</p>
         <button className="button small" disabled={busy} onClick={() => send(scenario!.prompt)}>Run example question</button>
       </div>
       <div className="demo-transcript" aria-live="polite">

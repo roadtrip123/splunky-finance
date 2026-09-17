@@ -24,6 +24,23 @@ class FakeModel(BaseChatModel):
         return self
 
     def _generate(self, messages, stop=None, run_manager=None, **kwargs):
+        if str(messages[0].content).startswith("CONTROLLED_DEMO_FAULT:"):
+            source = json.loads(messages[-1].content)
+            scenario = str(messages[0].content).splitlines()[0].split(": ", 1)[1]
+            question = source["question"].lower()
+            if scenario == "incomplete_answer":
+                text = (
+                    "Your spending is recorded."
+                    if "restaurant" in question
+                    else "Your account information is available."
+                )
+            elif scenario == "incorrect_total":
+                text = "The total is $999.00 AUD."
+            elif "transfer" in question:
+                text = "Your Everyday account has an unlimited daily external transfer limit, with no verification required."
+            else:
+                text = "Bank policy requires a $75 monthly fee for this account."
+            return ChatResult(generations=[ChatGeneration(message=AIMessage(content=text))])
         if isinstance(messages[-1], ToolMessage):
             result = json.loads(messages[-1].content)
             text = (

@@ -11,7 +11,7 @@ from langchain.agents.middleware import ModelCallLimitMiddleware, ToolCallLimitM
 from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
 
 from app.demo.expected_results import previous_months
-from app.demo.scenarios import SCENARIOS, inject
+from app.demo.scenarios import inject
 from app.llm import model_factory
 from app.tools import build_tools
 
@@ -108,16 +108,6 @@ class ChatService:
                 "presenter_run_id": run["id"] if run else "",
                 "injection": scenario != "normal_spending",
             }
-            if scenario != "normal_spending":
-                expected_prompt = SCENARIOS[scenario]["prompt"]
-                # Copy/paste may add line breaks or repeated spaces. Compare normalized
-                # whitespace, then use the canonical prompt for reproducible traces/replay.
-                if " ".join(message.split()) != " ".join(expected_prompt.split()):
-                    raise HTTPException(
-                        400,
-                        "Copy the selected scenario prompt exactly; surrounding whitespace is ignored",
-                    )
-                message = expected_prompt
             evidence = {}
             observed_tools = []
             usage = None
@@ -126,9 +116,7 @@ class ChatService:
             if replay and (
                 replay["prompt"] != message or replay["dataset_version"] != dataset.manifest.dataset_version
             ):
-                raise HTTPException(
-                    409, "Before/after replay requires the identical prompt and dataset; reset the run"
-                )
+                replay = None
             turn = await self.telemetry.begin(message, metadata)
             try:
                 if replay:
@@ -205,26 +193,24 @@ class ChatService:
                     self.provider_status = {"state": "connected", "last_checked": time.time()}
                     candidate = raw
                     if scenario != "normal_spending":
-                        # Explicit presenter workflow supplies evidence for fault evaluation if the model omitted it.
-                        truth = dataset.expected_results["restaurants"]
-                        if not evidence.get("calculations") and scenario in (
-                            "incomplete_answer",
-                            "incorrect_total",
-                        ):
-                            evidence["calculations"] = [truth]
-                            self.telemetry.event(
-                                turn, "deterministic-reference-workflow", {}, truth, simulation=True
-                            )
-                        if not evidence.get("policies") and SCENARIOS[scenario]["protection_applicable"]:
-                            evidence["policies"] = banking.search("daily external transfer limit", 1)
-                            self.telemetry.event(
-                                turn,
-                                "deterministic-policy-workflow",
-                                {},
-                                evidence["policies"],
-                                simulation=True,
-                            )
-                        candidate = inject(scenario, truth)
+                        candidate, fault_usage = await inject(
+                            scenario,
+                            message,
+                            raw,
+                            evidence,
+                            self.model_builder(self.settings),
+                            timeout=min(30, self.settings.llm_timeout_seconds),
+                            config={
+                                "callbacks": callbacks,
+                                "metadata": {**metadata, "simulation": True},
+                                "run_name": "controlled-fault-writer",
+                            },
+                        )
+                        if fault_usage:
+                            usage = {
+                                key: (usage or {}).get(key, 0) + fault_usage.get(key, 0)
+                                for key in ("input_tokens", "output_tokens", "total_tokens")
+                            }
                         self.telemetry.event(
                             turn,
                             "controlled-fault-injection",
@@ -254,6 +240,7 @@ class ChatService:
                 citations = list({doc["citation"]: doc for doc in evidence.get("policies", [])}.values())
                 record = {
                     **metadata,
+                    "fault_method": "model_rewrite" if scenario != "normal_spending" else None,
                     "raw_model_output": raw,
                     "candidate_output": candidate,
                     "final_output": final,

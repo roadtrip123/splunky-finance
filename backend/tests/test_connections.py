@@ -49,7 +49,7 @@ def test_automatic_link_ack_stale_request_and_normal_restore(client):
     result = client.post(
         "/api/chat", headers=customer, json={"message": prompt, "demo_version": state["version"]}
     ).json()
-    assert result["answer"] == "You spent $754.19 AUD on restaurants last month."
+    assert result["answer"] == "Your spending is recorded."
     run = change(client, admin, run, "normal_spending")
     state = client.post("/api/chat/demo-sync", headers=customer).json()
     normal = client.post(
@@ -134,7 +134,7 @@ def test_inflight_answer_keeps_original_scenario(client):
         response = future.result(timeout=10)
     assert response.status_code == 200
     assert response.json()["scenario"] == "incomplete_answer"
-    assert response.json()["answer"] == "You spent $754.19 AUD on restaurants last month."
+    assert response.json()["answer"] == "Your spending is recorded."
     assert client.post("/api/chat/demo-sync", headers=customer).json()["scenario"] == "normal_spending"
 
 

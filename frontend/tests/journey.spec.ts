@@ -50,7 +50,7 @@ test("presenter controls apply directly without customer login", async ({ page }
   await page.reload();
   await expect(page.getByRole("button", { name: "Enable Incomplete Answer", exact: true })).toHaveAttribute("aria-pressed", "true");
   await page.getByRole("button", { name: "Run example question" }).click();
-  await expect(page.locator(".demo-response").last()).toContainText("You spent $754.19 AUD on restaurants last month.");
+  await expect(page.locator(".demo-response").last()).toContainText("Your spending is recorded.");
   await expect(page.locator(".demo-response").last()).toContainText("Scenario used: Incomplete Answer");
   await page.getByRole("button", { name: "Enable Protection Before / After", exact: true }).click();
   await page.getByRole("button", { name: "Run example question" }).click();
@@ -118,7 +118,7 @@ async function verifyLiveSwitch(admin: import("@playwright/test").Page, bank: im
   await expect(admin.getByText('Applied to connected banking session', { exact: true })).toBeVisible();
   await bank.getByLabel('Ask My Bank Agent', { exact: true }).fill(completePrompt);
   await bank.getByRole('button', { name: 'Send message', exact: true }).click();
-  await expect(bank.locator('.message.assistant').last()).toContainText('You spent $754.19 AUD on restaurants last month.');
+  await expect(bank.locator('.message.assistant').last()).toContainText('Your spending is recorded.');
   await admin.getByRole('button', { name: 'Normal Answers', exact: true }).click();
   await expect(footer).toHaveClass(/demo-footer-normal/);
   await bank.getByLabel('Ask My Bank Agent', { exact: true }).fill(completePrompt);
@@ -159,4 +159,22 @@ test('another computer pairs once and receives live scenario changes', async ({ 
     await page.getByRole('button', { name: 'Enable Incomplete Answer', exact: true }).click();
     await expect(bank.locator('.demo-footer')).toHaveClass(/demo-footer-normal/);
   } finally { await remote.close(); }
+});
+
+test('opening suggestions include the full spending question and faults accept free questions', async ({ page, context }) => {
+  await login(page);
+  await page.getByRole('button', { name: 'Open My Bank Agent' }).click();
+  await expect(page.getByRole('button', { name: completePrompt, exact: false })).toBeVisible();
+  const admin = await context.newPage();
+  await presenter(admin);
+  for (const scenario of ['Incomplete Answer', 'Incorrect Total', 'Hallucinated Policy']) {
+    await admin.getByRole('button', { name: `Enable ${scenario}`, exact: true }).click();
+    await expect(admin.getByText('Applied to connected banking session', { exact: true })).toBeVisible();
+    await page.getByLabel('Ask My Bank Agent', { exact: true }).fill('What is my savings balance?');
+    await page.getByRole('button', { name: 'Send message', exact: true }).click();
+    const count = ['Incomplete Answer', 'Incorrect Total', 'Hallucinated Policy'].indexOf(scenario) + 1;
+    await expect(page.locator('.message.assistant')).toHaveCount(count);
+    await expect(page.locator('.message.assistant').last()).not.toContainText('$754.19');
+    await expect(page.getByRole('alert')).toHaveCount(0);
+  }
 });
