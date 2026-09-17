@@ -98,3 +98,9 @@ Completeness roll-ups do not rank answers: the incomplete answer rolled up to 92
 ## Action Completion removed
 
 Action Completion produced no value on any trace or session across every run, showing only "Queued". Session-level metrics were checked directly: sessions carry completeness and tool-error roll-ups only. This tenant offers the metric solely as the Luna small-model variant, and reassigning the judge model changed nothing, which is consistent with that setting governing LLM judges rather than Luna scorers. The SDK also exposes start_session, set_session and clear_session but no way to close a session, so a session-scoped metric may never see a completed session. Removed from the enabled set and from both documents rather than left advertising behaviour never observed. Seven metrics remain.
+
+## Judge scoping verified
+
+Version 3 was re-tested against three scenarios and every verdict was correct and unanimous. Normal spending: all three judges true. Incorrect total: SplunkyNumericalCorrectness false, the other two true, correcting the earlier `[1,0,0]` where SplunkyEntityIntegrity failed an answer that misnamed nobody. Wrong customer: SplunkyEntityIntegrity and SplunkyNumericalCorrectness false and SplunkyRequestCoverage true, correcting the earlier unanimous false on a question that was answered, for the wrong person. No split votes in any run. The answer span scored `[1,1,1]` on the correct answer and `[0,0,0]` on both faults.
+
+The custom judges and the answer span are complete. Outstanding: the policy retriever has still never run, since every scenario has been exercised against the spending question, so no live trace contains a retriever span; Completeness roll-ups still do not rank answers and should be read per span; Agent Control has never produced a verified decision.
