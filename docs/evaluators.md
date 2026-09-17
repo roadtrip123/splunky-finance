@@ -40,7 +40,7 @@ Custom judges are worth their cost only where no built-in can know the rule. Eac
 
 ## Reading the scores
 
-**A judge fails only on a contradiction it can point to.** An answer with its total removed is not a wrong total and not a wrong customer; it is an incomplete answer. Each judge returns true when its subject is simply absent, so exactly one metric goes red per scenario. If you edit a judge prompt, the change only reaches the tenant with `--apply --refresh-judges`, which deletes and recreates it and loses that judge's historical scores.
+**A judge fails only on a contradiction it can point to.** An answer with its total removed is not a wrong total and not a wrong customer; it is an incomplete answer. Each judge returns true when its subject is simply absent, so most scenarios light exactly one judge. Wrong Customer lights two by design: its candidate misstates both the identity and the figures. If you edit a judge prompt, the change only reaches the tenant with `--apply --refresh-judges`, which deletes and recreates it and loses that judge's historical scores.
 
 **Built-in span-level metrics score every LLM span in the trace.** A turn has up to four: one model call to choose the tool, one to compose the answer, the fault writer when a scenario is active, and the logged `customer-visible-answer` span. Context Adherence therefore reports a mix such as `false 2 / true 1` even on a correct answer.
 
@@ -68,7 +68,7 @@ The span worth reading is the agent's answer-composing call. The LangChain callb
 | Incomplete Answer | `SplunkyRequestCoverage` |
 | Hallucinated Policy | Context Adherence |
 | Incorrect Total | `SplunkyNumericalCorrectness` |
-| Wrong Customer | `SplunkyEntityIntegrity`, and Context Adherence |
+| Wrong Customer | `SplunkyEntityIntegrity` and `SplunkyNumericalCorrectness`, plus Context Adherence |
 | Protection Before / After | Context Adherence, plus the bound Agent Control decision |
 
 ## Agent Control

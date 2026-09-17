@@ -60,3 +60,9 @@ Live scores showed all three custom judges returning false on the incomplete-ans
 Per-span rationales from live traces corrected two earlier claims. Context Adherence does catch an invented fee stated during a calculation question: the agent's model calls carry their tool results as context, and the rationale named the fabricated 2.5% fee and scored it 0.0. No additional judge is needed for that case.
 
 The `customer-visible-answer` span, however, is logged with the question and the candidate and no context, so Context Adherence reports its claims as unsupported even for a correct answer. Adherence on that span is not meaningful; the span remains the node the Agent Control output control scopes, which is why it exists. The span worth reading is the agent's answer-composing call, verified at 1.0 for a correct total and 0.0 for a correct total with an invented fee appended. Documentation now says so; attaching evidence to the logged span as context remains open.
+
+## Scenario evaluation results
+
+All four fault scenarios were run against the live tenant and each was rejected by the metric intended to catch it, with the other judges staying green where their subject was untouched. Incomplete Answer failed only SplunkyRequestCoverage; Incorrect Total failed only SplunkyNumericalCorrectness; Hallucinated Policy was rejected by Context Adherence, whose rationale named the invented fee; Wrong Customer failed SplunkyEntityIntegrity and SplunkyNumericalCorrectness together, because its candidate misstates both identity and figures. Documentation previously claimed exactly one judge fails per scenario, which does not hold for Wrong Customer and has been corrected.
+
+Still unexercised: the policy retriever, since every scenario was run against the spending question, so no live trace yet contains a retriever span. Agent Control remains untested; every run so far recorded protection disabled.

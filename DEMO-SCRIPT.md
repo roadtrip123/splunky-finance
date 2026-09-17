@@ -82,7 +82,7 @@ For a question with three parts, checks that all three were answered. Distinct f
 | Incomplete Answer | `SplunkyRequestCoverage` |
 | Hallucinated Policy | Context Adherence |
 | Incorrect Total | `SplunkyNumericalCorrectness` |
-| Wrong Customer | `SplunkyEntityIntegrity`, and Context Adherence |
+| Wrong Customer | `SplunkyEntityIntegrity` and `SplunkyNumericalCorrectness`, plus Context Adherence |
 | Protection Before / After | Context Adherence, plus the bound Agent Control decision |
 
 ### Reading the numbers on screen
@@ -96,7 +96,11 @@ For a question with three parts, checks that all three were answered. Distinct f
 
 **Completeness is a percentage, not a pass or fail.** Expect roughly 44% on a good answer and 25% on a deliberately incomplete one. The movement is the point, not the number: quote the gap, never the figure alone.
 
-**Exactly one custom judge should go red per scenario.** An answer with its total removed is an incomplete answer, not a wrong total and not a wrong customer, so the other two judges stay green. If several go red at once, the judges are misreading absence as contradiction and need `--apply --refresh-judges`.
+**A judge goes red only when its own subject is contradicted.** An answer with its total removed is an incomplete answer, not a wrong total and not a wrong customer, so the other two judges stay green. Most scenarios therefore light exactly one judge.
+
+Wrong Customer is the deliberate exception and lights two: the injected answer misstates the customer *and* the figures, so `SplunkyEntityIntegrity` and `SplunkyNumericalCorrectness` both reject it. That is the scenario working, not a fault. Say it out loud — one bad answer can fail on several independent grounds at once, and that is exactly what you want an evaluation layer to show you.
+
+If a judge goes red for something its scenario did not touch, it is misreading absence as contradiction and needs `--apply --refresh-judges`.
 
 ### When a metric cannot help
 
@@ -216,7 +220,7 @@ This is the scenario that makes the cost of no evaluation layer obvious.
 
    > The banking tools cannot return another customer's data. Customer scope is captured server-side in the tool closure and is never accepted as a model argument. This identity was injected after the model call.
 
-6. `SplunkyEntityIntegrity` and Context Adherence should both reject the candidate.
+6. `SplunkyEntityIntegrity`, `SplunkyNumericalCorrectness`, and Context Adherence should all reject the candidate: the answer misstates who the customer is *and* what they spent. `SplunkyRequestCoverage` stays green, because the question was answered — just for the wrong person.
 
 Unlike the other scenarios, this candidate is a **fixed template**, not a model rewrite — the evidence panel reports `fault_method: fixed_template`. Two reasons: a live model asked to impersonate a cross-customer exposure may refuse, and the bound regex control needs a string known before the demo.
 
