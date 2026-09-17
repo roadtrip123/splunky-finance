@@ -89,10 +89,10 @@ For a question with three parts, checks that all three were answered. Distinct f
 
 **Context Adherence shows a mix even on a correct answer**, such as `false 2 / true 1`. Galileo scores every model call in the trace, and a normal turn has four: one to choose the tool, one to write the answer, the fault writer when a scenario is active, and the delivered answer. Two of those score low for reasons that are not the answer's fault:
 
-- The tool-choosing call contains no prose to check.
-- The `customer-visible-answer` span is logged with the question and the answer but **no context attached**, so it reports every claim as unsupported even when the answer is perfectly correct. Do not read adherence on this span.
+- The tool-choosing call contains only a tool call, and judges disagree about whether that can be adherent. It has scored both ways on different runs, so expect it to move.
+- Percentages at the top of a trace are roll-ups averaged across every model call, which is why a correct answer can roll up to 33% while the answer itself scored 100%.
 
-**Open the span whose rationale names the tool result.** That is the agent's answer-composing call, and it is the one that scores the answer honestly: `1.0` when the answer matches the calculation, `0.0` when it invents something. Expand the rationale on screen. It names the invented claim in plain English, which is far more convincing than the number.
+**Open the span whose rationale names the tool result.** That is the agent's answer-composing call, and it scores the answer honestly: `1.0` adherence and `100%` completeness for a correct answer, `0.0` when it invents something. Expand the rationale on screen. It names the invented claim in plain English, which is far more convincing than the number.
 
 **Completeness is a percentage, not a pass or fail.** Expect roughly 44% on a good answer and 25% on a deliberately incomplete one. The movement is the point, not the number: quote the gap, never the figure alone.
 

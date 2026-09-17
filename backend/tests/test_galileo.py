@@ -120,6 +120,12 @@ def test_real_sdk_callback_exports_model_and_tool_under_one_trace(settings, monk
     # Span-level evaluators and the bound output control both address this node by name.
     answer = next(c for c in children if c.type == "llm" and c.name == "customer-visible-answer")
     assert answer.output.content == event["candidate_output"]
+    # Logged with the question alone, this span reported every claim unsupported on every turn.
+    context = " ".join(str(m.content) for m in answer.input)
+    assert "75419" in context, "answer span carried no calculation evidence to be judged against"
+    assert event["evidence"]["customer"]["name"] in context
+    # Tool definitions stay off: Tool Selection Quality would fail a span that selects none.
+    assert not answer.tools
 
 
 def test_policy_retrieval_exports_a_retriever_span_with_chunks(settings, monkeypatch):

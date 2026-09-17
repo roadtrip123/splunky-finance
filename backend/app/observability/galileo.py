@@ -211,19 +211,45 @@ class Telemetry:
             self.status["last_error"] = "Metric names could not be resolved"
         return self.scorers
 
-    def answer_span(self, turn, prompt, candidate, usage=None):
+    @staticmethod
+    def answer_context(evidence):
+        """Render this turn's evidence as the context the delivered answer was drawn from.
+
+        Span-level evaluators judge an answer against the context on its own span. Logged with the
+        question alone, this span reported every claim as unsupported on every turn, correct answers
+        included, because there was nothing on it to support them.
+        """
+        parts = []
+        for result in (evidence or {}).get("calculations", []):
+            parts.append("Spending calculation (authoritative, integer AUD cents):\n" + json.dumps(result, default=str))
+        for document in (evidence or {}).get("policies", []):
+            parts.append(f"Policy {document.get('citation')}: {document.get('excerpt')}")
+        customer = (evidence or {}).get("customer")
+        if customer:
+            parts.append("Authenticated customer: " + json.dumps(customer, default=str))
+        accounts = (evidence or {}).get("accounts")
+        if accounts:
+            parts.append("Accounts owned by that customer: " + json.dumps(accounts, default=str))
+        return "\n\n".join(parts)[:12000]
+
+    def answer_span(self, turn, prompt, candidate, evidence=None, usage=None):
         """Log the delivered candidate as a named LLM span.
 
-        Span-level RAG evaluators score an LLM span against the trace's retrieved context, so they
-        need the customer answer as a plain string on its own node. The trace output stays the JSON
-        record the trace-level custom judges read. This is also the node the bound Agent Control
-        output control scopes, so evaluation and protection address the same step.
+        Carries the same evidence the agent answered from, so span-level evaluators can judge the
+        answer instead of reporting it unsupported. Tool definitions are deliberately not attached:
+        Tool Selection Quality scores LLM spans, and would fail a span that advertises tools and
+        selects none. The trace output stays the JSON record the trace-level custom judges read, and
+        the name and output are what the bound Agent Control output control scopes.
         """
         if not turn:
             return
         try:
+            context = self.answer_context(evidence)
+            messages = [{"role": "user", "content": prompt}]
+            if context:
+                messages.insert(0, {"role": "system", "content": "Context for this answer:\n" + context})
             turn["logger"].add_llm_span(
-                input=prompt,
+                input=messages,
                 output=candidate,
                 model=self.settings.model_name,
                 name="customer-visible-answer",

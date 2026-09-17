@@ -44,11 +44,13 @@ Custom judges are worth their cost only where no built-in can know the rule. Eac
 
 **Built-in span-level metrics score every LLM span in the trace.** A turn has up to four: one model call to choose the tool, one to compose the answer, the fault writer when a scenario is active, and the logged `customer-visible-answer` span. Context Adherence therefore reports a mix such as `false 2 / true 1` even on a correct answer.
 
-Two of those spans score low for reasons unrelated to answer quality. The tool-choosing call has no prose output. The `customer-visible-answer` span is logged with `add_llm_span(input=prompt, output=candidate)` and **no context**, so the evaluator sees unsupported claims whatever the answer says; adherence on that span is not meaningful and should not be read. It remains the node the Agent Control output control scopes, which is what it was added for.
+The `customer-visible-answer` span now carries this turn's evidence as context, so it can be judged on the answer rather than reported unsupported. Tool definitions are deliberately left off it: Tool Selection Quality scores LLM spans and would fail one that advertises tools and selects none.
 
-The span worth reading is the agent's answer-composing call. The LangChain callback attaches the tool result to it, so it scores the answer against real evidence: verified at `1.0` for a correct total and `0.0` for a correct total with an invented fee appended, with a rationale naming the fee.
+The tool-choosing call is genuinely borderline and varies between runs, scoring `[1,1,1]` on one trace and `[0,0,1]` on another, because judges disagree about whether a span containing only a tool call can be adherent. Expect it to move.
 
-**Completeness returns a percentage, not a verdict.** Use the direction, not the absolute value: a correct answer and a deliberately incomplete one scored 44% and 25% on the same question. The gap is the demonstration; neither number means much alone.
+The span that scores most reliably is the agent's answer-composing call. The LangChain callback attaches the tool result to it, and it has been verified at `1.0` adherence and `100%` completeness for a correct answer, and `0.0` for a correct total with an invented fee appended, with a rationale naming the fee.
+
+**Completeness returns a percentage, not a verdict, and the trace roll-up averages every LLM span.** On the answer-composing span a correct answer scored `100%`; the same turn rolled up to `33%` because spans without context average in. Read the per-span value, not the roll-up.
 
 ## Deliberately not enabled
 
