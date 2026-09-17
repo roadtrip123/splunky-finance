@@ -11,10 +11,10 @@ All accounts, transactions, policies, and faults are synthetic. No transfer, pay
 
 ## Before the audience arrives
 
-Use two tabs in the same browser profile because linking a presenter run requires both the presenter and customer session cookies.
+The presenter workspace includes its own automatically connected demo chat. No customer login, manual run creation, session linking, or logout is required. Settings are isolated to your presenter session; another browser or colleague has an independent demo. Refreshing preserves the active settings while the session and run remain valid.
 
-1. Open the public application and sign in to customer banking at `/login`.
-2. Open `/demo-admin` in a second tab and sign in with the separate presenter password.
+1. Open `/demo-admin` and sign in with the presenter password. The demo chat connects automatically.
+2. Optionally open customer banking at `/login` to demonstrate account pages. The scenario buttons control only the integrated demo chat.
 3. Check the status cards:
    - **Model provider** should become `connected` after a successful model request.
    - **Galileo** should show `connected`; `Export: exported` appears only after a trace flush succeeds.
@@ -55,7 +55,7 @@ In the customer tab:
 
 ## Part 2 — genuine tool-backed assistant turn
 
-Do this before starting a controlled presenter run, or leave the run on `normal_spending`.
+Use ordinary customer chat, or select **Normal Answers** in the presenter workspace and use its integrated chat.
 
 1. Open **My Bank Agent**.
 2. Start a new conversation.
@@ -72,27 +72,24 @@ Do this before starting a controlled presenter run, or leave the run on `normal_
 
 **What this shows:** a genuine model request selected an authoritative read-only tool. Galileo records model and tool spans rather than only a top-level session.
 
-## Part 3 — create and link a presenter run
+## Part 3 — choose a scenario directly
 
-In the presenter tab:
+1. In `/demo-admin`, click a scenario button such as **Enable Incomplete Answer**.
+2. Wait for the confirmation that it applies to the next demo message. The active button and **Scenario** indicator reflect the saved server setting.
+3. Read the expected behavior below the buttons, then click **Run example question**.
+4. Read **Scenario used** and the protection outcome above the response. These labels come from the backend result, not from the currently selected button.
 
-1. Select **Start a new run**.
-2. Keep **Output protection** disabled initially.
-3. Select **Link customer session**.
-4. Use **Open banking** or return to the already logged-in customer tab.
-5. Start a new customer conversation whenever the scenario changes.
+Changing scenarios automatically starts a fresh conversation and switches protection off. Earlier responses retain their original labels. There is no need to sign out, open incognito, or link a customer session. Settings remain scoped to this presenter session. A new login or expired run starts a normal demo again.
 
-A run isolates scenario selection, controlled candidates, trace evidence, and before/after replay. Linking requires presenter and customer authentication in the same browser. A run is unnecessary for ordinary chat or ordinary Galileo tracing.
-
-The message `Protection verification: unverified` is expected until a genuine Agent Control response has been received. Enabling a switch is configuration, not proof that a remote control ran.
+**Check and block unsafe answers** is available for policy scenarios. It checks the candidate before delivery; a rejected answer or unavailable check produces a fallback. Protection readiness is separate from the actual response decision. Incomplete answers and incorrect totals demonstrate evaluation, not the configured policy protection control.
 
 ## Part 4 — completeness evaluation
 
-1. Select scenario **`incomplete_answer`**.
-2. Copy the displayed prompt; the backend requires the selected scenario wording and punctuation; harmless leading, trailing, or repeated whitespace is normalized.
-3. In a new customer conversation, send it.
+1. Click **Enable Incomplete Answer**.
+2. Check that **Scenario: Incomplete Answer** is active.
+3. Click **Run example question**. The prompt is sent automatically in the integrated chat.
 4. The live model still runs first. The controlled workflow then replaces the candidate with only the restaurant total, deliberately omitting the transaction count, three largest purchases, and previous-month comparison.
-5. In **Latest run evidence**, expand the event and compare:
+5. In **Latest chat evidence**, expand the event and compare:
    - **Raw model output** — what the live model produced.
    - **Candidate output** — the deliberately incomplete sentence.
    - **Customer-visible answer** — the candidate delivered while protection is off.
@@ -103,8 +100,8 @@ The message `Protection verification: unverified` is expected until a genuine Ag
 
 ## Part 5 — policy grounding evaluation
 
-1. Select scenario **`hallucinated_policy`**.
-2. Copy and send the exact displayed prompt:
+1. Click **Enable Hallucinated Policy**.
+2. Click **Run example question** to send:
 
    > What is the daily external transfer limit on my Everyday account?
 
@@ -116,8 +113,8 @@ The message `Protection verification: unverified` is expected until a genuine Ag
 
 ## Part 6 — numerical correctness evaluation
 
-1. Select scenario **`incorrect_total`**.
-2. Copy and send its exact restaurant-spending prompt in a new conversation.
+1. Click **Enable Incorrect Total**.
+2. Click **Run example question**; the conversation was reset automatically.
 3. The controlled candidate adds exactly AUD $100.00 to the authoritative total. With the default dataset it reports **$854.19** rather than **$754.19**.
 4. Compare candidate output with **Inspect expected results** and the calculation evidence.
 5. Fetch actual Galileo scores. A configured `SplunkyNumericalCorrectness` metric should reject the altered amount.
@@ -130,16 +127,16 @@ This is the key protection demonstration.
 
 ### Before protection
 
-1. Select **`guardrail_before_after`**.
-2. Set **Output protection** to **Disabled**.
-3. Copy and send the exact transfer-limit prompt in a new customer conversation.
+1. Click **Enable Protection Before / After**.
+2. Leave **Check and block unsafe answers** unchecked.
+3. Click **Run example question**.
 4. Show that the customer receives the controlled unlimited/no-verification candidate.
 5. In evidence, note its candidate hash and event/run ID.
 
 ### After protection
 
-1. Return to the presenter tab and set **Output protection** to **Enabled — fail closed**.
-2. Send the identical prompt again without changing the dataset or scenario.
+1. Check **Check and block unsafe answers**.
+2. Click **Run example question** again without reselecting the scenario or changing the dataset.
 3. The application replays the exact frozen candidate and evidence. It does **not** make a second model call.
 4. Verify the second event has:
    - `replayed: true`;
@@ -169,9 +166,9 @@ If Agent Control is missing, unreachable, or returns no evaluated controls, the 
 
 ## Reset controls
 
-- **New conversation** clears the customer conversation while retaining the presenter run.
-- **Reset run** returns the run to `normal_spending`, clears replay state, and invalidates linked conversations. Use it between rehearsal sequences.
-- **Start a new run** creates a new isolated presenter run. Link it again to the customer session.
+- **New conversation** starts a fresh chat while retaining the active scenario and protection settings. Earlier response labels remain visible.
+- **Normal Answers** disables deliberate faults and protection, resets the conversation, and clears before/after replay when switching scenarios.
+- Selecting another scenario resets conversation context automatically. Refreshing keeps the saved scenario but clears the local chat transcript; evidence remains available for the active run.
 - **Confirm and reset data** regenerates the entire synthetic dataset with the selected seed/reference date, increments the dataset version, and invalidates all conversations and comparisons. Do not use this during a normal presentation unless reseeding is the topic.
 
 ## Honest status language
@@ -195,9 +192,10 @@ Use these exact distinctions:
 | Session visible but no child spans | Use a new turn on the current build; historical empty sessions cannot be reconstructed |
 | Scores pending/unconfigured | Confirm custom metrics are created/enabled, wait for asynchronous evaluation, then fetch actual scores |
 | Protection unverified | Configure/bind Agent Control and run a protected turn; the switch alone is not verification |
-| Exact prompt rejected | Copy the prompt again from the currently selected scenario |
+| Exact prompt rejected | Use **Run example question** for the active scenario |
 | Replay rejected | Do not change prompt, scenario, or dataset between before/after turns |
-| Customer run not affected | Link the current run again in the same browser profile |
+| Customer chat not affected | Use the integrated **Demo chat** in the presenter workspace; scenario controls are scoped there |
+| Settings changed in another tab | Review the refreshed selection and retry; stale requests are rejected |
 | HTTP 429 from model provider | Check provider quota/credit; distinguish it from Cloudflare rate limiting |
 
 ## Suggested closing statement

@@ -41,50 +41,27 @@ test("customer banking journey with real offline tool execution", async ({
   await page.getByRole("button", { name: "Log out" }).click();
   await expect(page).toHaveURL(/login$/);
 });
-test("separate presenter login, controlled before/after and confirmed reset", async ({
-  page,
-  context,
-}) => {
-  await login(page);
+test("presenter controls apply directly without customer login", async ({ page }) => {
   await page.goto("/demo-admin");
-  await page
-    .getByLabel("Password", { exact: true })
-    .fill("test-presenter-password-only");
+  await page.getByLabel("Password", { exact: true }).fill("test-presenter-password-only");
   await page.getByRole("button", { name: "Log in" }).click();
-  await page.getByRole("button", { name: "Start a new run" }).click();
-  await page.getByRole("button", { name: "Link customer session" }).click();
-  await page
-    .getByLabel("Scenario", { exact: true })
-    .selectOption("guardrail_before_after");
-  await expect(page.getByLabel("Scenario", { exact: true })).toHaveValue(
-    "guardrail_before_after",
-  );
-  const bank = await context.newPage();
-  await bank.goto("/banking");
-  await bank.getByRole("button", { name: "Open My Bank Agent" }).click();
-  await bank
-    .getByLabel("Ask My Bank Agent")
-    .fill("What is the daily external transfer limit on my Everyday account?");
-  await bank.getByRole("button", { name: "Send message" }).click();
-  await expect(bank.locator(".message.assistant")).toContainText("unlimited");
-  await page
-    .getByLabel("Output protection", { exact: true })
-    .selectOption("true");
-  await expect(
-    page.getByLabel("Output protection", { exact: true }),
-  ).toHaveValue("true");
-  await bank
-    .getByLabel("Ask My Bank Agent")
-    .fill("What is the daily external transfer limit on my Everyday account?");
-  await bank.getByRole("button", { name: "Send message" }).click();
-  await expect(bank.locator(".message.assistant").last()).toContainText(
-    "couldn't verify",
-  );
-  page.once("dialog", (dialog) => dialog.accept());
-  await page.getByRole("button", { name: "Confirm and reset data" }).click();
-  await expect(page.getByRole("heading", { name: /Version/ })).toContainText(
-    "Version",
-  );
+  await page.getByRole("button", { name: "Enable Incomplete Answer", exact: true }).click();
+  await expect(page.getByRole("button", { name: "Enable Incomplete Answer", exact: true })).toHaveAttribute("aria-pressed", "true");
+  await page.reload();
+  await expect(page.getByRole("button", { name: "Enable Incomplete Answer", exact: true })).toHaveAttribute("aria-pressed", "true");
+  await page.getByRole("button", { name: "Run example question" }).click();
+  await expect(page.locator(".demo-response").last()).toContainText("You spent $754.19 AUD on restaurants last month.");
+  await expect(page.locator(".demo-response").last()).toContainText("Scenario used: Incomplete Answer");
+  await page.getByRole("button", { name: "Enable Protection Before / After", exact: true }).click();
+  await page.getByRole("button", { name: "Run example question" }).click();
+  await expect(page.locator(".demo-response").last()).toContainText("unlimited");
+  await page.getByLabel("Check and block unsafe answers").click();
+  await expect(page.getByLabel("Check and block unsafe answers")).toBeChecked();
+  await page.getByRole("button", { name: "Run example question" }).click();
+  await expect(page.locator(".demo-response").last()).toContainText("couldn't verify");
+  await expect(page.locator(".demo-response").last()).toContainText("Could not be checked");
+  await expect(page.locator(".demo-response").first()).toContainText("Scenario used: Incomplete Answer");
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBeTruthy();
 });
 test("layout has no horizontal overflow", async ({ page }) => {
   await page.goto("/");

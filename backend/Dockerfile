@@ -5,8 +5,8 @@ RUN groupadd --gid 10001 bank && useradd --uid 10001 --gid bank --create-home ba
 WORKDIR /app/backend
 COPY backend/pyproject.toml backend/uv.lock ./
 RUN uv sync --frozen --no-dev
-COPY backend/app ./app
-COPY data /app/data
+COPY --chown=bank:bank backend/app ./app
+COPY --chown=bank:bank data /app/data
 RUN mkdir /app/runtime && chown bank:bank /app/runtime
 USER bank
 ENV PATH="/app/backend/.venv/bin:$PATH" PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1

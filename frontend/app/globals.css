@@ -1402,3 +1402,9 @@ pre {
     transition: none !important;
   }
 }
+
+.demo-scenarios { display: flex; flex-wrap: wrap; gap: 0.75rem; margin: 1rem 0; }
+.demo-workspace textarea { display: block; width: 100%; min-height: 100px; margin: 0.75rem 0; }
+.demo-response { padding: 1rem 0; border-bottom: 1px solid #d9e2db; }
+.demo-response .badge { white-space: normal; }
+.demo-transcript { max-height: 640px; overflow-y: auto; }

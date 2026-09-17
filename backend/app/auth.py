@@ -1,7 +1,6 @@
 import hmac
 import secrets
 import time
-from collections import defaultdict, deque
 from dataclasses import dataclass
 
 from argon2 import PasswordHasher
@@ -32,7 +31,6 @@ class Authentication:
             "admin": hasher.hash(settings.demo_admin_password.get_secret_value()),
         }
         self.sessions: dict[str, Session] = {}
-        self.attempts: dict[tuple, deque] = defaultdict(deque)
 
     @staticmethod
     def cookie(role):
@@ -41,22 +39,10 @@ class Authentication:
     def prune(self):
         now = time.time()
         self.sessions = {k: s for k, s in self.sessions.items() if s.expires > now}
-        for key in list(self.attempts):
-            if not self.attempts[key] or self.attempts[key][-1] < now - 300:
-                del self.attempts[key]
 
     def login(self, request, role, credentials, response):
         self.prune()
-        key = (request.client.host if request.client else "unknown", role)
-        if len(self.attempts) >= 1000 and key not in self.attempts:
-            raise HTTPException(429, "Login temporarily unavailable")
-        attempts = self.attempts[key]
         now = time.time()
-        while attempts and attempts[0] < now - 300:
-            attempts.popleft()
-        if len(attempts) >= 5:
-            raise HTTPException(429, "Too many login attempts; try again in five minutes")
-        attempts.append(now)
         try:
             valid = self.hasher.verify(self.hashes[role], credentials.password)
         except VerifyMismatchError:

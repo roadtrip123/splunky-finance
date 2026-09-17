@@ -273,6 +273,10 @@ class ChatService:
                 ]
                 return {
                     "conversation_id": identifier,
+                    "scenario": scenario,
+                    "protection_enabled": enabled,
+                    "protection_decision": decision,
+                    "presenter_run_id": run["id"] if run else None,
                     "answer": final,
                     "citations": citations,
                     "status": "fallback" if decision.get("action") == "safe_fallback" else "answered",

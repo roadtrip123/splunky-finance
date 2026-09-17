@@ -27,6 +27,18 @@ class GalileoSetting(StrictModel):
     expected_revision: int = Field(ge=0)
 
 
+class DemoSettings(StrictModel):
+    scenario: str
+    protection: bool
+    expected_revision: int = Field(ge=0)
+    run_id: str
+
+
+class DemoChatInput(ChatInput):
+    expected_revision: int = Field(ge=0)
+    run_id: str
+
+
 class Binding(StrictModel):
     token: str = Field(min_length=1, max_length=80)
 
@@ -229,6 +241,45 @@ def create_app(settings=None, model_builder=None, protection_adapter=None):
             raise HTTPException(409, "Wait for the current answer before resetting")
         chat.clear(current)
         return envelope(request, {"status": "reset"})
+
+    def demo_idle(current):
+        if any(c.owner == current.id and c.lock.locked() for c in chat.conversations.values()):
+            raise HTTPException(409, "Wait for the current answer before changing demo settings")
+
+    @app.post("/api/demo-admin/workspace")
+    async def demo_workspace(request: Request):
+        current = session(request, "admin", True)
+        run = chat.run(current)
+        if not run:
+            chat.clear(current)
+            run = chat.new_run(current)
+            run["protection"] = False
+        return envelope(request, run)
+
+    @app.put("/api/demo-admin/workspace")
+    async def demo_settings(request: Request, payload: DemoSettings):
+        current = session(request, "admin", True)
+        run = chat.owned_run(current, payload.run_id)
+        demo_idle(current)
+        if run["revision"] != payload.expected_revision:
+            raise HTTPException(409, "Settings changed in another tab. Refresh and try again.")
+        if payload.scenario not in SCENARIOS:
+            raise HTTPException(422, "Unknown scenario")
+        if payload.protection and not SCENARIOS[payload.scenario]["protection_applicable"]:
+            raise HTTPException(422, "Protection demonstration is available for policy scenarios")
+        if run["scenario"] != payload.scenario:
+            run["replay"] = None
+        chat.clear(current)
+        run.update(scenario=payload.scenario, protection=payload.protection, revision=run["revision"] + 1)
+        return envelope(request, run)
+
+    @app.post("/api/demo-admin/chat")
+    async def demo_answer(request: Request, payload: DemoChatInput):
+        current = session(request, "admin", True)
+        run = chat.owned_run(current, payload.run_id)
+        if run["revision"] != payload.expected_revision:
+            raise HTTPException(409, "Settings changed in another tab. Refresh and try again.")
+        return envelope(request, await chat.answer(current, payload, bank()))
 
     @app.post("/api/demo-admin/run")
     async def new_run(request: Request):

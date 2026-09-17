@@ -1,5 +1,5 @@
 "use client";
-import Link from "next/link";
+import DemoWorkspace from "./DemoWorkspace";
 import { useEffect, useState } from "react";
 import Brand from "./Brand";
 import Login from "./Login";
@@ -102,7 +102,6 @@ export default function Admin() {
       setBusy(false);
     }
   }
-  const run = status?.run;
   return (
     <>
       <header className="public-header">
@@ -267,134 +266,9 @@ export default function Admin() {
                     </span>
                   </article>
                 </div>
+                <DemoWorkspace onEvidence={refresh} />
                 <section className="admin-card">
-                  <div className="section-heading compact">
-                    <h2>Presenter run</h2>
-                    <button
-                      disabled={busy}
-                      className="button small"
-                      onClick={() =>
-                        action(() => mutate("demo-admin/run", {}, true))
-                      }
-                    >
-                      Start a new run
-                    </button>
-                  </div>
-                  {run ? (
-                    <>
-                      <p className="mono">{run.id}</p>
-                      <div className="admin-controls">
-                        <div>
-                          <label htmlFor="scenario">Scenario</label>
-                          <select
-                            id="scenario"
-                            value={run.scenario}
-                            disabled={busy}
-                            onChange={(e) =>
-                              action(() =>
-                                mutate(
-                                  "demo-admin/scenario",
-                                  {
-                                    run_id: run.id,
-                                    scenario_id: e.target.value,
-                                    expected_revision: run.revision,
-                                  },
-                                  true,
-                                  "PUT",
-                                ),
-                              )
-                            }
-                          >
-                            {Object.keys(status.scenarios).map((s) => (
-                              <option key={s}>{s}</option>
-                            ))}
-                          </select>
-                        </div>
-                        <div>
-                          <label htmlFor="protection">Output protection</label>
-                          <select
-                            id="protection"
-                            value={String(run.protection)}
-                            disabled={busy}
-                            onChange={(e) =>
-                              action(() =>
-                                mutate(
-                                  "demo-admin/protection",
-                                  {
-                                    run_id: run.id,
-                                    enabled: e.target.value === "true",
-                                    expected_revision: run.revision,
-                                  },
-                                  true,
-                                  "PUT",
-                                ),
-                              )
-                            }
-                          >
-                            <option value="false">Disabled</option>
-                            <option value="true">Enabled — fail closed</option>
-                          </select>
-                        </div>
-                        <button
-                          className="button outline small"
-                          disabled={busy}
-                          onClick={() =>
-                            action(async () => {
-                              await mutate("demo-admin/bind", {
-                                token: run.binding,
-                              });
-                              setNotice(
-                                "Run linked to the customer session in this browser. Open banking in another tab.",
-                              );
-                            })
-                          }
-                        >
-                          Link customer session
-                        </button>
-                        <Link
-                          href="/banking"
-                          target="_blank"
-                          className="text-link"
-                        >
-                          Open banking ↗
-                        </Link>
-                      </div>
-                      <p className="notice">
-                        Protection verification: {status.protection_status}.
-                        Enabling the switch does not prove a live control has
-                        run.
-                      </p>
-                      <div className="prompt-box">
-                        <span className="mini-label">DEMO PROMPT</span>
-                        <p>{status.scenarios[run.scenario].prompt}</p>
-                        <button
-                          className="text-button"
-                          onClick={async () => {
-                            try {
-                              await navigator.clipboard.writeText(
-                                status.scenarios[run.scenario].prompt,
-                              );
-                              setNotice("Prompt copied.");
-                            } catch {
-                              setNotice("Select and copy the prompt above.");
-                            }
-                          }}
-                        >
-                          Copy prompt
-                        </button>
-                      </div>
-                      <p className="fine-print">
-                        Fault scenarios deliberately inject the candidate after
-                        the live model call. Before/after replays the same
-                        candidate; traces label both behaviours.
-                      </p>
-                    </>
-                  ) : (
-                    <p className="muted">
-                      Create a run, log in to customer banking in this browser,
-                      then link the customer session.
-                    </p>
-                  )}
+                  <h2>Demo diagnostics</h2>
                   <div className="admin-actions">
                     <button
                       className="button outline small"
@@ -429,15 +303,6 @@ export default function Admin() {
                     </button>
                     <button
                       className="button outline small"
-                      disabled={busy}
-                      onClick={() =>
-                        action(() => mutate("demo-admin/reset", {}, true))
-                      }
-                    >
-                      Reset run
-                    </button>
-                    <button
-                      className="button outline small"
                       onClick={() =>
                         action(async () =>
                           setExpected(await api("demo-admin/expected-results")),
@@ -450,7 +315,7 @@ export default function Admin() {
                   {expected && <pre>{JSON.stringify(expected, null, 2)}</pre>}
                 </section>
                 <section className="admin-card">
-                  <h2>Latest run evidence</h2>
+                  <h2>Latest chat evidence</h2>
                   <button
                     className="button outline small"
                     disabled={busy}
@@ -464,7 +329,7 @@ export default function Admin() {
                   </button>
                   {!status.events.length ? (
                     <p className="muted">
-                      No runs observed yet. No scores or decisions are
+                      No demo responses yet. No scores or decisions are
                       fabricated.
                     </p>
                   ) : (

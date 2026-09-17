@@ -42,6 +42,19 @@ npm run dev
 
 The frontend proxies to backend port 8001. Local path overrides are necessary because `.env.example` uses container paths. Missing model credentials allow banking pages to run; chat reports that its provider is unconfigured. It never silently substitutes an offline model.
 
+## Direct demo controls
+
+Open `/demo-admin` and sign in once with the presenter password. The integrated demo chat connects automatically; no customer login, run creation, or session linking is needed.
+
+- Click **Enable Incomplete Answer**, **Enable Hallucinated Policy**, **Enable Incorrect Total**, or **Enable Protection Before / After**. **Normal Answers** returns to ordinary tool-backed answers.
+- A saved-setting confirmation and active scenario indicator show what applies to your next message. Scenario changes start a fresh conversation automatically and turn protection off.
+- Click **Run example question** to send the correct scenario prompt. Each response labels the scenario actually used and its protection outcome. Historical labels do not change when you select another scenario.
+- **Check and block unsafe answers** is available for the policy scenarios. It checks an answer before delivery; rejection or an unavailable check returns a fallback. A switch being on does not prove a successful control evaluation.
+- Settings are isolated to your presenter session. Refresh preserves settings while the session/run remains valid; another browser or colleague has a separate demo. Customer banking is independent. A new login or expired run starts with normal answers.
+- The transcript is local to the page. **Latest chat evidence** retains the active run’s recorded responses, candidate hashes, and real evaluation/control results.
+
+Follow [the presenter walkthrough](DEMO-SCRIPT.md) for expected outputs and before/after protection steps. After pulling frontend or backend changes, deploy with `sudo docker compose up --build -d` from the project root.
+
 ## Providers
 
 Configure `LLM_PROVIDER=openai|anthropic|ollama` and the corresponding model/key in `.env`; restart backend after changes. Defaults: OpenAI `gpt-4o-mini-2024-07-18`, Anthropic `claude-haiku-4-5-20251001`, and local Ollama `gemma4:e2b`. Calls have bounded time, output, model iterations, and tool iterations. Provider errors are reported safely without exposing keys. No fallback provider is selected automatically.

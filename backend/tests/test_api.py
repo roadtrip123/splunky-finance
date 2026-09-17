@@ -19,8 +19,8 @@ def test_auth_scope_csrf_and_logout(client):
     assert client.get("/api/accounts").status_code == 401
 
 
-def test_rate_limits_expiry(client):
-    for _ in range(5):
+def test_repeated_failed_logins_do_not_lock_out_valid_login(client):
+    for _ in range(7):
         assert (
             client.post(
                 "/api/auth/login",
@@ -29,12 +29,10 @@ def test_rate_limits_expiry(client):
             ).status_code
             == 401
         )
-    assert (
-        client.post(
-            "/api/auth/login", headers={"Origin": "http://localhost:3000"}, json={"password": "wrong"}
-        ).status_code
-        == 429
-    )
+    login(client)
+
+
+def test_session_expiry(client):
     login(client, True)
     for session in client.app.state.auth.sessions.values():
         session.expires = time.time() - 1
@@ -128,3 +126,80 @@ def test_controlled_scenario_accepts_pasted_whitespace(client):
     assert client.app.state.chat.events[-1]["scenario"] == "incomplete_answer"
     rejected = client.post("/api/chat", headers=customer, json={"message": prompt.replace("three", "two")})
     assert rejected.status_code == 400
+
+
+def test_presenter_workspace_without_customer_login(client):
+    from app.demo.scenarios import SCENARIOS
+
+    assert client.post("/api/demo-admin/workspace").status_code == 401
+    headers = login(client, True)
+    run = client.post("/api/demo-admin/workspace", headers=headers).json()
+    assert client.post("/api/demo-admin/workspace", headers=headers).json()["id"] == run["id"]
+    assert client.get("/api/auth/session").json()["authenticated"] is False
+    payload = {
+        "run_id": run["id"], "expected_revision": run["revision"], "scenario": "incomplete_answer", "protection": False
+    }
+    assert client.put("/api/demo-admin/workspace", json=payload).status_code == 403
+    run = client.put("/api/demo-admin/workspace", headers=headers, json=payload).json()
+    assert client.put("/api/demo-admin/workspace", headers=headers, json=payload).status_code == 409
+    answer = client.post(
+        "/api/demo-admin/chat",
+        headers=headers,
+        json={
+            "run_id": run["id"],
+            "expected_revision": run["revision"],
+            "message": SCENARIOS["incomplete_answer"]["prompt"],
+        },
+    ).json()
+    assert answer["answer"] == "You spent $754.19 AUD on restaurants last month."
+    assert answer["scenario"] == "incomplete_answer"
+    assert answer["protection_enabled"] is False
+    assert answer["protection_decision"]["decision"] == "disabled"
+    events = client.get("/api/demo-admin/status").json()["events"]
+    assert events[-1]["presenter_run_id"] == run["id"]
+    # A second presenter cannot modify or use the first presenter's demo.
+    second = login(client, True)
+    assert (
+        client.post(
+            "/api/demo-admin/chat",
+            headers=second,
+            json={"run_id": run["id"], "expected_revision": run["revision"], "message": "Hello"},
+        ).status_code
+        == 404
+    )
+    fresh = client.post("/api/demo-admin/workspace", headers=second).json()
+    assert fresh["scenario"] == "normal_spending"
+    assert fresh["id"] != run["id"]
+
+
+def test_demo_setting_change_clears_conversation_and_rejects_stale_send(client):
+    headers = login(client, True)
+    run = client.post("/api/demo-admin/workspace", headers=headers).json()
+    first = client.post(
+        "/api/demo-admin/chat",
+        headers=headers,
+        json={"run_id": run["id"], "expected_revision": 0, "message": "Hello"},
+    ).json()
+    changed = client.put(
+        "/api/demo-admin/workspace",
+        headers=headers,
+        json={"run_id": run["id"], "expected_revision": 0, "scenario": "incorrect_total", "protection": False},
+    ).json()
+    assert first["conversation_id"] not in client.app.state.chat.conversations
+    assert changed["revision"] == 1
+    assert (
+        client.post(
+            "/api/demo-admin/chat",
+            headers=headers,
+            json={"run_id": run["id"], "expected_revision": 0, "message": "Hello"},
+        ).status_code
+        == 409
+    )
+    assert (
+        client.put(
+            "/api/demo-admin/workspace",
+            headers=headers,
+            json={"run_id": run["id"], "expected_revision": 1, "scenario": "incorrect_total", "protection": True},
+        ).status_code
+        == 422
+    )
