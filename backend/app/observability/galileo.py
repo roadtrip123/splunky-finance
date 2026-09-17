@@ -181,6 +181,29 @@ class Telemetry:
         except Exception:  # noqa: BLE001 - isolate SDK failures without exposing credential-bearing errors
             self.status["last_error"] = "A telemetry event could not be recorded"
 
+    def answer_span(self, turn, prompt, candidate, usage=None):
+        """Log the delivered candidate as a named LLM span.
+
+        Span-level RAG evaluators score an LLM span against the trace's retrieved context, so they
+        need the customer answer as a plain string on its own node. The trace output stays the JSON
+        record the trace-level custom judges read. This is also the node the bound Agent Control
+        output control scopes, so evaluation and protection address the same step.
+        """
+        if not turn:
+            return
+        try:
+            turn["logger"].add_llm_span(
+                input=prompt,
+                output=candidate,
+                model=self.settings.model_name,
+                name="customer-visible-answer",
+                num_input_tokens=(usage or {}).get("input_tokens"),
+                num_output_tokens=(usage or {}).get("output_tokens"),
+                total_tokens=(usage or {}).get("total_tokens"),
+            )
+        except Exception:  # noqa: BLE001 - isolate SDK failures without exposing credential-bearing errors
+            self.status["last_error"] = "A telemetry event could not be recorded"
+
     async def finish(self, turn, record):
         if not turn:
             return

@@ -232,6 +232,7 @@ class ChatService:
                             "evidence": evidence,
                             "event_id": event_id,
                         }
+                self.telemetry.answer_span(turn, message, candidate, usage)
                 # This awaited gate completes before response construction. No token streaming bypass exists.
                 final, decision = await self.protection.check(
                     candidate, message, evidence, turn["logger"] if turn else None, enabled

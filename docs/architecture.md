@@ -2,7 +2,7 @@
 
 Next.js App Router renders public pages and authenticated banking pages. A same-origin API proxy forwards cookies and CSRF tokens to FastAPI. Only backend reads provider credentials. Customer and presenter roles have separate signed, HttpOnly, SameSite=Strict cookies, expiring server sessions, Argon2 password verification, and bounded failed-login tracking. Authenticated mutations require exact Origin and role CSRF tokens. Customer identifiers are injected into tool closures, never accepted as model authorization.
 
-Backend modules: config.py validates configuration; schemas.py validates persisted datasets; storage.py implements locked atomic JSON replacement; demo/generator.py generates synthetic ledgers; demo/expected_results.py supplies deterministic arithmetic; tools.py supplies account, transaction, calculation, and policy tools; agent.py manages bounded conversations and candidate replay; observability supplies Galileo export and synchronous output protection; main.py exposes routes.
+Backend modules: config.py validates configuration; schemas.py validates persisted datasets; storage.py implements locked atomic JSON replacement; demo/generator.py generates synthetic ledgers; demo/expected_results.py supplies deterministic arithmetic; tools.py supplies account, transaction, and calculation tools plus a policy retriever; agent.py manages bounded conversations and candidate replay; observability supplies Galileo export and synchronous output protection; main.py exposes routes.
 
 ## Data
 
@@ -19,6 +19,8 @@ Dataset version and hash protect reproducibility. Corrupt files cause a visible 
 ## Candidate protection and evaluation
 
 Each turn uses real banking tools through a bounded LangChain agent. Presenter fault scenarios deliberately inject a candidate after the model response. Deterministic evidence supplementation is marked as presenter workflow rather than model retrieval. The before/after scenario reuses the same candidate, evidence, prompt, and dataset; it makes no second model call. Its source event and candidate SHA256 identify that replay.
+
+Policy lookup runs through a LangChain retriever, so the callback records a retriever span carrying the retrieved chunks. Galileo RAG evaluators score generation against retrieved context; a tool span carrying the same JSON is not read as context, so retrieval-grounded metrics have no input without this. The delivered candidate is also logged as an LLM span named `customer-visible-answer`, which is the node span-level evaluators score and the node the bound Agent Control output control scopes. Trace output remains the JSON record that trace-level custom judges read.
 
 The protection gate is awaited before constructing the customer response. Missing configuration, service errors, or empty control evaluations produce a safe fallback when protection is enabled. Disabled protection delivers the candidate and is explicitly unverified. Actual Agent Control match/non-match responses determine allow/deny. Telemetry failure does not change an already verified gate decision. Asynchronous Galileo judges are distinct from the synchronous control gate; displayed scores are actual fetched metrics or unavailable.
 

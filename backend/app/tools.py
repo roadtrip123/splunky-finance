@@ -3,8 +3,11 @@ from datetime import date
 from pathlib import Path
 from typing import Annotated
 
+from langchain_core.documents import Document
+from langchain_core.retrievers import BaseRetriever
+from langchain_core.runnables import RunnableConfig
 from langchain_core.tools import tool
-from pydantic import Field
+from pydantic import ConfigDict, Field
 
 from app.demo.expected_results import CATEGORY_ALIASES, spending
 
@@ -84,6 +87,31 @@ class Banking:
         return [doc for _, doc in scored[:limit]]
 
 
+class PolicyRetriever(BaseRetriever):
+    """Policy lookup as a LangChain retriever.
+
+    Registering retrieval as a retriever rather than a plain tool makes the callback emit a
+    retriever span, so the chunks reach Galileo as context. RAG evaluators that score against
+    retrieved context (completeness, context adherence, chunk/context relevance) have no input
+    without it; a tool span carrying the same JSON is not read as context.
+    """
+
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+    banking: Banking
+    limit: int = 3
+
+    def _get_relevant_documents(self, query: str, *, run_manager=None) -> list[Document]:
+        return [
+            Document(
+                page_content=document["excerpt"],
+                metadata={
+                    key: document[key] for key in ("document_id", "title", "section", "citation")
+                },
+            )
+            for document in self.banking.search(query, self.limit)
+        ]
+
+
 def build_tools(banking: Banking, evidence: dict):
     # Customer scope is captured from the authenticated server dataset, never an LLM argument.
     @tool
@@ -155,9 +183,13 @@ def build_tools(banking: Banking, evidence: dict):
     def search_bank_policy(
         query: Annotated[str, Field(min_length=1, max_length=300)],
         limit: Annotated[int, Field(ge=1, le=5)] = 3,
+        config: RunnableConfig = None,
     ) -> dict:
         """Search fictional bank policies. Return source excerpts and section citations; no match means unknown."""
-        documents = banking.search(query, limit)
+        # `config` is injected by LangChain and hidden from the model. Passing it through keeps the
+        # retriever span inside this turn's trace instead of orphaning it.
+        found = PolicyRetriever(banking=banking, limit=limit).invoke(query, config=config)
+        documents = [{**document.metadata, "excerpt": document.page_content} for document in found]
         evidence.setdefault("policies", []).extend(documents)
         return {"documents": documents}
 

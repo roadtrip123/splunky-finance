@@ -117,3 +117,58 @@ def test_real_sdk_callback_exports_model_and_tool_under_one_trace(settings, monk
     assert any(child.type == "llm" for child in children)
     assert any(child.type == "tool" and child.name == "calculate_spending" for child in children)
     assert any(child.name == "output-protection-decision" for child in children)
+    # Span-level evaluators and the bound output control both address this node by name.
+    answer = next(c for c in children if c.type == "llm" and c.name == "customer-visible-answer")
+    assert answer.output.content == event["candidate_output"]
+
+
+def test_policy_retrieval_exports_a_retriever_span_with_chunks(settings, monkeypatch):
+    """Retrieved chunks must reach Galileo as a retriever span; RAG evaluators score against it."""
+    from uuid import uuid4
+
+    from conftest import FakeModel
+    from fastapi.testclient import TestClient
+    from galileo import GalileoLogger as RealLogger
+
+    from app.main import create_app
+
+    exported = []
+    original_init = RealLogger.__init__
+
+    def initialize(self, **kwargs):
+        original_init(
+            self,
+            project="offline",
+            log_stream="offline",
+            ingestion_hook=lambda request: exported.extend(request.traces),
+        )
+        self.project_id = str(uuid4())
+        self.log_stream_id = str(uuid4())
+
+    monkeypatch.setattr(RealLogger, "__init__", initialize)
+    monkeypatch.setattr(RealLogger, "start_session", lambda self, **kwargs: "offline-session")
+    monkeypatch.setattr("galileo.log_streams.get_log_stream", lambda **kwargs: object())
+    settings.galileo_enabled = True
+    settings.galileo_api_key = settings.openai_api_key
+    with TestClient(create_app(settings, model_builder=lambda s: FakeModel())) as client:
+        headers = login(client)
+        response = client.post(
+            "/api/chat",
+            headers=headers,
+            json={"message": "What are the fees on my Everyday account and the transfer limit?"},
+        )
+        assert response.status_code == 200
+        event = client.app.state.chat.events[-1]
+
+    def descendants(node):
+        for child in node.spans:
+            yield child
+            if hasattr(child, "spans"):
+                yield from descendants(child)
+
+    children = list(descendants(exported[0]))
+    retriever = next(child for child in children if child.type == "retriever")
+    assert retriever.output, "retriever span carried no chunks"
+    citations = {document["citation"] for document in event["evidence"]["policies"]}
+    assert "everyday-fees#monthly-fee" in citations
+    assert any(child.type == "llm" and child.name == "customer-visible-answer" for child in children)
