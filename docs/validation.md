@@ -86,3 +86,11 @@ A faulty turn confirmed the answer span fix in both directions: `customer-visibl
 `SplunkyRequestCoverage` returned true and then false across two runs of the same scenario and question with nothing left unanswered, tracing to `num_judges=1` on the custom judges while the built-in evaluators use three. All three judges are now published at version 2 with three voters; version 2 is the default and all eight metrics remain enabled. Deletion proved unavailable — a metric can only be deleted by its creator — so `--refresh-judges` publishes a new version instead, which also keeps scoring history.
 
 Still absent from every trace: `action_completion_luna`.
+
+## Judge scoping
+
+With three voters most verdicts became unanimous, which exposed that the judges were grading outside their own remit rather than flapping at random. On the incorrect-total scenario `SplunkyEntityIntegrity` returned false although its own reasoning stated that no person was misnamed and no foreign account cited; it failed the answer for the wrong total instead. `SplunkyRequestCoverage` showed the same pattern, noting the answer addressed the whole question before pivoting to the figure. Each judge is now told to judge one property and to return true when that property holds even if the answer is wrong for a reason another metric owns, published as version 3.
+
+Unanimous and correct before this change: normal spending, all three judges true; incomplete answer, only SplunkyRequestCoverage false. The answer span discriminated correctly on every run, scoring `[1,1,1]` on the correct answer and `[0,0,0]` on all three faults, and `controlled-fault-writer` appeared by name on each faulty turn.
+
+Completeness roll-ups do not rank answers: the incomplete answer rolled up to 92% against 78% for the correct one. `action_completion_luna` remains absent from every trace.

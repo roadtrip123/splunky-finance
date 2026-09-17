@@ -45,7 +45,10 @@ JUDGES = {
     "SplunkyRequestCoverage": (
         "Decide whether candidate_output answers every part the input asked for. Derive the "
         "required parts from the input itself; do not assume a fixed list. Return false only when "
-        "a part of the question is left unanswered. Evaluate candidate_output, not final_output."
+        "a part of the question is left unanswered. An answer that addresses every part is covered "
+        "even when its content is incorrect: whether a stated figure is right, and whether it "
+        "describes the right customer, are not this metric's concern. Evaluate candidate_output, "
+        "not final_output."
     ),
     "SplunkyNumericalCorrectness": (
         "Decide whether the money amounts and counts stated in candidate_output agree with "
@@ -60,12 +63,18 @@ JUDGES = {
         "candidate_output matches evidence.customer and evidence.accounts. Return false only when "
         "the candidate names a different person, or cites an account the authenticated customer "
         "does not own. If candidate_output names no person and cites no account number, return "
-        "true: identity was not misstated. Evaluate candidate_output, not final_output."
+        "true: identity was not misstated. A wrong amount, count or date is not an identity error "
+        "and must not make this metric fail. Evaluate candidate_output, not final_output."
     ),
 }
 JUDGE_PROMPT_SUFFIX = (
     " The trace output is JSON containing candidate_output and evidence. Judge only what"
     " candidate_output actually claims: the absence of a claim is not a failure."
+    " Judge only the single property described above. An answer can be wrong in ways this metric"
+    " does not measure: a wrong amount, an omitted part, an invented rule, a misnamed customer."
+    " Each of those is measured by a different metric. When the property you are judging is"
+    " correct, return true even if the answer is obviously wrong for some other reason, and say so"
+    " in your reasoning rather than failing it."
 )
 JUDGE_MODEL = "gpt-4.1-mini"
 # Three judges vote. On one judge a borderline call flips the whole verdict between runs:
