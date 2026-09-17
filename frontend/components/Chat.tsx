@@ -6,7 +6,11 @@ type Message = {
   role: "user" | "assistant";
   text: string;
   citations?: Citation[];
+  at: number;
+  elapsedMs?: number;
 };
+const clock = (at: number) =>
+  new Date(at).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit", second: "2-digit" });
 export default function Chat({
   close,
   visible,
@@ -42,7 +46,8 @@ export default function Chat({
   async function send(text: string) {
     if (!text.trim() || busy || !demo.ready || pairBusy) return;
     setError("");
-    setMessages((m) => [...m, { role: "user", text }]);
+    const sentAt = Date.now();
+    setMessages((m) => [...m, { role: "user", text, at: sentAt }]);
     setBusy(true);
     try {
       const confirmed = await demo.sync();
@@ -54,9 +59,16 @@ export default function Chat({
       }>("chat", { message: text, conversation_id: conversation, demo_version: confirmed.version });
       setInput("");
       setConversation(result.conversation_id);
+      const receivedAt = Date.now();
       setMessages((m) => [
         ...m,
-        { role: "assistant", text: result.answer, citations: result.citations },
+        {
+          role: "assistant",
+          text: result.answer,
+          citations: result.citations,
+          at: receivedAt,
+          elapsedMs: receivedAt - sentAt,
+        },
       ]);
     } catch (e) {
       setError((e as Error).message);
@@ -146,6 +158,11 @@ export default function Chat({
             <div key={index} className={`message ${message.role}`}>
               <span className="message-label">
                 {message.role === "user" ? "YOU" : "MY BANK AGENT"}
+                <time className="message-time" dateTime={new Date(message.at).toISOString()}>
+                  {clock(message.at)}
+                  {message.elapsedMs !== undefined &&
+                    ` · ${(message.elapsedMs / 1000).toFixed(1)}s`}
+                </time>
               </span>
               <p>{message.text}</p>
               {message.citations?.map((c) => (

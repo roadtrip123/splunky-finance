@@ -969,6 +969,16 @@ td small {
   font-size: 8px;
   color: var(--muted);
   letter-spacing: 1.4px;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+.message-time {
+  letter-spacing: 0.4px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 .message p {
   white-space: pre-wrap;
