@@ -11,10 +11,10 @@ All accounts, transactions, policies, and faults are synthetic. No transfer, pay
 
 ## Before the audience arrives
 
-The presenter workspace includes its own automatically connected demo chat. No customer login, manual run creation, session linking, or logout is required. Settings are isolated to your presenter session; another browser or colleague has an independent demo. Refreshing preserves the active settings while the session and run remain valid.
+The presenter portal controls a connected banking chat. Both browsers communicate through the server; no direct browser-to-browser connection is used.
 
-1. Open `/demo-admin` and sign in with the presenter password. The demo chat connects automatically.
-2. Optionally open customer banking at `/login` to demonstrate account pages. The scenario buttons control only the integrated demo chat.
+1. Sign into `/demo-admin`, then customer banking in another tab in the same browser profile. Open **My Bank Agent**. Automatic linking works regardless of which tab was opened first.
+2. For a different computer/profile, select **Connect using pairing code**. In the banking chat expand **Demo connection**, enter the code, and click **Connect demo**. Codes expire in five minutes and are single-use. Confirm the portal shows **Applied to connected banking session**. Each presenter controls one session; disconnect before selecting another.
 3. Check the status cards:
    - **Model provider** should become `connected` after a successful model request.
    - **Galileo** should show `connected`; `Export: exported` appears only after a trace flush succeeds.
@@ -72,22 +72,29 @@ Use ordinary customer chat, or select **Normal Answers** in the presenter worksp
 
 **What this shows:** a genuine model request selected an authoritative read-only tool. Galileo records model and tool spans rather than only a top-level session.
 
-## Part 3 — choose a scenario directly
+## Part 3 — control the existing banking conversation
 
-1. In `/demo-admin`, click a scenario button such as **Enable Incomplete Answer**.
-2. Wait for the confirmation that it applies to the next demo message. The active button and **Scenario** indicator reflect the saved server setting.
-3. Read the expected behavior below the buttons, then click **Run example question**.
-4. Read **Scenario used** and the protection outcome above the response. These labels come from the backend result, not from the currently selected button.
+1. Keep the banking chat open. Its footer says **Fictional banking data only** in the usual muted colour.
+2. In the portal, click **Enable Incomplete Answer**.
+3. Without refreshing banking, watch the same footer turn muted red. The text, position, size, and weight stay unchanged. The portal confirms **Applied to connected banking session** after the browser acknowledges the change.
+4. Send the displayed example question in the existing banking conversation. The response should contain only the total, omitting top purchases and the previous-month comparison.
+5. Click **Normal Answers** in the portal. Wait for the footer to return to its original muted colour, then ask the same question again. This response uses normal model/tool execution without the deliberate fault.
 
-Changing scenarios automatically starts a fresh conversation and switches protection off. Earlier responses retain their original labels. There is no need to sign out, open incognito, or link a customer session. Settings remain scoped to this presenter session. A new login or expired run starts a normal demo again.
+The visible transcript is preserved. Model context resets on setting changes so deliberately faulty prior answers do not contaminate the next answer. An in-flight response finishes using its original scenario; changes affect subsequent requests. Normal mode does not guarantee model correctness.
 
-**Check and block unsafe answers** is available for policy scenarios. It checks the candidate before delivery; a rejected answer or unavailable check produces a fallback. Protection readiness is separate from the actual response decision. Incomplete answers and incorrect totals demonstrate evaluation, not the configured policy protection control.
+Muted amber means synchronization or connection trouble; sending is paused until confirmation. Hover over the footer for details, or use its accessible description. The portal identifies the connected session and shows whether it has acknowledged settings. No scenario labels or traffic-light icons appear on customer responses; inspect detailed **Latest chat evidence** in the portal.
+
+If banking is closed, reopen My Bank Agent to resume acknowledgments. Connections remain stable until disconnected or expired. After explicit disconnect, use a new pairing code to reconnect. Refreshing retains valid links; a server restart or new login may require reconnection. Another computer never silently takes over an existing connection.
+
+The integrated presenter **Demo chat** is still available for rehearsal. **Run example question** sends there, not to the customer banking tab. For a live banking demonstration, copy the displayed prompt into My Bank Agent.
+
+**Check and block unsafe answers** is available for policy scenarios. Rejection or a check that cannot complete produces a fallback. Read the actual decision in the portal; a checked switch does not prove remote control execution.
 
 ## Part 4 — completeness evaluation
 
 1. Click **Enable Incomplete Answer**.
 2. Check that **Scenario: Incomplete Answer** is active.
-3. Click **Run example question**. The prompt is sent automatically in the integrated chat.
+3. Send the displayed example question in the connected banking chat. For rehearsal only, **Run example question** sends it in the portal.
 4. The live model still runs first. The controlled workflow then replaces the candidate with only the restaurant total, deliberately omitting the transaction count, three largest purchases, and previous-month comparison.
 5. In **Latest chat evidence**, expand the event and compare:
    - **Raw model output** — what the live model produced.
@@ -101,7 +108,7 @@ Changing scenarios automatically starts a fresh conversation and switches protec
 ## Part 5 — policy grounding evaluation
 
 1. Click **Enable Hallucinated Policy**.
-2. Click **Run example question** to send:
+2. Send the displayed question in the connected banking chat:
 
    > What is the daily external transfer limit on my Everyday account?
 
@@ -114,7 +121,7 @@ Changing scenarios automatically starts a fresh conversation and switches protec
 ## Part 6 — numerical correctness evaluation
 
 1. Click **Enable Incorrect Total**.
-2. Click **Run example question**; the conversation was reset automatically.
+2. Send the displayed restaurant-spending question in the connected banking chat; model context resets automatically.
 3. The controlled candidate adds exactly AUD $100.00 to the authoritative total. With the default dataset it reports **$854.19** rather than **$754.19**.
 4. Compare candidate output with **Inspect expected results** and the calculation evidence.
 5. Fetch actual Galileo scores. A configured `SplunkyNumericalCorrectness` metric should reject the altered amount.
@@ -129,14 +136,14 @@ This is the key protection demonstration.
 
 1. Click **Enable Protection Before / After**.
 2. Leave **Check and block unsafe answers** unchecked.
-3. Click **Run example question**.
+3. Send the displayed transfer-limit question in the connected banking chat.
 4. Show that the customer receives the controlled unlimited/no-verification candidate.
 5. In evidence, note its candidate hash and event/run ID.
 
 ### After protection
 
 1. Check **Check and block unsafe answers**.
-2. Click **Run example question** again without reselecting the scenario or changing the dataset.
+2. Send the same question in the same connected banking chat without reselecting the scenario or changing the dataset.
 3. The application replays the exact frozen candidate and evidence. It does **not** make a second model call.
 4. Verify the second event has:
    - `replayed: true`;
@@ -194,7 +201,9 @@ Use these exact distinctions:
 | Protection unverified | Configure/bind Agent Control and run a protected turn; the switch alone is not verification |
 | Exact prompt rejected | Use **Run example question** for the active scenario |
 | Replay rejected | Do not change prompt, scenario, or dataset between before/after turns |
-| Customer chat not affected | Use the integrated **Demo chat** in the presenter workspace; scenario controls are scoped there |
+| Customer chat not affected | Open My Bank Agent and check the portal connection acknowledgment; use pairing for another browser or computer |
+| Footer amber | Wait for reconnection; if expired, disconnect and pair again |
+| Pairing code rejected | Generate a fresh code; codes expire after five minutes and are single-use |
 | Settings changed in another tab | Review the refreshed selection and retry; stale requests are rejected |
 | HTTP 429 from model provider | Check provider quota/credit; distinguish it from Cloudflare rate limiting |
 

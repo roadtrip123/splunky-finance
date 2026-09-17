@@ -1408,3 +1408,9 @@ pre {
 .demo-response { padding: 1rem 0; border-bottom: 1px solid #d9e2db; }
 .demo-response .badge { white-space: normal; }
 .demo-transcript { max-height: 640px; overflow-y: auto; }
+.demo-footer-normal { color: inherit; }
+.demo-footer-fault { color: #a64b48; }
+.demo-footer-pending { color: #986c2c; }
+.demo-pairing { padding: 0.5rem 1rem; font-size: 0.75rem; }
+.demo-pairing summary { cursor: pointer; color: var(--muted); }
+.demo-pairing input { max-width: 12rem; }

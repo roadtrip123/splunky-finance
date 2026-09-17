@@ -27,3 +27,12 @@ Sessions, conversations, presenter runs, jobs, and recent evidence are bounded i
 ## Acceptance still requiring external configuration
 
 Verify one live tool-backed turn for each configured provider, genuine Galileo trace export and custom judge values for the controlled faults, real Agent Control allow/deny with a bound tenant control, and Docker build/start/restart persistence. Offline tests validate application behavior without asserting these external integrations passed.
+
+
+## Live demo connections
+
+`Connections` keeps one customer session attached to a presenter run. Automatic linking uses the authenticated customer and presenter cookies in the same browser profile. A different profile can redeem a five-minute, single-use pairing code while authenticated as a customer. Existing targets are never replaced implicitly. Disconnect disables automatic relinking until an explicit pairing succeeds. Links and codes live in the single backend process and expire with the sessions/runs.
+
+The open banking chat polls `POST /api/chat/demo-sync` approximately once per second and acknowledges the applied version through `POST /api/chat/demo-ack`. These endpoints require customer authentication and CSRF validation. The presenter status reports acknowledgment of the current run/revision separately from connection presence. Browser communication goes through the server, never peer-to-peer.
+
+The client synchronizes before each send and supplies `demo_version`; a changed revision returns 409. Model context restarts after a version change while the browser retains its visible transcript. Each turn snapshots run settings so changes do not alter an in-flight answer. The customer footer changes only colour; detailed evidence remains in the presenter portal. Pairing endpoints require CSRF and the appropriate role.

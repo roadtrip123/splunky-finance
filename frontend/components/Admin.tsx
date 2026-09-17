@@ -146,7 +146,7 @@ export default function Admin() {
               </h1>
               <p className="muted">
                 Actual configuration, controlled faults, and live evidence.
-                Customer banking stays separate.
+                Live controls for your connected banking chat.
               </p>
             </div>
             {error && (

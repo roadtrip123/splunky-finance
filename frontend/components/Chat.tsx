@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import { Citation, mutate } from "@/lib/api";
+import { useDemoConnection, demoRequest } from "@/lib/demo-connection";
 type Message = {
   role: "user" | "assistant";
   text: string;
@@ -13,6 +14,9 @@ export default function Chat({
   close: () => void;
   visible: boolean;
 }) {
+  const demo = useDemoConnection(visible);
+  const [pairCode, setPairCode] = useState("");
+  const [pairBusy, setPairBusy] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [conversation, setConversation] = useState<string>();
@@ -36,17 +40,19 @@ export default function Chat({
     bottom.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, busy]);
   async function send(text: string) {
-    if (!text.trim() || busy) return;
-    setInput("");
+    if (!text.trim() || busy || !demo.ready || pairBusy) return;
     setError("");
     setMessages((m) => [...m, { role: "user", text }]);
     setBusy(true);
     try {
+      const confirmed = await demo.sync();
+      if (confirmed.expired) throw new Error("Demo session expired. Disconnect or pair again.");
       const result = await mutate<{
         answer: string;
         conversation_id: string;
         citations: Citation[];
-      }>("chat", { message: text, conversation_id: conversation });
+      }>("chat", { message: text, conversation_id: conversation, demo_version: confirmed.version });
+      setInput("");
       setConversation(result.conversation_id);
       setMessages((m) => [
         ...m,
@@ -54,6 +60,7 @@ export default function Chat({
       ]);
     } catch (e) {
       setError((e as Error).message);
+      await demo.sync().catch(() => {});
     } finally {
       setBusy(false);
       field.current?.focus();
@@ -127,7 +134,7 @@ export default function Chat({
                   className="suggestion"
                   key={text}
                   onClick={() => send(text)}
-                  disabled={busy}
+                  disabled={busy || !demo.ready || pairBusy}
                 >
                   {text} ↗
                 </button>
@@ -188,7 +195,7 @@ export default function Chat({
           />
           <button
             className="button small"
-            disabled={busy || !input.trim()}
+            disabled={busy || !demo.ready || pairBusy || !input.trim()}
             aria-label="Send message"
           >
             ↑
@@ -197,7 +204,7 @@ export default function Chat({
             <button
               type="button"
               className="text-button"
-              disabled={busy}
+              disabled={busy || !demo.ready || pairBusy}
               onClick={async () => {
                 try {
                   await mutate("chat/reset");
@@ -211,9 +218,27 @@ export default function Chat({
             >
               New conversation
             </button>
-            <span>Fictional banking data only</span>
+            <span className={`demo-footer demo-footer-${demo.tone}`} title={demo.description} aria-label={`Fictional banking data only. ${demo.description}`}>Fictional banking data only</span>
           </div>
         </form>
+        <details className="demo-pairing">
+          <summary>Demo connection</summary>
+          <p>{demo.state?.connected ? "Connected to presenter controls." : "Same-browser linking is automatic. For another computer, enter the presenter’s pairing code."}</p>
+          <label htmlFor="demo-pair-code">Pairing code</label>
+          <input id="demo-pair-code" value={pairCode} maxLength={32} onChange={(e) => setPairCode(e.target.value)} />
+          <button type="button" className="text-button" disabled={busy || pairBusy || !pairCode.trim()} onClick={async () => {
+            setPairBusy(true); setError("");
+            try { await demoRequest("chat/demo-pair", { code: pairCode }); setPairCode(""); await demo.sync(); }
+            catch (e) { setError((e as Error).message); }
+            finally { setPairBusy(false); }
+          }}>Connect demo</button>
+          <button type="button" className="text-button" disabled={busy || pairBusy} onClick={async () => {
+            setPairBusy(true); setError("");
+            try { await demoRequest("chat/demo-disconnect"); await demo.sync(); }
+            catch (e) { setError((e as Error).message); }
+            finally { setPairBusy(false); }
+          }}>Disconnect demo</button>
+        </details>
       </div>
     </div>
   );

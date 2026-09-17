@@ -14,6 +14,7 @@ from pydantic import Field
 from app.agent import ChatService
 from app.auth import Authentication, Session
 from app.config import Settings
+from app.demo.connections import Connections
 from app.demo.scenarios import SCENARIOS
 from app.observability.galileo import Telemetry
 from app.observability.protection import Protection
@@ -39,6 +40,14 @@ class DemoChatInput(ChatInput):
     run_id: str
 
 
+class DemoVersion(StrictModel):
+    version: str = Field(max_length=100)
+
+
+class PairingCode(StrictModel):
+    code: str = Field(min_length=1, max_length=32)
+
+
 class Binding(StrictModel):
     token: str = Field(min_length=1, max_length=80)
 
@@ -52,6 +61,7 @@ def create_app(settings=None, model_builder=None, protection_adapter=None):
     chat = ChatService(
         settings, telemetry, protection, **({"model_builder": model_builder} if model_builder else {})
     )
+    links = Connections(auth, chat)
     jobs = {}
 
     @asynccontextmanager
@@ -232,7 +242,68 @@ def create_app(settings=None, model_builder=None, protection_adapter=None):
     @app.post("/api/chat")
     async def answer(request: Request, payload: ChatInput):
         current = session(request, changing=True)
+        state = links.state(current)
+        if state["expired"] or (
+            payload.demo_version is not None and payload.demo_version != state["version"]
+        ):
+            raise HTTPException(409, "Demo settings changed; wait for synchronization and send again")
+        # Start fresh model context after a setting change, keeping the browser transcript.
+        context_version = getattr(current, "context_version", None)
+        if payload.conversation_id:
+            existing = chat.conversations.get(payload.conversation_id)
+            if existing and existing.owner != current.id:
+                raise HTTPException(404, "Conversation not found")
+        if context_version is not None and context_version != state["version"]:
+            payload = payload.model_copy(update={"conversation_id": None})
+        current.context_version = state["version"]
         return envelope(request, await chat.answer(current, payload, bank()))
+
+    @app.post("/api/chat/demo-sync")
+    async def demo_sync(request: Request):
+        customer = session(request, changing=True)
+        links.auto(customer, auth.get(request, "admin", required=False))
+        return envelope(request, links.state(customer))
+
+    @app.post("/api/chat/demo-ack")
+    async def demo_ack(request: Request, payload: DemoVersion):
+        customer = session(request, changing=True)
+        if payload.version != links.state(customer)["version"]:
+            raise HTTPException(409, "Demo settings changed")
+        links.seen[customer.id] = (payload.version, time.time())
+        return envelope(request, {"status": "acknowledged"})
+
+    @app.post("/api/chat/demo-pair")
+    async def demo_pair(request: Request, payload: PairingCode):
+        customer = session(request, changing=True)
+        links.pair(customer, payload.code)
+        return envelope(request, links.state(customer))
+
+    @app.post("/api/chat/demo-disconnect")
+    async def demo_disconnect(request: Request):
+        customer = session(request, changing=True)
+        links.disconnect(customer)
+        return envelope(request, links.state(customer))
+
+    @app.post("/api/demo-admin/pairing")
+    async def demo_pairing(request: Request):
+        admin = session(request, "admin", True)
+        run = chat.run(admin)
+        if not run:
+            raise HTTPException(409, "Open the demo workspace first")
+        return envelope(request, links.issue(run))
+
+    @app.post("/api/demo-admin/disconnect")
+    async def presenter_disconnect(request: Request):
+        admin = session(request, "admin", True)
+        run = chat.run(admin)
+        if run:
+            customer = auth.sessions.get(run.get("customer_id"))
+            if customer:
+                links.disconnect(customer, run)
+            run.pop("customer_id", None)
+            run["auto_disabled"] = True
+            links.codes = {k: v for k, v in links.codes.items() if v[0] != run["id"]}
+        return envelope(request, {"status": "disconnected"})
 
     @app.post("/api/chat/reset")
     async def clear_chat(request: Request):
@@ -254,6 +325,7 @@ def create_app(settings=None, model_builder=None, protection_adapter=None):
             chat.clear(current)
             run = chat.new_run(current)
             run["protection"] = False
+        links.auto(auth.get(request, required=False), current)
         return envelope(request, run)
 
     @app.put("/api/demo-admin/workspace")
@@ -294,7 +366,7 @@ def create_app(settings=None, model_builder=None, protection_adapter=None):
         run = chat.run(admin)
         if not run or not secrets.compare_digest(payload.token, run["binding"]):
             raise HTTPException(403, "Presenter run binding rejected")
-        customer.run_id = run["id"]
+        links.attach(customer, run)
         chat.clear(customer)
         return envelope(request, {"status": "bound"})
 
@@ -350,6 +422,7 @@ def create_app(settings=None, model_builder=None, protection_adapter=None):
         return envelope(
             request,
             {
+                "banking_connection": links.status(run),
                 "provider": settings.llm_provider,
                 "model": settings.model_name,
                 "provider_status": chat.provider_status,

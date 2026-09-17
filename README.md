@@ -42,18 +42,27 @@ npm run dev
 
 The frontend proxies to backend port 8001. Local path overrides are necessary because `.env.example` uses container paths. Missing model credentials allow banking pages to run; chat reports that its provider is unconfigured. It never silently substitutes an offline model.
 
-## Direct demo controls
+## Live presenter controls and banking chat
 
-Open `/demo-admin` and sign in once with the presenter password. The integrated demo chat connects automatically; no customer login, run creation, or session linking is needed.
+Open `/demo-admin` and sign in with the presenter password. Sign into customer banking in another tab in the **same browser profile** and open **My Bank Agent**. The server links the two sessions automatically. No logout, page refresh, or manual linking is needed.
 
-- Click **Enable Incomplete Answer**, **Enable Hallucinated Policy**, **Enable Incorrect Total**, or **Enable Protection Before / After**. **Normal Answers** returns to ordinary tool-backed answers.
-- A saved-setting confirmation and active scenario indicator show what applies to your next message. Scenario changes start a fresh conversation automatically and turn protection off.
-- Click **Run example question** to send the correct scenario prompt. Each response labels the scenario actually used and its protection outcome. Historical labels do not change when you select another scenario.
-- **Check and block unsafe answers** is available for the policy scenarios. It checks an answer before delivery; rejection or an unavailable check returns a fallback. A switch being on does not prove a successful control evaluation.
-- Settings are isolated to your presenter session. Refresh preserves settings while the session/run remains valid; another browser or colleague has a separate demo. Customer banking is independent. A new login or expired run starts with normal answers.
-- The transcript is local to the page. **Latest chat evidence** retains the active run’s recorded responses, candidate hashes, and real evaluation/control results.
+For another computer or incognito session, click **Connect using pairing code** in the portal. In My Bank Agent, expand **Demo connection**, enter the code, and click **Connect demo**. Codes expire after five minutes and can be used only once. A presenter controls one banking session; an existing connection is never silently replaced. Use **Disconnect banking session** or **Disconnect demo** before changing targets. Explicit disconnect disables automatic relinking; use a new pairing code to reconnect.
 
-Follow [the presenter walkthrough](DEMO-SCRIPT.md) for expected outputs and before/after protection steps. After pulling frontend or backend changes, deploy with `sudo docker compose up --build -d` from the project root.
+Click **Enable Incomplete Answer**, **Enable Hallucinated Policy**, **Enable Incorrect Total**, or **Enable Protection Before / After**. The connected banking chat receives changes automatically (approximately once per second while open). The portal confirms **Applied to connected banking session** only after that browser acknowledges the current setting.
+
+The chat footer keeps the exact words **Fictional banking data only**, with no icons or layout change:
+
+- Original muted colour: normal answers.
+- Muted red: a controlled fault is active.
+- Muted amber: synchronization, connection failure, or expired demo. Sending is paused until settings are confirmed. A tooltip/accessibility label describes the state.
+
+Ask the scenario's example question in the existing banking conversation. Switching **Normal Answers** restores normal tool-backed responses. The transcript remains visible, but model context starts fresh when settings change. An answer already underway finishes using its original scenario. Stale sends are rejected rather than silently using the wrong setting.
+
+**Check and block unsafe answers** is available for policy scenarios. Rejection or an unavailable check produces a fallback; enabling the switch alone does not prove a successful control evaluation. The optional integrated presenter chat remains available for rehearsal. Detailed scenario, protection, and evaluation evidence stays in the portal, not the customer transcript.
+
+Sessions are isolated from other presenters. Refreshing preserves valid server-side links; restart, logout, or expiry may require pairing again. Closed banking chats do not acknowledge settings until reopened. Follow [the presenter walkthrough](DEMO-SCRIPT.md) for the live demo sequence.
+
+After pulling changes, deploy from the project root with `sudo docker compose up --build -d`.
 
 ## Providers
 

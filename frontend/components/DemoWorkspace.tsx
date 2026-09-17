@@ -4,7 +4,7 @@ import { api, mutate } from "@/lib/api";
 
 type Run = { id: string; scenario: string; protection: boolean; revision: number };
 type Scenario = { prompt: string; protection_applicable: boolean };
-type Status = { run: Run | null; scenarios: Record<string, Scenario>; protection_status: string; galileo: { enabled: boolean; connection: string } };
+type Status = { banking_connection: { state: string; session: string | null }; run: Run | null; scenarios: Record<string, Scenario>; protection_status: string; galileo: { enabled: boolean; connection: string } };
 type Answer = { answer: string; conversation_id: string; scenario: string; protection_enabled: boolean; protection_decision: { decision?: string }; };
 type Entry = { question: string; result: Answer };
 const descriptions: Record<string, [string, string]> = {
@@ -24,6 +24,7 @@ function decision(result: Answer) {
   }
 }
 export default function DemoWorkspace({ onEvidence }: { onEvidence: () => Promise<void> }) {
+  const [pairing, setPairing] = useState<{ code: string; expires_at: number }>();
   const [status, setStatus] = useState<Status>();
   const [busy, setBusy] = useState(false);
   const active = useRef(false);
@@ -47,7 +48,7 @@ export default function DemoWorkspace({ onEvidence }: { onEvidence: () => Promis
     refresh().catch((e) => setError(e.message));
     const timer = setInterval(() => {
       if (!active.current) refresh().catch((e) => setError(e.message));
-    }, 7000);
+    }, 1500);
     return () => clearInterval(timer);
   }, []);
   async function select(scenario: string, protection: boolean) {
@@ -60,7 +61,7 @@ export default function DemoWorkspace({ onEvidence }: { onEvidence: () => Promis
       current.current = run;
       setStatus({ ...status, run });
       setConversation(undefined);
-      setNotice(`${label(scenario)} enabled. Protection ${protection ? "on" : "off"}. Applies to your next message in this demo chat. A fresh conversation is ready.`);
+      setNotice(`${label(scenario)} enabled. Protection ${protection ? "on" : "off"}. Saved for your next message. Check the banking connection confirmation below.`);
       await onEvidence();
     } catch (e) {
       setError((e as Error).message);
@@ -89,10 +90,24 @@ export default function DemoWorkspace({ onEvidence }: { onEvidence: () => Promis
   const protectionReady = status?.galileo.enabled && status.galileo.connection === "connected" && status.protection_status === "verified";
   return <section className="admin-card demo-workspace" aria-label="Demo chat workspace">
     <h2>Choose what to demonstrate</h2>
-    <p>These controls apply to the demo chat below. Your colleague’s session and customer banking are separate.</p>
+    <p>These controls apply to your connected banking session and the demo chat below. Other sessions remain independent.</p>
     {error && <p role="alert" className="error">{error}</p>}
     {notice && <p role="status" className="notice">{notice}</p>}
     {!run ? <p role="status">Connecting your demo chat…</p> : <>
+      <div className="prompt-box">
+        <h3>Banking connection</h3>
+        <p role="status">{status?.banking_connection.state === "applied" ? "Applied to connected banking session" : status?.banking_connection.state === "updating" ? "Applying settings to banking session…" : status?.banking_connection.state === "waiting" ? "Waiting for banking chat to acknowledge settings — open My Bank Agent" : status?.banking_connection.state === "disconnected" ? "Banking session disconnected or expired" : "No banking session connected. Open banking in this browser, or pair another computer."}</p>
+        {status?.banking_connection.session && <p>Session: {status.banking_connection.session}</p>}
+        {!status?.banking_connection.session && <button className="button outline small" disabled={busy} onClick={async () => {
+          try { setPairing(await mutate("demo-admin/pairing", {}, true)); setError(""); }
+          catch (e) { setError((e as Error).message); }
+        }}>Connect using pairing code</button>}
+        {pairing && !status?.banking_connection.session && <p>Pairing code: <strong data-testid="pairing-code">{pairing.code}</strong> · Expires {new Date(pairing.expires_at * 1000).toLocaleTimeString()}. Enter it under Demo connection in My Bank Agent.</p>}
+        {status?.banking_connection.session && <button className="text-button" disabled={busy} onClick={async () => {
+          try { await mutate("demo-admin/disconnect", {}, true); setPairing(undefined); await refresh(); }
+          catch (e) { setError((e as Error).message); }
+        }}>Disconnect banking session</button>}
+      </div>
       <div className="demo-scenarios">
         {Object.entries(status!.scenarios).map(([key]) => <button key={key}
           className={`button ${run.scenario === key ? "" : "outline"}`}

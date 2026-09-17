@@ -91,6 +91,7 @@ class Login(StrictModel):
 
 
 class ChatInput(StrictModel):
+    demo_version: str | None = Field(default=None, max_length=100)
     message: str = Field(min_length=1, max_length=3000)
     conversation_id: str | None = Field(default=None, max_length=80)
 

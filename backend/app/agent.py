@@ -89,7 +89,8 @@ class ChatService:
             raise HTTPException(409, "An answer is already being processed")
         async with conversation.lock:
             conversation.updated = now
-            run = self.run(session)
+            live_run = self.run(session)
+            run = dict(live_run) if live_run else None
             scenario = run["scenario"] if run else "normal_spending"
             enabled = run["protection"] if run else self.settings.galileo_protection_enabled
             dataset = banking.dataset
@@ -232,8 +233,12 @@ class ChatService:
                             simulation=True,
                             scenario=scenario,
                         )
-                    if run and scenario == "guardrail_before_after":
-                        run["replay"] = {
+                    if (
+                        run
+                        and scenario == "guardrail_before_after"
+                        and live_run["revision"] == run["revision"]
+                    ):
+                        live_run["replay"] = {
                             "prompt": message,
                             "dataset_version": dataset.manifest.dataset_version,
                             "raw": raw,

@@ -101,3 +101,62 @@ test("presenter can enable and disable Galileo with honest missing-key status", 
   await disable.click();
   await expect(enable).toBeVisible();
 });
+
+async function presenter(page: import("@playwright/test").Page) {
+  await page.goto('/demo-admin');
+  await page.getByLabel('Password', { exact: true }).fill('test-presenter-password-only');
+  await page.getByRole('button', { name: 'Log in' }).click();
+  await expect(page.getByRole('button', { name: 'Enable Incomplete Answer', exact: true })).toBeVisible();
+}
+const completePrompt = 'How much did I spend on restaurants last month, what were my three biggest transactions, and how does that compare with the previous month?';
+async function verifyLiveSwitch(admin: import("@playwright/test").Page, bank: import("@playwright/test").Page) {
+  const footer = bank.locator('.demo-footer');
+  await expect(footer).toHaveText('Fictional banking data only');
+  await expect(footer).toHaveClass(/demo-footer-normal/);
+  await admin.getByRole('button', { name: 'Enable Incomplete Answer', exact: true }).click();
+  await expect(footer).toHaveClass(/demo-footer-fault/);
+  await expect(admin.getByText('Applied to connected banking session', { exact: true })).toBeVisible();
+  await bank.getByLabel('Ask My Bank Agent', { exact: true }).fill(completePrompt);
+  await bank.getByRole('button', { name: 'Send message', exact: true }).click();
+  await expect(bank.locator('.message.assistant').last()).toContainText('You spent $754.19 AUD on restaurants last month.');
+  await admin.getByRole('button', { name: 'Normal Answers', exact: true }).click();
+  await expect(footer).toHaveClass(/demo-footer-normal/);
+  await bank.getByLabel('Ask My Bank Agent', { exact: true }).fill(completePrompt);
+  await bank.getByRole('button', { name: 'Send message', exact: true }).click();
+  await expect(bank.locator('.message.assistant')).toHaveCount(2);
+  await expect(bank.locator('.message.assistant').last()).toContainText('Restaurant spending was');
+  await expect(footer).toHaveText('Fictional banking data only');
+}
+test('same-browser banking chat follows presenter without refresh', async ({ page, context }) => {
+  await login(page);
+  await page.getByRole('button', { name: 'Open My Bank Agent' }).click();
+  const admin = await context.newPage();
+  await presenter(admin);
+  await verifyLiveSwitch(admin, page);
+  await page.route('**/api/chat/demo-sync', route => route.abort());
+  await expect(page.locator('.demo-footer')).toHaveClass(/demo-footer-pending/);
+  await expect(page.getByRole('button', { name: 'Send message', exact: true })).toBeDisabled();
+  await page.unroute('**/api/chat/demo-sync');
+  await expect(page.locator('.demo-footer')).toHaveClass(/demo-footer-normal/);
+});
+test('another computer pairs once and receives live scenario changes', async ({ page, browser, baseURL }) => {
+  await presenter(page);
+  await page.getByRole('button', { name: 'Connect using pairing code' }).click();
+  const code = await page.getByTestId('pairing-code').innerText();
+  const remote = await browser.newContext({ baseURL });
+  try {
+    const bank = await remote.newPage();
+    await login(bank);
+    await bank.getByRole('button', { name: 'Open My Bank Agent' }).click();
+    await bank.getByText('Demo connection', { exact: true }).click();
+    await bank.getByLabel('Pairing code', { exact: true }).fill(code);
+    await bank.getByRole('button', { name: 'Connect demo', exact: true }).click();
+    await expect(page.getByText('Applied to connected banking session', { exact: true })).toBeVisible();
+    await bank.getByText('Demo connection', { exact: true }).click();
+    await verifyLiveSwitch(page, bank);
+    await page.getByRole('button', { name: 'Disconnect banking session' }).click();
+    await expect(page.getByRole('button', { name: 'Connect using pairing code' })).toBeVisible();
+    await page.getByRole('button', { name: 'Enable Incomplete Answer', exact: true }).click();
+    await expect(bank.locator('.demo-footer')).toHaveClass(/demo-footer-normal/);
+  } finally { await remote.close(); }
+});
