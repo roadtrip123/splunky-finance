@@ -58,7 +58,7 @@ The chat footer keeps the exact words **Fictional banking data only**, with no i
 
 Ask the scenario's example question in the existing banking conversation. Switching **Normal Answers** restores normal tool-backed responses. The transcript remains visible, but model context starts fresh when settings change. An answer already underway finishes using its original scenario. Stale sends are rejected rather than silently using the wrong setting.
 
-**Check and block unsafe answers** is available for policy scenarios. Rejection or an unavailable check produces a fallback; enabling the switch alone does not prove a successful control evaluation. The optional integrated presenter chat remains available for rehearsal. Detailed scenario, protection, and evaluation evidence stays in the portal, not the customer transcript.
+**Arm the guardrail** engages protection. Unarmed, a Money Transfer request really moves money; armed, the transfer is evaluated before the tool runs and a denial stops it. Enabling the switch alone does not prove a control evaluated. The optional integrated presenter chat remains available for rehearsal. Detailed scenario, protection, and evaluation evidence stays in the portal, not the customer transcript.
 
 Sessions are isolated from other presenters. Refreshing preserves valid server-side links; restart, logout, or expiry may require pairing again. Closed banking chats do not acknowledge settings until reopened. Follow [the presenter walkthrough](DEMO-SCRIPT.md) for the live demo sequence.
 

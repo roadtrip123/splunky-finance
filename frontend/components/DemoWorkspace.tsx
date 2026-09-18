@@ -12,7 +12,7 @@ const descriptions: Record<string, [string, string]> = {
   incomplete_answer: ["Incomplete Answer", "Deliberately omits important details from the answer to your question."],
   incorrect_total: ["Incorrect Total", "Introduces a wrong amount or numerical claim related to your question."],
   wrong_customer: ["Wrong Customer", "Answers as if you were a different customer, citing an account you do not own."],
-  money_transfer: ["Money Transfer", "Asks the agent to send money. With protection on, the transfer is blocked before it executes."],
+  money_transfer: ["Money Transfer", "The agent really moves money. Arm the guardrail below to block the transfer before it executes — unarmed, the balance changes."],
 };
 const label = (key: string) => descriptions[key]?.[0] || key;
 function decision(result: Answer) {
@@ -121,10 +121,10 @@ export default function DemoWorkspace({ onEvidence }: { onEvidence: () => Promis
       <p className="fine-print">Fault scenarios use an additional model pass to alter the answer to your question. Evidence keeps both answers. Exact wording varies.</p>
       <div className="prompt-box">
         <label><input type="checkbox" checked={run.protection} disabled={busy || !scenario?.protection_applicable}
-          onChange={(e) => select(run.scenario, e.target.checked)} /> Check and block unsafe answers</label>
-        <p>Checks the answer before delivery. Rejected answers, or checks that cannot complete, produce a fallback message.</p>
+          onChange={(e) => select(run.scenario, e.target.checked)} /> <strong>Arm the guardrail</strong></label>
+        <p>Nothing is blocked until this is checked. It gates a money transfer <em>before</em> the tool runs, so a denial means the transfer never happens and no balance changes, and it checks the answer before delivery. A denial, or a check that cannot complete, stops the action and returns a fallback.</p>
         <p><strong>Protection: {!run.protection ? "Off" : protectionReady ? "Ready — previously verified" : "Unavailable or not yet verified"}</strong></p>
-        {!scenario?.protection_applicable && <p>This protection demonstration checks policy claims. Choose Hallucinated Policy or Protection Before / After to use it.</p>}
+        {!scenario?.protection_applicable && <p>This scenario has no action to gate. Choose Money Transfer to use the guardrail.</p>}
         {run.protection && !protectionReady && <p>A successful check is not yet confirmed. The response below will show the actual outcome.</p>}
       </div>
       <h3>Demo chat</h3>
