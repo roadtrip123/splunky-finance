@@ -76,7 +76,7 @@ For a question with three parts, checks that all three were answered. It is abou
 
 Run against the live tenant on 17 September 2026. Every judge verdict was unanimous across its three voters, and "Answer span" is Context Adherence on `customer-visible-answer`.
 
-| Scenario | RequestCoverage | NumericalCorrectness | EntityIntegrity | Answer span |
+| Scenario | AnswerWholeQuestion | NumericalCorrectness | RightCustomer | Answer span |
 | --- | --- | --- | --- | --- |
 | normal_spending | ✅ true | ✅ true | ✅ true | `[1,1,1]` |
 | incomplete_answer | 🔴 false | ✅ true | ✅ true | `[0,0,0]` |

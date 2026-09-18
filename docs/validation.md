@@ -118,3 +118,11 @@ Backend suite: 47 passed; lint passed; production build passed.
 `SplunkyRequestCoverage` is now `SplunkyAnswerWholeQuestion` and `SplunkyEntityIntegrity` is now `SplunkyRightCustomer`. Both were created fresh with three voters and the scoped prompts, and the log stream now enables the new names alongside `SplunkyNumericalCorrectness` and the four built-ins. The originals remain in the tenant unenabled, because deletion is refused for anyone but a metric's creator. The verified-results table in the walkthrough carries the new names, though the verdicts in it were observed under the old ones; the judge logic is unchanged, only the labels.
 
 Backend suite: 47 passed; lint passed.
+
+## Evaluator set reduced on cost
+
+Per-turn evaluation cost was measured against live traces: about $0.22 a turn across seven metrics, of which `completeness` alone was $0.13-0.18, roughly 78%. That metric had already been found unusable, its roll-up ranking a deliberately incomplete answer at 92% against 78% for a correct one. `tool_selection_quality` and `tool_error_rate` were correct on every run but never caught a problem.
+
+The set is now four: the three custom judges, which detect every scenario, and `context_adherence`, kept as the Galileo-native evaluator that works here and whose rationale named the invented fee. About $0.035 a turn, an 84% reduction, with nothing lost that the walkthrough demonstrates. Both documents were updated so neither describes a metric that no longer runs.
+
+Not yet taken: the custom judges each consume around 9,000 tokens because the trace output carries the whole record including every account and top-purchase row.
