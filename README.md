@@ -48,7 +48,7 @@ Open `/demo-admin` and sign in with the presenter password. Sign into customer b
 
 For another computer or incognito session, click **Connect using pairing code** in the portal. In My Bank Agent, expand **Demo connection**, enter the code, and click **Connect demo**. Codes expire after five minutes and can be used only once. A presenter controls one banking session; an existing connection is never silently replaced. Use **Disconnect banking session** or **Disconnect demo** before changing targets. Explicit disconnect disables automatic relinking; use a new pairing code to reconnect.
 
-Click **Enable Incomplete Answer**, **Enable Hallucinated Policy**, **Enable Incorrect Total**, or **Enable Protection Before / After**. The connected banking chat receives changes automatically (approximately once per second while open). The portal confirms **Applied to connected banking session** only after that browser acknowledges the current setting.
+Click **Enable Incomplete Answer**, **Enable Incorrect Total**, **Enable Wrong Customer**, or **Enable Protection Before / After**. The connected banking chat receives changes automatically (approximately once per second while open). The portal confirms **Applied to connected banking session** only after that browser acknowledges the current setting.
 
 The chat footer keeps the exact words **Fictional banking data only**, with no icons or layout change:
 

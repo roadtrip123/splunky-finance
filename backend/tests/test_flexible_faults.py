@@ -7,7 +7,7 @@ from langchain_core.messages import AIMessage
 from app.demo.scenarios import inject
 
 
-@pytest.mark.parametrize("scenario", ["incomplete_answer", "incorrect_total", "hallucinated_policy"])
+@pytest.mark.parametrize("scenario", ["incomplete_answer", "incorrect_total", "guardrail_before_after"])
 @pytest.mark.parametrize(
     "question",
     [

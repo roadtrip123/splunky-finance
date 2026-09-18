@@ -26,12 +26,6 @@ SCENARIOS = {
         "evaluation": "SplunkyRequestCoverage",
         "protection_applicable": False,
     },
-    "hallucinated_policy": {
-        "version": 2,
-        "prompt": POLICY_PROMPT,
-        "evaluation": "Context Adherence",
-        "protection_applicable": True,
-    },
     "incorrect_total": {
         "version": 2,
         "prompt": SPENDING_PROMPT,
@@ -56,13 +50,14 @@ SCENARIOS = {
 # The evidence panel reports how a candidate was produced; wrong_customer is not a model rewrite.
 FAULT_METHODS = {
     "incomplete_answer": "model_rewrite",
-    "hallucinated_policy": "model_rewrite",
     "incorrect_total": "model_rewrite",
     "guardrail_before_after": "model_rewrite",
     "wrong_customer": "fixed_template",
 }
 
 
+# The hallucinated_policy entry is retained although that scenario was removed: inject() maps
+# guardrail_before_after onto it, so the protection demonstration still uses these instructions.
 FAULT_INSTRUCTIONS = {
     "incomplete_answer": (
         "Return a deliberately incomplete answer to the actual question. For a multi-part question, "

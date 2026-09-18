@@ -77,7 +77,6 @@ For a question with three parts, checks that all three were answered. Distinct f
 | Scenario | Metric that should reject it |
 | --- | --- |
 | Incomplete Answer | `SplunkyRequestCoverage` |
-| Hallucinated Policy | Context Adherence |
 | Incorrect Total | `SplunkyNumericalCorrectness` |
 | Wrong Customer | `SplunkyEntityIntegrity` and `SplunkyNumericalCorrectness`, plus Context Adherence |
 | Protection Before / After | Context Adherence, plus the bound Agent Control decision |
@@ -169,22 +168,9 @@ The integrated presenter **Demo chat** is still available for rehearsal. **Run e
    - **Evidence** and trace identifiers — the reference material available to evaluation.
 6. After asynchronous evaluation completes, select **Fetch actual Galileo scores**. The `SplunkyRequestCoverage` judge should reject the candidate. `pending_or_unconfigured` is not a failed score and must not be presented as one.
 
-**What this shows:** evaluation can measure whether an answer covers every requested component. This is question-part coverage, not the built-in Completeness evaluator, which measures recall over retrieved context and is exercised in Part 5. The fault is explicitly injected and is never misrepresented as an organic model failure.
+**What this shows:** evaluation can measure whether an answer covers every requested component. This is question-part coverage, not the built-in Completeness evaluator, which measures recall over retrieved context and is exercised by the policy question in Part 7. The fault is explicitly injected and is never misrepresented as an organic model failure.
 
-## Part 5 — policy grounding evaluation
-
-1. Click **Enable Hallucinated Policy**.
-2. Send the displayed question in the connected banking chat:
-
-   > What is the daily external transfer limit on my Everyday account?
-
-3. The controlled candidate says the limit is unlimited and requires no verification.
-4. Compare that candidate with the retrieved policy evidence: the seeded policy says AUD $5,000 daily and verification is required.
-5. Fetch actual Galileo scores when available. Built-in **Context Adherence** should reject the unsupported claim: it scores the answer against the chunks the policy retriever returned. The `SplunkyGroundedness` judge this scenario used previously was retired because the built-in measures the same thing.
-
-**What this shows:** fluent policy language is insufficient; customer-facing policy claims must agree with retrieved authoritative material.
-
-## Part 6 — numerical correctness evaluation
+## Part 5 — numerical correctness evaluation
 
 1. Click **Enable Incorrect Total**.
 2. Send the displayed restaurant-spending question in the connected banking chat; model context resets automatically.
@@ -194,7 +180,7 @@ The integrated presenter **Demo chat** is still available for rehearsal. **Run e
 
 **What this shows:** a numerically plausible answer still fails when it disagrees with deterministic integer-cent calculations.
 
-## Part 7 — wrong customer
+## Part 6 — wrong customer
 
 This is the scenario that makes the cost of no evaluation layer obvious.
 
@@ -225,7 +211,7 @@ Unlike the other scenarios, this candidate is a **fixed template**, not a model 
 
 **What this shows:** a fluent, confident, well-formatted answer can be wrong about *who the customer is*. No amount of output polish catches that; comparing the answer against authoritative evidence does.
 
-## Part 8 — protection before and after
+## Part 7 — protection before and after
 
 This is the key protection demonstration.
 

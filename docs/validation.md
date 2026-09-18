@@ -104,3 +104,11 @@ Action Completion produced no value on any trace or session across every run, sh
 Version 3 was re-tested against three scenarios and every verdict was correct and unanimous. Normal spending: all three judges true. Incorrect total: SplunkyNumericalCorrectness false, the other two true, correcting the earlier `[1,0,0]` where SplunkyEntityIntegrity failed an answer that misnamed nobody. Wrong customer: SplunkyEntityIntegrity and SplunkyNumericalCorrectness false and SplunkyRequestCoverage true, correcting the earlier unanimous false on a question that was answered, for the wrong person. No split votes in any run. The answer span scored `[1,1,1]` on the correct answer and `[0,0,0]` on both faults.
 
 The custom judges and the answer span are complete. Outstanding: the policy retriever has still never run, since every scenario has been exercised against the spending question, so no live trace contains a retriever span; Completeness roll-ups still do not rank answers and should be read per span; Agent Control has never produced a verified decision.
+
+## Hallucinated Policy scenario removed
+
+The scenario was dropped from `SCENARIOS`, the presenter portal, the flexible-fault tests, the README and the walkthrough, where Part 5 was removed and the remaining parts renumbered. Its `FAULT_INSTRUCTIONS` entry is deliberately retained: `inject()` maps `guardrail_before_after` onto those instructions, so removing them would have broken the protection demonstration. The flexible-fault test now parametrises `guardrail_before_after` in its place, keeping coverage of that instruction path.
+
+The policy retriever is still reachable, since `guardrail_before_after` uses `POLICY_PROMPT`. It remains unexercised on any live trace.
+
+Backend suite: 47 passed; lint passed; production build passed.

@@ -76,7 +76,6 @@ The span that scores most reliably is the agent's answer-composing call. The Lan
 | Scenario | Metric that should reject it |
 | --- | --- |
 | Incomplete Answer | `SplunkyRequestCoverage` |
-| Hallucinated Policy | Context Adherence |
 | Incorrect Total | `SplunkyNumericalCorrectness` |
 | Wrong Customer | `SplunkyEntityIntegrity` and `SplunkyNumericalCorrectness`, plus Context Adherence |
 | Protection Before / After | Context Adherence, plus the bound Agent Control decision |
