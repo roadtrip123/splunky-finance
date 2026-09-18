@@ -66,19 +66,19 @@ Watches for tools that errored or failed. This is plumbing health rather than an
 **SplunkyNumericalCorrectness — "Do the numbers match the ledger?"**
 Compares every dollar figure and count against the authoritative calculation, in integer cents. It fails on $854.19 when the ledger says $754.19. *Why this one is custom:* Galileo's built-in Correctness evaluator has no way to know which figure is right, because both are equally plausible English. Only this bank's ledger knows. This is the clearest example of when building your own metric is worth it.
 
-**SplunkyEntityIntegrity — "Is this even the right customer?"**
+**SplunkyRightCustomer — "Is this even the right customer?"**
 Checks every name and account number against the authenticated customer's real identity. It fails when the answer greets the wrong person or cites an account they do not own.
 
-**SplunkyRequestCoverage — "Did the answer address the whole question?"**
+**SplunkyAnswerWholeQuestion — "Did the answer address the whole question?"**
 For a question with three parts, checks that all three were answered. Distinct from Completeness: this one is about the *question*, Completeness is about the *source documents*.
 
 ### Which metric catches which scenario
 
 | Scenario | Metric that should reject it |
 | --- | --- |
-| Incomplete Answer | `SplunkyRequestCoverage` |
+| Incomplete Answer | `SplunkyAnswerWholeQuestion` |
 | Incorrect Total | `SplunkyNumericalCorrectness` |
-| Wrong Customer | `SplunkyEntityIntegrity` and `SplunkyNumericalCorrectness`, plus Context Adherence |
+| Wrong Customer | `SplunkyRightCustomer` and `SplunkyNumericalCorrectness`, plus Context Adherence |
 | Protection Before / After | Context Adherence, plus the bound Agent Control decision |
 
 ### Verified results
@@ -109,7 +109,7 @@ The `incomplete_answer` row was verified before the judge-scoping change and has
 
 **A judge goes red only when its own subject is contradicted.** An answer with its total removed is an incomplete answer, not a wrong total and not a wrong customer, so the other two judges stay green. Most scenarios therefore light exactly one judge.
 
-Wrong Customer is the deliberate exception and lights two: the injected answer misstates the customer *and* the figures, so `SplunkyEntityIntegrity` and `SplunkyNumericalCorrectness` both reject it. That is the scenario working, not a fault. Say it out loud — one bad answer can fail on several independent grounds at once, and that is exactly what you want an evaluation layer to show you.
+Wrong Customer is the deliberate exception and lights two: the injected answer misstates the customer *and* the figures, so `SplunkyRightCustomer` and `SplunkyNumericalCorrectness` both reject it. That is the scenario working, not a fault. Say it out loud — one bad answer can fail on several independent grounds at once, and that is exactly what you want an evaluation layer to show you.
 
 If a judge goes red for something its scenario did not touch, it is misreading absence as contradiction and needs `--apply --refresh-judges`.
 
@@ -181,7 +181,7 @@ The integrated presenter **Demo chat** is still available for rehearsal. **Run e
    - **Candidate output** — the deliberately incomplete sentence.
    - **Customer-visible answer** — the candidate delivered while protection is off.
    - **Evidence** and trace identifiers — the reference material available to evaluation.
-6. After asynchronous evaluation completes, select **Fetch actual Galileo scores**. The `SplunkyRequestCoverage` judge should reject the candidate. `pending_or_unconfigured` is not a failed score and must not be presented as one.
+6. After asynchronous evaluation completes, select **Fetch actual Galileo scores**. The `SplunkyAnswerWholeQuestion` judge should reject the candidate. `pending_or_unconfigured` is not a failed score and must not be presented as one.
 
 **What this shows:** evaluation can measure whether an answer covers every requested component. This is question-part coverage, not the built-in Completeness evaluator, which measures recall over retrieved context and is exercised by the policy question in Part 7. The fault is explicitly injected and is never misrepresented as an organic model failure.
 
@@ -218,7 +218,7 @@ This is the scenario that makes the cost of no evaluation layer obvious.
 
    > The banking tools cannot return another customer's data. Customer scope is captured server-side in the tool closure and is never accepted as a model argument. This identity was injected after the model call.
 
-6. `SplunkyEntityIntegrity`, `SplunkyNumericalCorrectness`, and Context Adherence should all reject the candidate: the answer misstates who the customer is *and* what they spent. `SplunkyRequestCoverage` stays green, because the question was answered — just for the wrong person.
+6. `SplunkyRightCustomer`, `SplunkyNumericalCorrectness`, and Context Adherence should all reject the candidate: the answer misstates who the customer is *and* what they spent. `SplunkyAnswerWholeQuestion` stays green, because the question was answered — just for the wrong person.
 
 The fabricated answer appears in the trace as a span named **`controlled-fault-writer`**, tagged `simulation: true`, sitting outside the `Agent` node. Open it beside the agent's own model call to show the genuine answer and the injected one side by side. Wrong Customer has no such span, because no model runs for it.
 

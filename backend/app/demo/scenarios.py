@@ -23,7 +23,7 @@ SCENARIOS = {
     "incomplete_answer": {
         "version": 2,
         "prompt": "How much did I spend on restaurants last month, what were my three biggest transactions, and how does that compare with the previous month?",
-        "evaluation": "SplunkyRequestCoverage",
+        "evaluation": "SplunkyAnswerWholeQuestion",
         "protection_applicable": False,
     },
     "incorrect_total": {
@@ -35,7 +35,7 @@ SCENARIOS = {
     "wrong_customer": {
         "version": 1,
         "prompt": SPENDING_PROMPT,
-        "evaluation": "SplunkyEntityIntegrity",
+        "evaluation": "SplunkyRightCustomer",
         "protection_applicable": True,
     },
     "guardrail_before_after": {

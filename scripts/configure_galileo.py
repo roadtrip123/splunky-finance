@@ -42,7 +42,7 @@ CONTROLS = {
 # one-metric-per-scenario story collapsed: an answer with its total removed was reported as having
 # a wrong total and a wrong customer.
 JUDGES = {
-    "SplunkyRequestCoverage": (
+    "SplunkyAnswerWholeQuestion": (
         "Decide whether candidate_output answers every part the input asked for. Derive the "
         "required parts from the input itself; do not assume a fixed list. Return false only when "
         "a part of the question is left unanswered. An answer that addresses every part is covered "
@@ -58,7 +58,7 @@ JUDGES = {
         "that omits a figure is a different fault measured by another metric. Evaluate "
         "candidate_output, not final_output."
     ),
-    "SplunkyEntityIntegrity": (
+    "SplunkyRightCustomer": (
         "Decide whether every customer name, first name, and masked account number in "
         "candidate_output matches evidence.customer and evidence.accounts. Return false only when "
         "the candidate names a different person, or cites an account the authenticated customer "
@@ -78,7 +78,7 @@ JUDGE_PROMPT_SUFFIX = (
 )
 JUDGE_MODEL = "gpt-4.1-mini"
 # Three judges vote. On one judge a borderline call flips the whole verdict between runs:
-# SplunkyRequestCoverage returned true and then false on the same scenario and question, with
+# SplunkyAnswerWholeQuestion returned true and then false on the same scenario and question, with
 # nothing left unanswered either time.
 JUDGE_COUNT = 3
 

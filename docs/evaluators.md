@@ -31,23 +31,27 @@ Custom judges are worth their cost only where no built-in can know the rule. Eac
 | Judge | Why a built-in cannot do it |
 | --- | --- |
 | **SplunkyNumericalCorrectness** | Built-in Correctness has no reference data. It cannot know that $854.19 is wrong and $754.19 is right; both are plausible. This judge compares against `evidence.calculations` in integer AUD cents. |
-| **SplunkyEntityIntegrity** | Checks every name and masked account number in the candidate against `evidence.customer` and `evidence.accounts`. Customer identity is seeded into evidence server-side, so this holds even when no profile tool is called. |
-| **SplunkyRequestCoverage** | Whether the answer covered every part the question asked. Derives the required parts from the input rather than assuming a fixed list. |
+| **SplunkyRightCustomer** | Checks every name and masked account number in the candidate against `evidence.customer` and `evidence.accounts`. Customer identity is seeded into evidence server-side, so this holds even when no profile tool is called. |
+| **SplunkyAnswerWholeQuestion** | Whether the answer covered every part the question asked. Derives the required parts from the input rather than assuming a fixed list. |
+
+### Renamed
+
+`SplunkyRequestCoverage` became `SplunkyAnswerWholeQuestion` and `SplunkyEntityIntegrity` became `SplunkyRightCustomer`, so each name says what it checks without needing the description. The originals still exist in the tenant but are no longer enabled: a metric can only be deleted by its creator, and that call is refused here. Scores recorded under the old names stay with the old metrics and do not carry across.
 
 ### Retired
 
 - **SplunkyGroundedness** — built-in Context Adherence scores the same thing against the retriever span, and Galileo maintains it.
-- **SplunkyCompleteness** — renamed to `SplunkyRequestCoverage`. It measured question-part coverage, not recall over retrieved context, and sharing a name with the built-in Completeness evaluator made both hard to explain. Its instructions also hardcoded the restaurant question, so it returned false for the wrong reason on anything else.
+- **SplunkyCompleteness** — renamed to `SplunkyAnswerWholeQuestion`. It measured question-part coverage, not recall over retrieved context, and sharing a name with the built-in Completeness evaluator made both hard to explain. Its instructions also hardcoded the restaurant question, so it returned false for the wrong reason on anything else.
 
 ## Reading the scores
 
 **A judge fails only on a contradiction it can point to.** An answer with its total removed is not a wrong total and not a wrong customer; it is an incomplete answer. Each judge returns true when its subject is simply absent, so most scenarios light exactly one judge. Wrong Customer lights two by design: its candidate misstates both the identity and the figures. If you edit a judge prompt or settings, the change only reaches the tenant with `--apply --refresh-judges`, which publishes a new version of each judge and makes it the default. Versioning rather than delete-and-recreate: deletion is refused for anyone but a metric's original creator, and versioning keeps the scoring history.
 
-**Each judge is scoped to one property and told to ignore the others.** Without that, a judge that had correctly established its own subject was fine would fail the answer anyway on noticing a different defect. `SplunkyEntityIntegrity` said in its own reasoning that "misnaming a person doesn't apply here" and then returned false because the total was wrong. A judge must return true when its property holds, even when the answer is obviously wrong for a reason another metric owns.
+**Each judge is scoped to one property and told to ignore the others.** Without that, a judge that had correctly established its own subject was fine would fail the answer anyway on noticing a different defect. `SplunkyRightCustomer` said in its own reasoning that "misnaming a person doesn't apply here" and then returned false because the total was wrong. A judge must return true when its property holds, even when the answer is obviously wrong for a reason another metric owns.
 
 **Completeness roll-ups do not rank answers.** A deliberately incomplete answer rolled up to 92% while the correct answer on the same question rolled up to 78%. Read per-span values, and do not put the roll-up on screen.
 
-**All three judges use three voters.** On a single judge a borderline call flips the whole verdict between runs — `SplunkyRequestCoverage` returned true and then false on the same scenario and question, with nothing left unanswered either time. Three judges vote, matching the built-in evaluators.
+**All three judges use three voters.** On a single judge a borderline call flips the whole verdict between runs — `SplunkyAnswerWholeQuestion` returned true and then false on the same scenario and question, with nothing left unanswered either time. Three judges vote, matching the built-in evaluators.
 
 **Built-in span-level metrics score every LLM span in the trace.** A turn has up to four: one model call to choose the tool, one to compose the answer, `controlled-fault-writer` when a scenario is active, and `customer-visible-answer`. The last two are logged explicitly rather than through the LangChain callback, which names chat-model spans after the model class and left the fault writer indistinguishable from the agent's genuine calls. Context Adherence therefore reports a mix such as `false 2 / true 1` even on a correct answer.
 
@@ -75,9 +79,9 @@ The span that scores most reliably is the agent's answer-composing call. The Lan
 
 | Scenario | Metric that should reject it |
 | --- | --- |
-| Incomplete Answer | `SplunkyRequestCoverage` |
+| Incomplete Answer | `SplunkyAnswerWholeQuestion` |
 | Incorrect Total | `SplunkyNumericalCorrectness` |
-| Wrong Customer | `SplunkyEntityIntegrity` and `SplunkyNumericalCorrectness`, plus Context Adherence |
+| Wrong Customer | `SplunkyRightCustomer` and `SplunkyNumericalCorrectness`, plus Context Adherence |
 | Protection Before / After | Context Adherence, plus the bound Agent Control decision |
 
 ## Agent Control

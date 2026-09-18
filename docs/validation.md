@@ -112,3 +112,9 @@ The scenario was dropped from `SCENARIOS`, the presenter portal, the flexible-fa
 The policy retriever is still reachable, since `guardrail_before_after` uses `POLICY_PROMPT`. It remains unexercised on any live trace.
 
 Backend suite: 47 passed; lint passed; production build passed.
+
+## Judges renamed
+
+`SplunkyRequestCoverage` is now `SplunkyAnswerWholeQuestion` and `SplunkyEntityIntegrity` is now `SplunkyRightCustomer`. Both were created fresh with three voters and the scoped prompts, and the log stream now enables the new names alongside `SplunkyNumericalCorrectness` and the four built-ins. The originals remain in the tenant unenabled, because deletion is refused for anyone but a metric's creator. The verified-results table in the walkthrough carries the new names, though the verdicts in it were observed under the old ones; the judge logic is unchanged, only the labels.
+
+Backend suite: 47 passed; lint passed.
