@@ -19,9 +19,8 @@ type Event = {
   final_output: string;
   candidate_hash: string;
   trace_id: string | null;
-  replayed: boolean;
-  source_run_id: string | null;
   decision: Record<string, unknown>;
+  action_decisions: Record<string, unknown>[];
   evaluation: Record<string, unknown>;
 };
 type Status = {
@@ -264,6 +263,28 @@ export default function Admin() {
                     <span className="badge">
                       {status.dataset.transaction_count} transactions
                     </span>
+                    <button
+                      className="button outline small"
+                      disabled={busy}
+                      title="Restore balances and transactions after a Money Transfer run"
+                      onClick={() => {
+                        if (confirm("Restore the dataset? Balances and transactions return to their seeded values and conversations are cleared."))
+                          action(() =>
+                            mutate(
+                              "demo-admin/dataset/reset",
+                              {
+                                confirmed: true,
+                                expected_version: status.dataset.dataset_version,
+                                seed: status.dataset.seed,
+                                reference_date: status.dataset.reference_date,
+                              },
+                              true,
+                            ),
+                          );
+                      }}
+                    >
+                      Reset balance
+                    </button>
                   </article>
                 </div>
                 <DemoWorkspace onEvidence={refresh} />
@@ -340,8 +361,8 @@ export default function Admin() {
                         <details className="event" key={e.run_id}>
                           <summary>
                             {e.scenario} · {String(e.decision.decision)} ·{" "}
-                            {e.replayed
-                              ? "candidate replay"
+                            {e.action_decisions?.length
+                              ? `action ${String(e.action_decisions[0].decision)}`
                               : "live model + optional injection"}
                           </summary>
                           <p className="mono">
@@ -362,7 +383,7 @@ export default function Admin() {
                               {
                                 decision: e.decision,
                                 evaluation: e.evaluation,
-                                source_run_id: e.source_run_id,
+                                action_decisions: e.action_decisions,
                               },
                               null,
                               2,

@@ -236,7 +236,7 @@ Let that sit before saying anything. The balance is the whole argument.
 
 ### After protection
 
-1. Click **Confirm and reset data** to restore the dataset, then re-select **Money Transfer**.
+1. Click **Reset balance** on the DATASET card at the top of the portal to restore the ledger, then re-select **Money Transfer**.
 2. Check **Check and block unsafe answers**.
 3. Send the **same request**, word for word.
 4. The balance does not move. The customer is told the transfer could not be completed.
@@ -252,7 +252,7 @@ With protection on and Agent Control unreachable, the application blocks the tra
 
 ### Resetting between runs
 
-Unlike every other scenario, this one changes the data. **Confirm and reset data** before each rehearsal, or the second run starts from an already-reduced balance and the comparison loses its force.
+Unlike every other scenario, this one changes the data. **Reset balance** on the DATASET card before each rehearsal, or the second run starts from an already-reduced balance and the comparison loses its force. It restores the seeded ledger without touching the seed or reference date, so the figures in this guide keep matching.
 
 ## Reading the evidence panel## Reading the evidence panel
 
@@ -273,7 +273,7 @@ Unlike every other scenario, this one changes the data. **Confirm and reset data
 ## Reset controls
 
 - **New conversation** starts a fresh chat while retaining the active scenario and protection settings. Earlier response labels remain visible.
-- **Confirm and reset data** is required between Money Transfer runs, because that scenario really moves money.
+- **Reset balance**, on the DATASET card, is required between Money Transfer runs because that scenario really moves money. It reuses the current seed and reference date. The **Confirm and reset data** control lower down does the same thing but also lets you change them, which will move every figure in this guide.
 - **Normal Answers** disables deliberate faults and protection and resets the conversation. It does not restore data a transfer has moved; use **Confirm and reset data** for that.
 - Selecting another scenario resets conversation context automatically. Refreshing keeps the saved scenario but clears the local chat transcript; evidence remains available for the active run.
 - **Confirm and reset data** regenerates the entire synthetic dataset with the selected seed/reference date, increments the dataset version, and invalidates all conversations and comparisons. Do not use this during a normal presentation unless reseeding is the topic.
@@ -302,7 +302,7 @@ Use these exact distinctions:
 | Only `Splunky*` scores appear | The three custom judges are trace-level; the five built-in evaluators are span-level. Read built-in values in the Galileo console until the portal reads span metrics |
 | Protection unverified | Configure/bind Agent Control and run a protected turn; the switch alone is not verification |
 | Exact prompt rejected | Use **Run example question** for the active scenario |
-| Balance already reduced | A previous Money Transfer run moved real money. Use **Confirm and reset data** before comparing again |
+| Balance already reduced | A previous Money Transfer run moved real money. Use **Reset balance** on the DATASET card before comparing again |
 | Customer chat not affected | Open My Bank Agent and check the portal connection acknowledgment; use pairing for another browser or computer |
 | Chats missing from Latest chat evidence | The panel shows only the current presenter run. Presenter logout abandons earlier events, which stay in memory but can no longer be displayed; read those turns in the Galileo console |
 | Footer amber | Wait for reconnection; if expired, disconnect and pair again |
