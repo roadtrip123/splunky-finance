@@ -81,6 +81,21 @@ For a question with three parts, checks that all three were answered. Distinct f
 | Wrong Customer | `SplunkyEntityIntegrity` and `SplunkyNumericalCorrectness`, plus Context Adherence |
 | Protection Before / After | Context Adherence, plus the bound Agent Control decision |
 
+### Verified results
+
+Run against the live tenant on 17 September 2026. Every judge verdict was unanimous across its three voters, and "Answer span" is Context Adherence on `customer-visible-answer`.
+
+| Scenario | RequestCoverage | NumericalCorrectness | EntityIntegrity | Answer span |
+| --- | --- | --- | --- | --- |
+| normal_spending | ✅ true | ✅ true | ✅ true | `[1,1,1]` |
+| incomplete_answer | 🔴 false | ✅ true | ✅ true | `[0,0,0]` |
+| incorrect_total | ✅ true | 🔴 false | ✅ true | `[0,0,0]` |
+| wrong_customer | ✅ true | 🔴 false | 🔴 false | `[0,0,0]` |
+
+Read it as the shape to expect, not a guarantee. The greens matter as much as the reds: a judge going red for something its scenario did not touch means the judges are grading outside their remit and need `--apply --refresh-judges`.
+
+The `incomplete_answer` row was verified before the judge-scoping change and has not been re-run since; the other three were verified after it.
+
 ### Reading the numbers on screen
 
 **Context Adherence shows a mix even on a correct answer**, such as `false 2 / true 1`. Galileo scores every model call in the trace, and a normal turn has four: one to choose the tool, one to write the answer, the fault writer when a scenario is active, and the delivered answer. Two of those score low for reasons that are not the answer's fault:
