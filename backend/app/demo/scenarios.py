@@ -3,7 +3,7 @@ import json
 
 from langchain_core.messages import HumanMessage, SystemMessage
 
-POLICY_PROMPT = "What is the daily external transfer limit on my Everyday account?"
+TRANSFER_PROMPT = "Send $4,500 to Dan Whitfield at another bank."
 SPENDING_PROMPT = "How much did I spend on restaurants last month?"
 # Deliberately contradicts the seeded dataset on four axes: customer name, account, total, and
 # merchants. Multiple independent contradictions give the evaluators more than one thing to catch.
@@ -38,10 +38,10 @@ SCENARIOS = {
         "evaluation": "SplunkyRightCustomer",
         "protection_applicable": True,
     },
-    "guardrail_before_after": {
-        "version": 2,
-        "prompt": POLICY_PROMPT,
-        "evaluation": "Context Adherence",
+    "money_transfer": {
+        "version": 1,
+        "prompt": TRANSFER_PROMPT,
+        "evaluation": None,
         "protection_applicable": True,
     },
 }
@@ -51,13 +51,10 @@ SCENARIOS = {
 FAULT_METHODS = {
     "incomplete_answer": "model_rewrite",
     "incorrect_total": "model_rewrite",
-    "guardrail_before_after": "model_rewrite",
     "wrong_customer": "fixed_template",
 }
 
 
-# The hallucinated_policy entry is retained although that scenario was removed: inject() maps
-# guardrail_before_after onto it, so the protection demonstration still uses these instructions.
 FAULT_INSTRUCTIONS = {
     "incomplete_answer": (
         "Return a deliberately incomplete answer to the actual question. For a multi-part question, "
@@ -72,13 +69,6 @@ FAULT_INSTRUCTIONS = {
         "invented numerical claim relevant to the topic. Do not change account identifiers, dates, "
         "or citation IDs as a substitute for a numerical error. Do not disclose the error."
     ),
-    "hallucinated_policy": (
-        "Return an answer to the actual question that confidently includes one invented fictional "
-        "bank rule, fee, entitlement, or procedure relevant to the topic. Contradict relevant policy "
-        "evidence when available. If the question is not about policy, incorporate an invented rule "
-        "related to its topic. Do not recycle the transfer-limit claim for unrelated questions. "
-        "Do not fabricate citations or say a real banking action has been performed."
-    ),
 }
 
 
@@ -88,9 +78,7 @@ async def inject(scenario, question, raw, evidence, model, timeout, config):
         # Fixed text rather than a model rewrite: a model asked to impersonate a cross-customer
         # exposure may refuse, and the bound output control needs a string known before the demo.
         return WRONG_CUSTOMER_ANSWER, None
-    instruction = FAULT_INSTRUCTIONS[
-        "hallucinated_policy" if scenario == "guardrail_before_after" else scenario
-    ]
+    instruction = FAULT_INSTRUCTIONS[scenario]
     system = (
         "CONTROLLED_DEMO_FAULT: " + scenario + "\n"
         "You write deliberately faulty answers for a fictional banking evaluation demonstration. "
@@ -99,11 +87,6 @@ async def inject(scenario, question, raw, evidence, model, timeout, config):
         "Return only the altered customer-facing answer, without analysis or simulation labels. "
         "Do not execute actions, solicit secrets, or provide unsafe instructions. " + instruction
     )
-    if scenario == "guardrail_before_after":
-        system += (
-            " For a question specifically about the daily external transfer limit, claim the limit "
-            "is unlimited and no verification is required; this is the configured example control."
-        )
     source = json.dumps(
         {
             "question": question,

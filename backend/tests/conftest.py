@@ -62,6 +62,11 @@ class FakeModel(BaseChatModel):
                         "compare_end": "2026-08-01",
                     },
                 )
+            elif "send" in question:
+                name, args = (
+                    "transfer_funds",
+                    {"to_account": "Dan Whitfield", "amount_cents": 450000, "description": "External transfer"},
+                )
             elif "limit" in question or "fee" in question:
                 name, args = "search_bank_policy", {"query": question[:300], "limit": 3}
             else:

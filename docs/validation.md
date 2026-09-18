@@ -126,3 +126,13 @@ Per-turn evaluation cost was measured against live traces: about $0.22 a turn ac
 The set is now four: the three custom judges, which detect every scenario, and `context_adherence`, kept as the Galileo-native evaluator that works here and whose rationale named the invented fee. About $0.035 a turn, an 84% reduction, with nothing lost that the walkthrough demonstrates. Both documents were updated so neither describes a metric that no longer runs.
 
 Not yet taken: the custom judges each consume around 9,000 tokens because the trace output carries the whole record including every account and top-purchase row.
+
+## Money-transfer guardrail
+
+The protection demonstration now stops an action rather than a sentence. `transfer_funds` debits the Everyday account, appends a posted `external_transfer` movement and persists through the existing atomic write, making it the only tool in the application that writes. A `TransferGuard` middleware implements `awrap_tool_call`, so the gate evaluates the call at Agent Control's `pre` stage and a denial short-circuits execution: the tool is never invoked and no balance changes. An answer-stage gate could not achieve this, because by the time a candidate exists the transfer has already happened.
+
+Replaced: the `guardrail_before_after` scenario, its candidate-replay machinery, and the two `post`-stage regex controls that matched answer text. One control remains, `splunky-transfer-deny`, scoped to `step_types: ["tool"]`, `step_names: ["transfer_funds"]`, `stages: ["pre"]`, created and bind requested. Replay is gone because the request is identical on both runs and the comparison is now whether the action executes, so there is no candidate text to hold constant.
+
+Tests: a denied call leaves the balance and transaction count unchanged and records a `deny`; a permitted call moves money and the ledger still reconciles, which matters because a dataset that fails reconciliation will not reload after a restart; and protection enabled with Agent Control unconfigured blocks the transfer and leaves the dataset file byte-identical.
+
+Backend suite: 45 passed; lint passed; production build passed. The gate has not yet been exercised against a live tenant decision.

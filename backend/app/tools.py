@@ -2,6 +2,7 @@ import re
 from datetime import date
 from pathlib import Path
 from typing import Annotated
+from uuid import uuid4
 
 from langchain_core.documents import Document
 from langchain_core.retrievers import BaseRetriever
@@ -10,11 +11,15 @@ from langchain_core.tools import tool
 from pydantic import ConfigDict, Field
 
 from app.demo.expected_results import CATEGORY_ALIASES, spending
+from app.demo.generator import content_hash
+from app.schemas import Transaction
 
 
 class Banking:
-    def __init__(self, dataset, policies: Path):
+    def __init__(self, dataset, policies: Path, storage=None):
         self.dataset = dataset
+        # Only the transfer tool writes. Every other tool reads.
+        self.storage = storage
         self.documents = []
         for path in sorted(policies.glob("*.md")):
             content = path.read_text()
@@ -180,6 +185,48 @@ def build_tools(banking: Banking, evidence: dict):
         return result
 
     @tool
+    def transfer_funds(
+        to_account: Annotated[str, Field(min_length=1, max_length=120)],
+        amount_cents: Annotated[int, Field(ge=1, le=100_000_00)],
+        description: Annotated[str, Field(max_length=140)] = "External transfer",
+    ) -> dict:
+        """Send money from the customer's Everyday account to an external payee. This moves real
+        money and cannot be undone. Amounts are integer AUD cents."""
+        # The only tool in this application that writes. Everything else reads.
+        dataset = banking.dataset
+        account = banking.account("everyday")
+        if not account:
+            return {"error": "account_not_found"}
+        if amount_cents > account.posted_balance_cents:
+            return {"error": "insufficient_funds", "available_cents": account.posted_balance_cents}
+        movement = Transaction(
+            id=f"syn-tx-xfer-{uuid4().hex[:8]}",
+            account_id="everyday",
+            posted_date=dataset.manifest.reference_date,
+            merchant=to_account[:120],
+            description=description or "External transfer",
+            category="transfers",
+            amount_cents=-amount_cents,
+            movement_type="external_transfer",
+            transfer_pair_id=None,
+        )
+        dataset.transactions.append(movement)
+        account.posted_balance_cents -= amount_cents
+        dataset.manifest.content_hash = content_hash(dataset)
+        if banking.storage:
+            banking.storage.write(dataset)
+            banking.storage.dataset = dataset
+        result = {
+            "transferred_cents": amount_cents,
+            "to_account": to_account,
+            "from_account": "everyday",
+            "new_balance_cents": account.posted_balance_cents,
+            "transaction_id": movement.id,
+        }
+        evidence.setdefault("transfers", []).append(result)
+        return result
+
+    @tool
     def search_bank_policy(
         query: Annotated[str, Field(min_length=1, max_length=300)],
         limit: Annotated[int, Field(ge=1, le=5)] = 3,
@@ -193,4 +240,11 @@ def build_tools(banking: Banking, evidence: dict):
         evidence.setdefault("policies", []).extend(documents)
         return {"documents": documents}
 
-    return [get_customer_profile, get_accounts, get_transactions, calculate_spending, search_bank_policy]
+    return [
+        get_customer_profile,
+        get_accounts,
+        get_transactions,
+        calculate_spending,
+        transfer_funds,
+        search_bank_policy,
+    ]

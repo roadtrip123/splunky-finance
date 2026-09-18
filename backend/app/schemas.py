@@ -30,7 +30,9 @@ class Transaction(StrictModel):
     amount_cents: int
     currency: Literal["AUD"] = "AUD"
     status: Literal["posted", "pending"] = "posted"
-    movement_type: Literal["purchase", "refund", "transfer", "repayment", "income", "interest", "fee"]
+    movement_type: Literal[
+        "purchase", "refund", "transfer", "repayment", "income", "interest", "fee", "external_transfer"
+    ]
     transfer_pair_id: str | None = None
 
 

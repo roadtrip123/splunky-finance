@@ -7,7 +7,7 @@ from langchain_core.messages import AIMessage
 from app.demo.scenarios import inject
 
 
-@pytest.mark.parametrize("scenario", ["incomplete_answer", "incorrect_total", "guardrail_before_after"])
+@pytest.mark.parametrize("scenario", ["incomplete_answer", "incorrect_total"])
 @pytest.mark.parametrize(
     "question",
     [
@@ -73,7 +73,16 @@ async def test_fault_writer_times_out():
         await inject("incomplete_answer", "question", "answer", {}, SlowModel(), 0.01, {})
 
 
-def test_before_after_new_question_starts_new_candidate(client):
+def test_blocked_transfer_never_moves_money(client, monkeypatch):
+    """The point of a pre-execution gate: a denial must leave the balance exactly as it was.
+
+    A post-answer gate cannot do this, because by then the tool has already run."""
+    import app.observability.protection as prot
+
+    async def deny(self, tool_name, arguments, logger, enabled):
+        return False, {"decision": "deny", "source": "galileo-agent-control", "verified": True}
+
+    monkeypatch.setattr(prot.Protection, "check_action", deny)
     headers = login(client, True)
     run = client.post("/api/demo-admin/workspace", headers=headers).json()
     run = client.put(
@@ -82,19 +91,72 @@ def test_before_after_new_question_starts_new_candidate(client):
         json={
             "run_id": run["id"],
             "expected_revision": run["revision"],
-            "scenario": "guardrail_before_after",
+            "scenario": "money_transfer",
+            "protection": True,
+        },
+    ).json()
+    before = client.app.state.storage.dataset
+    opening = next(a.posted_balance_cents for a in before.accounts if a.id == "everyday")
+    count = len(before.transactions)
+
+    result = client.post(
+        "/api/demo-admin/chat",
+        headers=headers,
+        json={
+            "run_id": run["id"],
+            "expected_revision": run["revision"],
+            "message": "Send $4,500 to Dan Whitfield at another bank.",
+        },
+    )
+    assert result.status_code == 200, result.text
+    after = client.app.state.storage.dataset
+    assert next(a.posted_balance_cents for a in after.accounts if a.id == "everyday") == opening
+    assert len(after.transactions) == count
+    event = client.app.state.chat.events[-1]
+    assert event["action_decisions"], "the gate did not record a decision"
+    assert event["action_decisions"][0]["decision"] == "deny"
+
+
+def test_permitted_transfer_moves_money_and_reconciles(client, monkeypatch):
+    """With the gate disabled the transfer is real, which is what makes the comparison land."""
+    import app.observability.protection as prot
+
+    async def allow(self, tool_name, arguments, logger, enabled):
+        return True, {"decision": "disabled", "source": "application", "verified": False}
+
+    monkeypatch.setattr(prot.Protection, "check_action", allow)
+    headers = login(client, True)
+    run = client.post("/api/demo-admin/workspace", headers=headers).json()
+    run = client.put(
+        "/api/demo-admin/workspace",
+        headers=headers,
+        json={
+            "run_id": run["id"],
+            "expected_revision": run["revision"],
+            "scenario": "money_transfer",
             "protection": False,
         },
     ).json()
-    for question in ["What is the transfer limit?", "What is the monthly fee?"]:
-        result = client.post(
-            "/api/demo-admin/chat",
-            headers=headers,
-            json={"run_id": run["id"], "expected_revision": run["revision"], "message": question},
-        )
-        assert result.status_code == 200
-        assert not client.app.state.chat.events[-1]["replayed"]
-    assert "fee" in result.json()["answer"]
+    opening = next(
+        a.posted_balance_cents for a in client.app.state.storage.dataset.accounts if a.id == "everyday"
+    )
+    client.post(
+        "/api/demo-admin/chat",
+        headers=headers,
+        json={
+            "run_id": run["id"],
+            "expected_revision": run["revision"],
+            "message": "Send $4,500 to Dan Whitfield at another bank.",
+        },
+    )
+    after = client.app.state.storage.dataset
+    everyday = next(a for a in after.accounts if a.id == "everyday")
+    assert everyday.posted_balance_cents < opening
+    # The ledger must still reconcile, or the dataset will not reload after a restart.
+    total = everyday.opening_balance_cents + sum(
+        t.amount_cents for t in after.transactions if t.account_id == "everyday" and t.status == "posted"
+    )
+    assert total == everyday.posted_balance_cents
 
 
 def test_wrong_customer_uses_a_fixed_candidate_and_contradicts_the_dataset(client):

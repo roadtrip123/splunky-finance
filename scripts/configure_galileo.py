@@ -7,33 +7,29 @@ from app.config import Settings
 from app.observability.galileo import Telemetry
 
 
-def _deny_control(pattern):
-    """Server-side regex deny on the delivered candidate.
+def _tool_deny_control(tool_name):
+    """Server-side deny on a tool call, evaluated before the tool runs.
 
-    Scoped to the `customer-visible-answer` LLM span, which the application logs for exactly this
-    purpose. A regex rejects a controlled contradiction known before the demo; it is not a general
-    semantic validator.
+    The `pre` stage is what makes this a guardrail rather than an audit trail: at `post` the tool
+    has already executed and the money has already moved. The step carries no output at this stage,
+    so the condition matches the call itself.
     """
     return {
         "condition": {
-            "selector": {"path": "output"},
-            "evaluator": {"name": "regex", "config": {"pattern": pattern}},
+            "selector": {"path": "input"},
+            "evaluator": {"name": "regex", "config": {"pattern": "(?i).+"}},
         },
         "execution": "server",
-        "scope": {
-            "step_types": ["llm"],
-            "step_names": ["customer-visible-answer"],
-            "stages": ["post"],
-        },
+        "scope": {"step_types": ["tool"], "step_names": [tool_name], "stages": ["pre"]},
         "action": {"decision": "deny"},
         "enabled": True,
     }
 
 
+# One control. The two earlier regex controls matched answer text at the `post` stage, which can
+# only suppress a sentence describing an action that has already happened.
 CONTROLS = {
-    "splunky-seeded-policy-deny": _deny_control("(?i)unlimited daily external transfer limit"),
-    # Anchored on ASCII so the pattern does not depend on the masked-number bullet characters.
-    "splunky-wrong-customer-deny": _deny_control("(?i)(dan whitfield|4127)"),
+    "splunky-transfer-deny": _tool_deny_control("transfer_funds"),
 }
 # Custom judges earn their place only where no built-in can know the rule. SplunkyGroundedness was
 # retired because built-in Context Adherence scores the same thing against the retriever span.

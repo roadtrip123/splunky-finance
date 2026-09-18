@@ -4,7 +4,7 @@ Fictional Australian banking demonstration: a responsive Next.js website, determ
 
 ## Current validation
 
-Production frontend build and desktop/mobile browser journeys passed. Backend tests cover ledger integrity, date arithmetic, session isolation, CSRF, controlled faults, replay, and fail-closed protection. Browser tests use an explicit offline model that invokes real banking tools; they do not validate paid model APIs or fabricate Galileo scores.
+Production frontend build and desktop/mobile browser journeys passed. Backend tests cover ledger integrity, date arithmetic, session isolation, CSRF, controlled faults, and the pre-execution transfer gate including that a blocked transfer leaves balances untouched. Browser tests use an explicit offline model that invokes real banking tools; they do not validate paid model APIs or fabricate Galileo scores.
 
 One live OpenAI tool-backed turn and its Galileo model/tool span export have been verified. Anthropic/Ollama calls, Galileo judges, and tenant-bound Agent Control remain unverified. Docker image builds require access to the server's Docker daemon; the current user does not yet have that access.
 
@@ -48,7 +48,7 @@ Open `/demo-admin` and sign in with the presenter password. Sign into customer b
 
 For another computer or incognito session, click **Connect using pairing code** in the portal. In My Bank Agent, expand **Demo connection**, enter the code, and click **Connect demo**. Codes expire after five minutes and can be used only once. A presenter controls one banking session; an existing connection is never silently replaced. Use **Disconnect banking session** or **Disconnect demo** before changing targets. Explicit disconnect disables automatic relinking; use a new pairing code to reconnect.
 
-Click **Enable Incomplete Answer**, **Enable Incorrect Total**, **Enable Wrong Customer**, or **Enable Protection Before / After**. The connected banking chat receives changes automatically (approximately once per second while open). The portal confirms **Applied to connected banking session** only after that browser acknowledges the current setting.
+Click **Enable Incomplete Answer**, **Enable Incorrect Total**, **Enable Wrong Customer**, or **Enable Money Transfer**. The connected banking chat receives changes automatically (approximately once per second while open). The portal confirms **Applied to connected banking session** only after that browser acknowledges the current setting.
 
 The chat footer keeps the exact words **Fictional banking data only**, with no icons or layout change:
 

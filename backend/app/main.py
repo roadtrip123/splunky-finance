@@ -119,7 +119,7 @@ def create_app(settings=None, model_builder=None, protection_adapter=None):
     def bank():
         if not storage.dataset:
             raise HTTPException(503, "Banking data is unavailable")
-        return Banking(storage.dataset, settings.policy_dir)
+        return Banking(storage.dataset, settings.policy_dir, storage)
 
     def envelope(request, content):
         return {**content, "correlation_id": request.state.correlation_id}

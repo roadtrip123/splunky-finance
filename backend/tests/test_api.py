@@ -59,7 +59,10 @@ def test_offline_agent_tools_conversation_isolation(client):
     )
 
 
-def test_injection_replay_fail_closed_reset(client):
+def test_transfer_gate_fails_closed_and_leaves_data_untouched(client):
+    """Protection on with Agent Control unconfigured must block the action, not permit it.
+
+    An unverified gate that lets money through would be worse than no gate."""
     customer = login(client)
     admin = login(client, True)
     run = client.post("/api/demo-admin/run", headers=admin).json()
@@ -71,22 +74,20 @@ def test_injection_replay_fail_closed_reset(client):
     run = client.put(
         "/api/demo-admin/scenario",
         headers=admin,
-        json={"run_id": run["id"], "expected_revision": 0, "scenario_id": "guardrail_before_after"},
+        json={"run_id": run["id"], "expected_revision": 0, "scenario_id": "money_transfer"},
     ).json()
-    prompt = "What is the daily external transfer limit on my Everyday account?"
-    first = client.post("/api/chat", headers=customer, json={"message": prompt})
-    assert first.status_code == 200, first.text
-    assert "unlimited" in first.json()["answer"]
     run = client.put(
         "/api/demo-admin/protection",
         headers=admin,
         json={"run_id": run["id"], "expected_revision": run["revision"], "enabled": True},
     ).json()
-    second = client.post("/api/chat", headers=customer, json={"message": prompt})
-    assert second.json()["status"] == "fallback" and "unlimited" not in second.json()["answer"]
-    events = client.app.state.chat.events
-    assert events[-1]["candidate_hash"] == events[-2]["candidate_hash"] and events[-1]["replayed"]
-    assert events[-1]["decision"]["verified"] is False
+    prompt = "Send $4,500 to Dan Whitfield at another bank."
+    response = client.post("/api/chat", headers=customer, json={"message": prompt})
+    assert response.status_code == 200, response.text
+    decisions = client.app.state.chat.events[-1]["action_decisions"]
+    assert decisions and decisions[0]["decision"] == "unavailable"
+    assert decisions[0]["verified"] is False
+    # The dataset file must be byte-identical: no transfer, no ledger change.
     assert client.app.state.storage.path.read_bytes() == before
     assert (
         client.post(

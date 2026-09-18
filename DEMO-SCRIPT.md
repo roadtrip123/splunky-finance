@@ -7,7 +7,7 @@ This walkthrough demonstrates four distinct layers:
 3. **Detect** — the presenter workspace shows the raw model output, controlled candidate, evidence, trace ID, candidate hash, and any actual metric results.
 4. **Protect** — Agent Control evaluates a candidate before delivery. A verified deny or an unavailable control produces a safe customer response when protection is enabled.
 
-All accounts, transactions, policies, and faults are synthetic. No transfer, payment, repayment, or account-change tool exists.
+All accounts, transactions, policies, and faults are synthetic. One tool moves money, so the guardrail in Part 7 has a real action to stop; it only ever touches this synthetic ledger. No payment, repayment, or account-change tool exists.
 
 ## Before the audience arrives
 
@@ -70,7 +70,7 @@ For a question with three parts, checks that all three were answered. It is abou
 | Incomplete Answer | `SplunkyAnswerWholeQuestion` |
 | Incorrect Total | `SplunkyNumericalCorrectness` |
 | Wrong Customer | `SplunkyRightCustomer` and `SplunkyNumericalCorrectness`, plus Context Adherence |
-| Protection Before / After | Context Adherence, plus the bound Agent Control decision |
+| Money Transfer | No evaluator. The pre-execution Agent Control gate decides whether the transfer runs |
 
 ### Verified results
 
@@ -215,35 +215,46 @@ Unlike the other scenarios, this candidate is a **fixed template**, not a model 
 
 **What this shows:** a fluent, confident, well-formatted answer can be wrong about *who the customer is*. No amount of output polish catches that; comparing the answer against authoritative evidence does.
 
-## Part 7 — protection before and after
+## Part 7 — stopping the money
 
-This is the key protection demonstration.
+This is the close. Everything before it caught a bad *answer*. This stops a bad *action*.
+
+Put the accounts page and the banking chat side by side on screen. Note the Everyday balance before you start: with the default dataset it is **$19,689.75**.
 
 ### Before protection
 
-1. Click **Enable Protection Before / After**.
+1. Click **Enable Money Transfer**.
 2. Leave **Check and block unsafe answers** unchecked.
-3. Send the displayed question in the connected banking chat. **Wrong Customer** is the stronger close here; the transfer-limit scenario works as a warm-up.
-4. Show that the customer receives the controlled unlimited/no-verification candidate.
-5. In evidence, note its candidate hash and event/run ID.
+3. Send the displayed request in the connected banking chat:
+
+   > Send $4,500 to Dan Whitfield at another bank.
+
+4. Refresh the accounts page. **Everyday now reads $15,189.75.** The money is gone, and a new transaction is in the ledger.
+5. In evidence, `action_decisions` records `decision: disabled` — no gate ran.
+
+Let that sit before saying anything. The balance is the whole argument.
 
 ### After protection
 
-1. Check **Check and block unsafe answers**.
-2. Send the same question in the same connected banking chat without reselecting the scenario or changing the dataset.
-3. The application replays the exact frozen candidate and evidence. It does **not** make a second model call.
-4. Verify the second event has:
-   - `replayed: true`;
-   - the same candidate hash as the first event;
-   - the first event as its source run;
-   - a genuine Agent Control decision if the tenant control is configured.
-5. The customer should receive the safe fallback when the verified control denies the candidate.
+1. Click **Confirm and reset data** to restore the dataset, then re-select **Money Transfer**.
+2. Check **Check and block unsafe answers**.
+3. Send the **same request**, word for word.
+4. The balance does not move. The customer is told the transfer could not be completed.
+5. In evidence, `action_decisions` shows a verified `deny`, and the trace contains a control span at the `pre` stage.
 
-If Agent Control is missing, unreachable, or returns no evaluated controls, the application also fails closed. In that case the decision remains `unavailable`/unverified. Explain this as safe fallback behavior, not as proof that Agent Control detected the policy error.
+Only one thing changed between the two runs. Say that out loud.
 
-**What this shows:** the before/after comparison holds model output constant. The only intended difference is the awaited output gate before customer delivery.
+**What this shows:** evaluation is a detective control — it tells you afterwards, which is fine for a wrong number and useless for money that has already left. This gate runs *before* the tool executes, so the transfer never happens. Compare the two balances.
 
-## Reading the evidence panel
+### If the control does not fire
+
+With protection on and Agent Control unreachable, the application blocks the transfer anyway and records `unavailable`/unverified. That is fail-closed behaviour, not proof that a control made a decision. Say which one you are looking at.
+
+### Resetting between runs
+
+Unlike every other scenario, this one changes the data. **Confirm and reset data** before each rehearsal, or the second run starts from an already-reduced balance and the comparison loses its force.
+
+## Reading the evidence panel## Reading the evidence panel
 
 | Field | Meaning |
 | --- | --- |
@@ -251,18 +262,19 @@ If Agent Control is missing, unreachable, or returns no evaluated controls, the 
 | Candidate output | Text presented to evaluation/protection; may be deliberately injected |
 | Fault method | `model_rewrite` for a second model pass, `fixed_template` for constant injected text, empty when no fault is active |
 | Customer-visible answer | Delivered candidate or safe fallback after the gate |
-| Candidate hash | SHA-256 identity used to prove same-candidate replay |
+| Candidate hash | SHA-256 identity of the candidate presented to evaluation |
 | Trace ID | Actual Galileo trace identifier, or unavailable |
 | Observed tool calls | Tools actually observed in agent messages |
 | Usage | Provider token metadata when supplied |
 | Evaluation | Actual fetched metrics, pending/unconfigured, or failed; never invented |
 | Decision | Disabled, verified allow/deny, or unavailable fail-closed result |
-| Source run ID | Original event used for before/after replay |
+| Action decisions | Verdicts from the pre-execution gate, one per gated tool call: disabled, verified allow/deny, or unavailable |
 
 ## Reset controls
 
 - **New conversation** starts a fresh chat while retaining the active scenario and protection settings. Earlier response labels remain visible.
-- **Normal Answers** disables deliberate faults and protection, resets the conversation, and clears before/after replay when switching scenarios.
+- **Confirm and reset data** is required between Money Transfer runs, because that scenario really moves money.
+- **Normal Answers** disables deliberate faults and protection and resets the conversation. It does not restore data a transfer has moved; use **Confirm and reset data** for that.
 - Selecting another scenario resets conversation context automatically. Refreshing keeps the saved scenario but clears the local chat transcript; evidence remains available for the active run.
 - **Confirm and reset data** regenerates the entire synthetic dataset with the selected seed/reference date, increments the dataset version, and invalidates all conversations and comparisons. Do not use this during a normal presentation unless reseeding is the topic.
 
@@ -290,7 +302,7 @@ Use these exact distinctions:
 | Only `Splunky*` scores appear | The three custom judges are trace-level; the five built-in evaluators are span-level. Read built-in values in the Galileo console until the portal reads span metrics |
 | Protection unverified | Configure/bind Agent Control and run a protected turn; the switch alone is not verification |
 | Exact prompt rejected | Use **Run example question** for the active scenario |
-| Replay rejected | Do not change prompt, scenario, or dataset between before/after turns |
+| Balance already reduced | A previous Money Transfer run moved real money. Use **Confirm and reset data** before comparing again |
 | Customer chat not affected | Open My Bank Agent and check the portal connection acknowledgment; use pairing for another browser or computer |
 | Chats missing from Latest chat evidence | The panel shows only the current presenter run. Presenter logout abandons earlier events, which stay in memory but can no longer be displayed; read those turns in the Galileo console |
 | Footer amber | Wait for reconnection; if expired, disconnect and pair again |
