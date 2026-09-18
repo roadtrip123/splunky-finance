@@ -16,9 +16,6 @@ Then confirm in the tenant console that every metric is enabled on the log strea
 | Evaluator | Level | Why it is here |
 | --- | --- | --- |
 | **Context Adherence** (`context_adherence`) | LLM span | Primary metric. Fails the wrong-customer answer and the invented policy. Replaces the retired `SplunkyGroundedness` judge. |
-| **Completeness** (`completeness`) | LLM span | Paired with Context Adherence on a policy question: the same answer scores high adherence and low completeness. |
-| **Tool Selection Quality** (`tool_selection_quality`) | LLM span | Gives the genuine tool-backed turn an actual score instead of only showing spans. |
-| **Tool Error Rate** (`tool_error_rate`) | Tool span | Detects tool execution failures; near-free once tool spans are clean. |
 
 Metric names are resolved against the tenant and the available set differs between tenants. This one exposes Tool Error as `tool_error_rate`. The setup script checks every name against the tenant's scorer list before enabling, and names the missing ones rather than failing with a raw traceback. The tenant also contains many hand-made metrics from other users with similar titles (`Completeness - Craig`, `Context Adherence - gaxie`); enable the `preset` ones listed above, not those copies.
 
@@ -63,6 +60,22 @@ The span that scores most reliably is the agent's answer-composing call. The Lan
 
 **Completeness returns a percentage, not a verdict, and the trace roll-up averages every LLM span.** On the answer-composing span a correct answer scored `100%`; the same turn rolled up to `33%` because spans without context average in. Read the per-span value, not the roll-up.
 
+## Cost
+
+Evaluation cost was measured per turn against live traces. The set was cut from seven metrics to four, from roughly $0.22 a turn to $0.035, an 84% reduction, without losing anything the demonstration shows.
+
+| Metric | Per turn | Kept |
+| --- | ---: | --- |
+| `completeness` | $0.13-0.18 | No. Around 78% of the entire bill, and its roll-up ranked a deliberately incomplete answer above a correct one. |
+| `context_adherence` | $0.022 | Yes. The Galileo-native evaluator that works here, and the one whose rationale named the invented fee. |
+| `tool_selection_quality` | $0.009 | No. Correct on every run but never caught a problem. |
+| `tool_error_rate` | $0.002 | No. Same. |
+| Each custom judge | $0.004 | Yes. These are what detect the scenarios. |
+
+Dropping `context_adherence` as well would reach about $0.013 a turn, but every remaining metric would then be one written in-house, which weakens a demonstration of Galileo's own evaluation.
+
+A further lever, not yet taken: the custom judges each consume around 9,000 tokens because the trace output carries the whole record, including every account and top-purchase row. Trimming that to what the judges actually read would cut tokens again without dropping a metric.
+
 ## Deliberately not enabled
 
 | Evaluator | Reason |
@@ -72,6 +85,8 @@ The span that scores most reliably is the agent's answer-composing call. The Lan
 | **A judge for invented fees** | Not needed. Context Adherence catches an invented fee stated alongside correct figures, because the agent's model calls carry their tool results as context. Verified against a live trace. |
 | **Chunk Relevance, Context Precision, Precision @ K** | Policy search is keyword overlap and returns some irrelevant chunks. These would score honestly but poorly. Enable them only to demonstrate retrieval-quality problems deliberately. |
 | **Ground Truth Adherence** | Viable once `expected_results` is wired in as ground truth. Not configured. |
+| **Completeness** | Enabled for a time and removed on cost. See the section above. Its per-span values were sound; the trace roll-up was not, and it accounted for most of the evaluation bill. |
+| **Tool Selection Quality, Tool Error Rate** | Correct on every run but never caught a problem. Removed on cost. |
 | **Action Completion** | Enabled for a time and removed. It produced no value on any trace or session across every run. This tenant offers it only as the Luna small-model variant, and the SDK exposes no way to close a session for a session-scoped metric to score. Reassigning the judge model changed nothing, which fits: that setting governs LLM judges, not Luna. |
 | **Text-to-SQL, Multimodal** | No SQL generation and no image or audio input. |
 

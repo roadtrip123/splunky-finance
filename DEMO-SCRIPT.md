@@ -3,7 +3,7 @@
 This walkthrough demonstrates four distinct layers:
 
 1. **Observe** — a real model selects read-only banking tools and Galileo records the model, tool, and workflow spans.
-2. **Evaluate** — Galileo evaluators assess a deliberately controlled candidate. Four are Galileo's own; three are custom judges written for this bank. See [What each evaluator looks for](#what-each-evaluator-looks-for).
+2. **Evaluate** — Galileo evaluators assess a deliberately controlled candidate. One is Galileo's own; three are custom judges written for this bank. See [What each evaluator looks for](#what-each-evaluator-looks-for).
 3. **Detect** — the presenter workspace shows the raw model output, controlled candidate, evidence, trace ID, candidate hash, and any actual metric results.
 4. **Protect** — Agent Control evaluates a candidate before delivery. A verified deny or an unavailable control produces a safe customer response when protection is enabled.
 
@@ -45,21 +45,12 @@ Use **Inspect expected results** in the presenter workspace to retrieve the acti
 
 ## What each evaluator looks for
 
-Seven metrics run on this demo. Four are Galileo's own, enabled out of the box. Three are custom judges written for this bank, because no off-the-shelf evaluator can know its ledger or its customer. Full setup detail is in [docs/evaluators.md](docs/evaluators.md); this section is what to say out loud.
+Four metrics run on this demo. One is Galileo's own, enabled out of the box. Three are custom judges written for this bank, because no off-the-shelf evaluator can know its ledger or its customer. Full setup detail is in [docs/evaluators.md](docs/evaluators.md); this section is what to say out loud.
 
-### Galileo's own evaluators
+### Galileo's own evaluator
 
 **Context Adherence — "Did the answer stick to the source material?"**
 Checks every claim against the documents the agent actually looked up. It fails when the answer states something the sources do not support: an invented fee, a made-up limit, a rule nobody wrote down. This is the workhorse metric of the demo.
-
-**Completeness — "Did the answer use everything relevant it was given?"**
-The mirror image of Context Adherence. That one asks whether everything said was supported; this asks whether everything supported was said. It fails when the retrieved documents held relevant facts the answer left out. The line worth saying: *every word of this answer is true, and it still only told the customer a third of what they needed.*
-
-**Tool Selection Quality — "Did the agent pick the right tool?"**
-Compares what the customer asked against which banking tool the agent chose. It fails when the agent reaches for the wrong one, such as searching policy documents to answer a spending total.
-
-**Tool Error Rate — "Did the tools actually work?"**
-Watches for tools that errored or failed. This is plumbing health rather than answer quality, and it is the one that tells you a problem is not the model's fault.
 
 ### Custom judges written for this bank
 
@@ -70,7 +61,7 @@ Compares every dollar figure and count against the authoritative calculation, in
 Checks every name and account number against the authenticated customer's real identity. It fails when the answer greets the wrong person or cites an account they do not own.
 
 **SplunkyAnswerWholeQuestion — "Did the answer address the whole question?"**
-For a question with three parts, checks that all three were answered. Distinct from Completeness: this one is about the *question*, Completeness is about the *source documents*.
+For a question with three parts, checks that all three were answered. It is about the *question*, not about whether the answer is correct: a wrong figure is another metric's business.
 
 ### Which metric catches which scenario
 
@@ -103,9 +94,7 @@ The `incomplete_answer` row was verified before the judge-scoping change and has
 - The tool-choosing call contains only a tool call, and judges disagree about whether that can be adherent. It has scored both ways on different runs, so expect it to move.
 - Percentages at the top of a trace are roll-ups averaged across every model call, which is why a correct answer can roll up to 33% while the answer itself scored 100%.
 
-**Open the span whose rationale names the tool result.** That is the agent's answer-composing call, and it scores the answer honestly: `1.0` adherence and `100%` completeness for a correct answer, `0.0` when it invents something. Expand the rationale on screen. It names the invented claim in plain English, which is far more convincing than the number.
-
-**Completeness is a percentage, not a pass or fail.** Expect roughly 44% on a good answer and 25% on a deliberately incomplete one. The movement is the point, not the number: quote the gap, never the figure alone.
+**Open the span whose rationale names the tool result.** That is the agent's answer-composing call, and it scores the answer honestly: `1.0` for a correct answer, `0.0` when it invents something. Expand the rationale on screen. It names the invented claim in plain English, which is far more convincing than the number.
 
 **A judge goes red only when its own subject is contradicted.** An answer with its total removed is an incomplete answer, not a wrong total and not a wrong customer, so the other two judges stay green. Most scenarios therefore light exactly one judge.
 
@@ -115,9 +104,9 @@ If a judge goes red for something its scenario did not touch, it is misreading a
 
 ### When a metric cannot help
 
-Context Adherence and Completeness both work by comparing the answer against documents the agent retrieved. **If the agent looked nothing up, they have nothing to compare against and stay silent.**
+Context Adherence works by comparing the answer against what the agent retrieved or computed. **If it had nothing to check against, it has nothing to say.**
 
-In practice the agent's own model calls carry their tool results as context, so Context Adherence still works on a calculation question: an invented fee stated alongside a correct total is caught, and the rationale names it. What changes without retrieval is Completeness, whose absolute percentage becomes unreliable because there are few retrieved facts to be complete about.
+In practice the agent's own model calls carry their tool results as context, so Context Adherence works on a calculation question too: an invented fee stated alongside a correct total is caught, and the rationale names it.
 
 The custom judges are unaffected by this. They read `evidence` from the trace output, which is always present.
 
@@ -183,7 +172,7 @@ The integrated presenter **Demo chat** is still available for rehearsal. **Run e
    - **Evidence** and trace identifiers — the reference material available to evaluation.
 6. After asynchronous evaluation completes, select **Fetch actual Galileo scores**. The `SplunkyAnswerWholeQuestion` judge should reject the candidate. `pending_or_unconfigured` is not a failed score and must not be presented as one.
 
-**What this shows:** evaluation can measure whether an answer covers every requested component. This is question-part coverage, not the built-in Completeness evaluator, which measures recall over retrieved context and is exercised by the policy question in Part 7. The fault is explicitly injected and is never misrepresented as an organic model failure.
+**What this shows:** evaluation can measure whether an answer covers every requested component. This measures whether the question was fully answered, not whether the answer was right. The fault is explicitly injected and is never misrepresented as an organic model failure.
 
 ## Part 5 — numerical correctness evaluation
 

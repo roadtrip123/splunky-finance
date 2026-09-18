@@ -88,11 +88,12 @@ JUDGE_COUNT = 3
 # Action Completion is deliberately absent: it produced no value on any trace or session, this
 # tenant offers it only as the Luna small-model variant, and the SDK exposes no way to close a
 # session for a session-scoped metric to score.
+# Measured per turn against live traces: completeness cost $0.13-0.18, roughly 78% of the whole
+# evaluation bill, while its roll-up ranked a deliberately incomplete answer above a correct one.
+# Tool Selection Quality and Tool Error Rate were correct on every run but never caught anything.
+# Context Adherence is kept as the Galileo-native evaluator that does work here, at about $0.02.
 BUILTIN_METRICS = [
     "context_adherence",
-    "completeness",
-    "tool_selection_quality",
-    "tool_error_rate",
 ]
 
 
