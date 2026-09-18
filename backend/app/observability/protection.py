@@ -1,7 +1,7 @@
 import asyncio
 
 FALLBACK = "I couldn't verify that answer against the bank's policies. Please check the account terms or contact the bank for confirmation."
-BLOCKED = "I can't complete that request. A transfer of this kind has to be confirmed with the bank directly."
+BLOCKED = "Transfer option is not available from My Bank Agent."
 
 
 class Protection:

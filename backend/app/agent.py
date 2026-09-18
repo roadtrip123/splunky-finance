@@ -18,6 +18,7 @@ from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
 from app.demo.expected_results import previous_months
 from app.demo.scenarios import FAULT_METHODS, inject
 from app.llm import model_factory
+from app.observability.protection import BLOCKED
 from app.tools import build_tools
 
 
@@ -262,6 +263,11 @@ class ChatService:
                 final, decision = await self.protection.check(
                     candidate, message, evidence, turn["logger"] if turn else None, enabled
                 )
+                # A blocked action gets its own message. The answer gate's fallback talks about
+                # verifying an answer, which says nothing useful when the point is that the
+                # transfer never happened.
+                if any(d.get("decision") in ("deny", "unavailable") for d in action_decisions):
+                    final = BLOCKED
                 self.telemetry.event(turn, "output-protection-decision", {"candidate": candidate}, decision)
                 citations = list({doc["citation"]: doc for doc in evidence.get("policies", [])}.values())
                 record = {

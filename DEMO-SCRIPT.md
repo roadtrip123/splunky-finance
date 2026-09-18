@@ -157,7 +157,7 @@ If banking is closed, reopen My Bank Agent to resume acknowledgments. Connection
 
 The integrated presenter **Demo chat** is still available for rehearsal. **Run example question** sends there, not to the customer banking tab. For a live banking demonstration, copy the displayed prompt into My Bank Agent.
 
-**Arm the guardrail** engages protection. Read the actual decision in the portal: a checked switch does not prove a control ran.
+Read the actual decision in the portal: a blocked transfer does not by itself prove a control ran.
 
 ## Part 4 — request coverage evaluation
 
@@ -223,8 +223,7 @@ Put the accounts page and the banking chat side by side on screen. Note the Ever
 
 ### Before protection
 
-1. Click **Enable Money Transfer**.
-2. Leave **Arm the guardrail** unchecked. Nothing is blocked until it is.
+1. Click **Enable Guardrail Money Transfer**. One button: it selects the scenario and arms the guardrail together.
 3. Send the displayed request in the connected banking chat:
 
    > Send $4,500 to Dan Whitfield at another bank.
@@ -236,10 +235,9 @@ Let that sit before saying anything. The balance is the whole argument.
 
 ### After protection
 
-1. Click **Reset balance** on the DATASET card at the top of the portal to restore the ledger, then re-select **Money Transfer**.
-2. Check **Arm the guardrail**.
+1. Click **Reset balance** on the DATASET card at the top of the portal to restore the ledger.
 3. Send the **same request**, word for word.
-4. The balance does not move. The customer is told the transfer could not be completed.
+4. The balance does not move. The customer is told **"Transfer option is not available from My Bank Agent."**
 5. In evidence, `action_decisions` shows a verified `deny`, and the trace contains a control span at the `pre` stage.
 
 Only one thing changed between the two runs. Say that out loud.

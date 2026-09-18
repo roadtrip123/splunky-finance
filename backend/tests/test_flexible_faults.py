@@ -115,6 +115,9 @@ def test_blocked_transfer_never_moves_money(client, monkeypatch):
     event = client.app.state.chat.events[-1]
     assert event["action_decisions"], "the gate did not record a decision"
     assert event["action_decisions"][0]["decision"] == "deny"
+    # The answer gate's fallback talks about verifying an answer, which says nothing useful when
+    # the point is that the transfer never happened.
+    assert result.json()["answer"] == "Transfer option is not available from My Bank Agent."
 
 
 def test_permitted_transfer_moves_money_and_reconciles(client, monkeypatch):

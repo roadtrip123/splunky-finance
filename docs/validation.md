@@ -136,3 +136,11 @@ Replaced: the `guardrail_before_after` scenario, its candidate-replay machinery,
 Tests: a denied call leaves the balance and transaction count unchanged and records a `deny`; a permitted call moves money and the ledger still reconciles, which matters because a dataset that fails reconciliation will not reload after a restart; and protection enabled with Agent Control unconfigured blocks the transfer and leaves the dataset file byte-identical.
 
 Backend suite: 45 passed; lint passed; production build passed. The gate has not yet been exercised against a live tenant decision.
+
+## Guardrail controls simplified
+
+A live run moved money with the guardrail unarmed. The scenario button and the arming checkbox were separate, the checkbox read "Check and block unsafe answers", and its description covered only answer checking, so nothing connected it to a transfer. Selecting a protection-applicable scenario now arms the guardrail in the same click and the checkbox is gone, along with the explanatory paragraphs around it; the button reads **Enable Guardrail Money Transfer**.
+
+A blocked transfer now returns "Transfer option is not available from My Bank Agent." rather than the answer gate's fallback, which spoke about verifying an answer and said nothing about the transfer not happening. The override keys on the gate's decision being `deny` or `unavailable` rather than on an action label, which a test double had omitted.
+
+Backend suite: 45 passed; lint passed; production build passed.

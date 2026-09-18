@@ -12,7 +12,7 @@ const descriptions: Record<string, [string, string]> = {
   incomplete_answer: ["Incomplete Answer", "Deliberately omits important details from the answer to your question."],
   incorrect_total: ["Incorrect Total", "Introduces a wrong amount or numerical claim related to your question."],
   wrong_customer: ["Wrong Customer", "Answers as if you were a different customer, citing an account you do not own."],
-  money_transfer: ["Money Transfer", "The agent really moves money. Arm the guardrail below to block the transfer before it executes — unarmed, the balance changes."],
+  money_transfer: ["Guardrail Money Transfer", "The agent tries to move real money. The guardrail evaluates the transfer before the tool runs, so a block means no balance changes."],
 };
 const label = (key: string) => descriptions[key]?.[0] || key;
 function decision(result: Answer) {
@@ -112,21 +112,15 @@ export default function DemoWorkspace({ onEvidence }: { onEvidence: () => Promis
         {Object.entries(status!.scenarios).map(([key]) => <button key={key}
           className={`button ${run.scenario === key ? "" : "outline"}`}
           aria-pressed={run.scenario === key} disabled={busy}
-          onClick={() => select(key, false)}>
+          onClick={() => select(key, status!.scenarios[key].protection_applicable)}>
           {key === "normal_spending" ? "Normal Answers" : `Enable ${label(key)}`}
         </button>)}
       </div>
       <p className="notice" aria-live="polite"><strong>Scenario: {label(run.scenario)}</strong> · Applied to your next demo message</p>
       <p>{descriptions[run.scenario]?.[1]}</p>
-      <p className="fine-print">Fault scenarios use an additional model pass to alter the answer to your question. Evidence keeps both answers. Exact wording varies.</p>
-      <div className="prompt-box">
-        <label><input type="checkbox" checked={run.protection} disabled={busy || !scenario?.protection_applicable}
-          onChange={(e) => select(run.scenario, e.target.checked)} /> <strong>Arm the guardrail</strong></label>
-        <p>Nothing is blocked until this is checked. It gates a money transfer <em>before</em> the tool runs, so a denial means the transfer never happens and no balance changes, and it checks the answer before delivery. A denial, or a check that cannot complete, stops the action and returns a fallback.</p>
-        <p><strong>Protection: {!run.protection ? "Off" : protectionReady ? "Ready — previously verified" : "Unavailable or not yet verified"}</strong></p>
-        {!scenario?.protection_applicable && <p>This scenario has no action to gate. Choose Money Transfer to use the guardrail.</p>}
-        {run.protection && !protectionReady && <p>A successful check is not yet confirmed. The response below will show the actual outcome.</p>}
-      </div>
+      {run.protection && (
+        <p className="notice"><strong>Guardrail armed</strong> · {protectionReady ? "previously verified" : "not yet verified — the response will show the actual outcome"}</p>
+      )}
       <h3>Demo chat</h3>
       <p>No customer login or session linking is needed.</p>
       <div className="prompt-box"><strong>Example question — or ask your own</strong><p>{scenario?.prompt}</p>
