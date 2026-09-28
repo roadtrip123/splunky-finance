@@ -194,3 +194,9 @@ Selection persists beside the Galileo connection in the same runtime file and ap
 `workshop.py` also blanks the provider keys and OpenAI base URL for participant instances, so a fresh stack arrives with no credentials of the operator's at all.
 
 Backend suite: 50 passed; lint passed; production build passed.
+
+## Injected answer reads as a model call
+
+The span carrying an injected answer was named `controlled-fault-writer` and tagged `simulation: true`, which marked the fabrication as staged everywhere it appeared in Galileo. It is now named after the chat model class, like the agent's own calls, so a trace shows the failure the way a genuine model failure would look. The demonstration depends on that: a trace that labels the fault as injected undercuts the thing it is meant to show.
+
+The honest record moves entirely to the presenter evidence, which was always the authoritative one: it keeps `raw_model_output` beside `candidate_output` and reports `fault_method`. A regression asserts the span is named like a model call, carries no simulation marker, still holds the turn's evidence so the evaluator judges it against the tool results, and that the evidence retains both answers and the method.

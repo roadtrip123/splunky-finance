@@ -443,13 +443,24 @@ class Telemetry:
             parts.append("Accounts owned by that customer: " + json.dumps(accounts, default=str))
         return "\n\n".join(parts)[:12000]
 
+    def model_span_name(self):
+        """The name the LangChain callback gives the agent's own model calls."""
+        return {
+            "openai": "ChatOpenAI",
+            "anthropic": "ChatAnthropic",
+            "ollama": "ChatOllama",
+        }.get(self.settings.llm_provider, "ChatOpenAI")
+
     def fault_span(self, turn, scenario, prompt, candidate, evidence=None, usage=None):
         """Log the controlled fault writer as its own named span.
 
-        Logged through the LangChain callback it arrived as another `ChatOllama`, visually identical
-        to the agent's genuine calls, so the one span holding the fabrication was the hardest in the
-        trace to find. Carries the same evidence as the answer span, so the evaluator judges the
-        fabricated claim against what the tools actually returned.
+        Named after the chat model class so it reads as an ordinary model call in the trace: the
+        demonstration depends on the failure looking like something a model produced. The honest
+        record lives in the presenter evidence, which keeps the genuine answer beside the injected
+        one and reports which method produced it.
+
+        Carries the same evidence as the answer span, so the evaluator judges the fabricated claim
+        against what the tools actually returned.
         """
         if not turn:
             return
@@ -462,8 +473,7 @@ class Telemetry:
                 input=messages,
                 output=candidate,
                 model=self.settings.model_name,
-                name="controlled-fault-writer",
-                metadata={"simulation": True, "scenario": scenario},
+                name=self.model_span_name(),
                 num_input_tokens=(usage or {}).get("input_tokens"),
                 num_output_tokens=(usage or {}).get("output_tokens"),
                 total_tokens=(usage or {}).get("total_tokens"),

@@ -50,7 +50,7 @@ Custom judges are worth their cost only where no built-in can know the rule. Eac
 
 **All three judges use three voters.** On a single judge a borderline call flips the whole verdict between runs — `SplunkyAnswerWholeQuestion` returned true and then false on the same scenario and question, with nothing left unanswered either time. Three judges vote, matching the built-in evaluators.
 
-**Built-in span-level metrics score every LLM span in the trace.** A turn has up to four: one model call to choose the tool, one to compose the answer, `controlled-fault-writer` when a scenario is active, and `customer-visible-answer`. The last two are logged explicitly rather than through the LangChain callback, which names chat-model spans after the model class and left the fault writer indistinguishable from the agent's genuine calls. Context Adherence therefore reports a mix such as `false 2 / true 1` even on a correct answer.
+**Built-in span-level metrics score every LLM span in the trace.** A turn has up to four: one model call to choose the tool, one to compose the answer, the fault writer when a scenario is active, and `customer-visible-answer`. The last two are logged explicitly rather than through the LangChain callback, which names chat-model spans after the model class and left the fault writer indistinguishable from the agent's genuine calls. Context Adherence therefore reports a mix such as `false 2 / true 1` even on a correct answer.
 
 The `customer-visible-answer` span now carries this turn's evidence as context, so it can be judged on the answer rather than reported unsupported. Tool definitions are deliberately left off it: Tool Selection Quality scores LLM spans and would fail one that advertises tools and selects none.
 
@@ -110,7 +110,7 @@ A regex rejects a controlled contradiction known before the demo. It is not a ge
 
 ## Known limits
 
-- Built-in span-level evaluators score **every** LLM span, including `controlled-fault-writer`. Read the score on `customer-visible-answer` and expect questions about the others.
+- Built-in span-level evaluators score **every** LLM span, the injected answer included. Read the score on `customer-visible-answer` and expect questions about the others.
 - **Fetch actual Galileo scores** reads trace-level metrics. Span-level built-in values may not appear there; read them in the console until this is confirmed against a live tenant.
 - `pending_or_unconfigured` means no value was retrieved yet. It is not a failed score and must not be presented as one.
 - No built-in evaluator here has been confirmed to return an actual value from a live tenant. Enable them and verify one real score before presenting them.

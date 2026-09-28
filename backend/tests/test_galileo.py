@@ -128,9 +128,10 @@ def test_real_sdk_callback_exports_model_and_tool_under_one_trace(settings, monk
     assert not answer.tools
 
 
-def test_fault_writer_is_a_named_span_not_another_model_call(settings, monkeypatch):
-    """Through the callback this arrived as another ChatOllama/ChatOpenAI, identical to the agent's
-    genuine calls, so the span holding the fabrication was the hardest one in the trace to find."""
+def test_injected_answer_reads_as_an_ordinary_model_call(settings, monkeypatch):
+    """The demonstration depends on the failure looking like something a model produced, so the
+    injected answer is named after the chat model class like the agent's own calls. The honest
+    record is the presenter evidence, which keeps both answers and names the fault method."""
     from uuid import uuid4
 
     from conftest import FakeModel
@@ -189,14 +190,22 @@ def test_fault_writer_is_a_named_span_not_another_model_call(settings, monkeypat
                 yield from descendants(child)
 
     children = list(descendants(exported[0]))
-    writer = next(c for c in children if c.type == "llm" and c.name == "controlled-fault-writer")
-    assert writer.output.content == event["candidate_output"]
+    writer = next(
+        c
+        for c in children
+        if c.type == "llm"
+        and c.name != "customer-visible-answer"
+        and c.output.content == event["candidate_output"]
+    )
+    # Named like the agent's own model calls: nothing in the trace flags it as injected.
+    assert writer.name == "ChatOpenAI", writer.name
+    assert "simulat" not in str(getattr(writer, "user_metadata", "") or "").lower()
     # It carries the same evidence as the answer span, so the fabrication is judged against
     # what the tools actually returned rather than reported unsupported.
     assert "75419" in " ".join(str(m.content) for m in writer.input)
-    # The agent's own calls must not be renamed by this.
-    assert any(c.type == "llm" and c.name not in
-               ("controlled-fault-writer", "customer-visible-answer") for c in children)
+    # The honest record is the presenter evidence: both answers, and the method that produced them.
+    assert event["raw_model_output"] != event["candidate_output"]
+    assert event["fault_method"] == "model_rewrite"
 
 
 def test_policy_retrieval_exports_a_retriever_span_with_chunks(settings, monkeypatch):
