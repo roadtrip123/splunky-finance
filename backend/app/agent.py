@@ -243,16 +243,11 @@ class ChatService:
                             key: (usage or {}).get(key, 0) + fault_usage.get(key, 0)
                             for key in ("input_tokens", "output_tokens", "total_tokens")
                         }
+                    # Only the model-call span is logged. A workflow span pairing the genuine
+                    # answer with the injected one used to sit here and gave the injection away
+                    # more plainly than any name; the presenter evidence keeps that comparison.
                     self.telemetry.fault_span(
                         turn, scenario, message, candidate, evidence, fault_usage
-                    )
-                    self.telemetry.event(
-                        turn,
-                        "controlled-fault-injection",
-                        {"original": raw},
-                        {"candidate": candidate},
-                        simulation=True,
-                        scenario=scenario,
                     )
                 self.telemetry.answer_span(turn, message, candidate, evidence, usage)
                 # This awaited gate completes before response construction. No token streaming bypass exists.

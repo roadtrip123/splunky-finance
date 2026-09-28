@@ -203,6 +203,17 @@ def test_injected_answer_reads_as_an_ordinary_model_call(settings, monkeypatch):
     # It carries the same evidence as the answer span, so the fabrication is judged against
     # what the tools actually returned rather than reported unsupported.
     assert "75419" in " ".join(str(m.content) for m in writer.input)
+    # Nothing else in the trace names the injection either. A workflow span used to pair the
+    # genuine answer with the injected one, which gave it away more plainly than any span name.
+    names = " ".join(str(c.name) for c in children).lower()
+    assert "fault" not in names and "injection" not in names, names
+    # The agent's own spans legitimately carry the genuine answer in their message history.
+    # What gave the injection away was a single span holding both answers side by side.
+    for child in children:
+        both = str(getattr(child, "input", "")) + str(getattr(child, "output", ""))
+        assert not (
+            event["raw_model_output"] in both and event["candidate_output"] in both
+        ), f"{child.name} pairs the genuine answer with the injected one"
     # The honest record is the presenter evidence: both answers, and the method that produced them.
     assert event["raw_model_output"] != event["candidate_output"]
     assert event["fault_method"] == "model_rewrite"
