@@ -16,6 +16,9 @@ class Telemetry:
             saved = json.loads(self.toggle_path.read_text())
             if type(saved.get("enabled")) is bool:
                 self.enabled = saved["enabled"]
+            # Saved connection details outrank the environment, so a workshop participant can
+            # point their own instance at their own project without editing a file or restarting.
+            self.apply_connection(saved.get("connection") or {})
         except (OSError, ValueError, TypeError, AttributeError):
             pass
         settings.galileo_enabled = self.enabled
@@ -37,15 +40,83 @@ class Telemetry:
         self.scorers = {}
         self.scorers_at = 0.0
 
-    def set_enabled(self, enabled):
+    CONNECTION_FIELDS = (
+        "galileo_api_key",
+        "galileo_project",
+        "galileo_log_stream",
+        "galileo_console_url",
+        "galileo_api_url",
+        "agent_control_url",
+    )
+
+    def apply_connection(self, values):
+        """Copy saved connection details onto settings, treating the API key as a secret."""
+        from pydantic import SecretStr
+
+        for field in self.CONNECTION_FIELDS:
+            value = values.get(field)
+            if not isinstance(value, str) or not value:
+                continue
+            setattr(self.settings, field, SecretStr(value) if field.endswith("_key") else value)
+
+    def connection(self):
+        """Current connection details. The API key is reported as set or not, never returned."""
+        s = self.settings
+        return {
+            "galileo_project": s.galileo_project,
+            "galileo_log_stream": s.galileo_log_stream,
+            "galileo_console_url": s.galileo_console_url,
+            "galileo_api_url": s.galileo_api_url,
+            "agent_control_url": s.agent_control_url,
+            "galileo_api_key_set": bool(s.galileo_api_key.get_secret_value()),
+        }
+
+    def _persist(self, connection=None):
+        saved = {"enabled": self.enabled}
+        if connection is None:
+            try:
+                connection = (json.loads(self.toggle_path.read_text()) or {}).get("connection")
+            except (OSError, ValueError, TypeError, AttributeError):
+                connection = None
+        if connection:
+            saved["connection"] = connection
         self.toggle_path.parent.mkdir(parents=True, exist_ok=True)
         temporary = self.toggle_path.with_suffix(".tmp")
         with temporary.open("w") as stream:
-            json.dump({"enabled": enabled}, stream)
+            json.dump(saved, stream)
             stream.flush()
             os.fsync(stream.fileno())
         os.replace(temporary, self.toggle_path)
+        os.chmod(self.toggle_path, 0o600)
+
+    def set_connection(self, values):
+        """Save connection details and apply them without a restart."""
+        current = {}
+        try:
+            current = (json.loads(self.toggle_path.read_text()) or {}).get("connection") or {}
+        except (OSError, ValueError, TypeError, AttributeError):
+            pass
+        for field in self.CONNECTION_FIELDS:
+            value = values.get(field)
+            if isinstance(value, str) and value:
+                current[field] = value
+        self.apply_connection(current)
+        self._persist(current)
+        self.scorers, self.scorers_at = {}, 0.0
+        self.revision += 1
+        self.status.update(
+            revision=self.revision,
+            state="unconfigured",
+            connection="not_checked",
+            project_id=None,
+            log_stream_id=None,
+            last_checked_at=None,
+            last_error=None,
+        )
+
+    def set_enabled(self, enabled):
         self.enabled = enabled
+        self._persist()
         self.settings.galileo_enabled = enabled
         self.revision += 1
         self.status.update(
@@ -182,6 +253,83 @@ class Telemetry:
             logger.conclude()
         except Exception:  # noqa: BLE001 - isolate SDK failures without exposing credential-bearing errors
             self.status["last_error"] = "A telemetry event could not be recorded"
+
+    async def setup_project(self):
+        """Enable the metrics on this log stream and bind the transfer control.
+
+        The judges and the control definition are tenant-wide and already exist, but metric
+        enablement and control binding are both per log stream, so every participant runs this
+        against their own project.
+        """
+        self.configure_environment()
+
+        def apply():
+            from galileo import GalileoLogger
+            from galileo.log_streams import enable_metrics
+            from galileo.scorers import Scorers
+
+            from app.observability.setup_definitions import BUILTIN_METRICS, JUDGES
+
+            s = self.settings
+            available = {str(getattr(row, "name", "")) for row in Scorers().list()}
+            wanted = [m for m in list(JUDGES) + BUILTIN_METRICS if m in available]
+            missing = [m for m in list(JUDGES) + BUILTIN_METRICS if m not in available]
+            enable_metrics(
+                project_name=s.galileo_project, log_stream_name=s.galileo_log_stream, metrics=wanted
+            )
+            logger = GalileoLogger(project=s.galileo_project, log_stream=s.galileo_log_stream)
+            return wanted, missing, str(logger.log_stream_id)
+
+        metrics, missing, log_stream_id = await asyncio.wait_for(asyncio.to_thread(apply), 60)
+        controls = await self._bind_controls(log_stream_id)
+        return {
+            "metrics_enabled": metrics,
+            "metrics_unavailable": missing,
+            "controls": controls,
+            "log_stream_id": log_stream_id,
+        }
+
+    async def _bind_controls(self, log_stream_id):
+        """Bind the transfer control to this log stream, reusing the tenant-wide definition."""
+        s = self.settings
+        if not s.agent_control_url:
+            return {"state": "skipped", "reason": "No Agent Control URL configured"}
+        try:
+            from agent_control import AgentControlClient
+            from agent_control.controls import clone_and_bind_control, create_control, list_controls
+
+            from app.observability.setup_definitions import CONTROLS
+
+            bound = []
+            async with AgentControlClient(
+                base_url=s.agent_control_url,
+                timeout=30,
+                api_key=s.galileo_api_key.get_secret_value(),
+                api_key_header=s.agent_control_api_key_header,
+                runtime_auth_mode="jwt",
+                runtime_token_header=s.agent_control_runtime_token_header,
+            ) as client:
+                for name, definition in CONTROLS.items():
+                    existing = await list_controls(client, name=name, limit=10)
+                    found = (existing.get("controls") or [None])[0]
+                    identifier = (
+                        (found.get("control_id") or found.get("id"))
+                        if found
+                        else (await create_control(client, name=name, data=definition))["control_id"]
+                    )
+                    # Always bind: the definition is tenant-wide but the binding is per log
+                    # stream, so reusing one without binding leaves this stream unguarded.
+                    await clone_and_bind_control(
+                        client,
+                        control_id=identifier,
+                        target_type="log_stream",
+                        target_id=log_stream_id,
+                        enabled=True,
+                    )
+                    bound.append(name)
+            return {"state": "bound", "controls": bound}
+        except Exception:  # noqa: BLE001 - sanitize credential-bearing SDK errors
+            return {"state": "failed", "reason": "Control binding failed; check the Agent Control URL"}
 
     async def scorer_names(self):
         """Map scorer id to name.

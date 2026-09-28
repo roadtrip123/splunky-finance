@@ -154,3 +154,17 @@ Two changes were needed for stacks to coexist. `compose.override.yaml` pinned ev
 Verified on this host: two stacks provisioned on ports 3201 and 3202, both serving, with separate `sf-p01_runtime-data` and `sf-p02_runtime-data` volumes; `list` reporting both; `down --purge` removing containers, volumes and generated env files; and the repository's own stack on 3100 unaffected throughout. Generated env files are written 0600 into a gitignored `workshop/` directory.
 
 Not yet done: the portal cannot set Galileo credentials, so connecting to Galileo still requires editing an env file. That is the remaining blocker for a zero-SSH participant experience.
+
+## Workshop configurability
+
+Galileo connection details are now settable from the portal and applied without a restart. `Telemetry.set_connection` writes them alongside the enable flag in `runtime/galileo-settings.json` at mode 0600, and they outrank the environment on load, so a participant points their instance at their own project without shell access. The API key is never returned: the connection payload reports only whether one is set, and a regression asserts the key does not appear in the response and that a blank field leaves the stored value unchanged.
+
+`POST /api/demo-admin/galileo/setup` enables the metrics on the participant's log stream and binds the transfer control, reusing the tenant-wide judges and control definition. Metric enablement and control binding are both per log stream, so each participant runs it for their own project. The shared definitions moved from `scripts/configure_galileo.py` into `app/observability/setup_definitions.py`, because the container image copies only `backend/app` and `data/` and the script directory is not present at runtime.
+
+`DEMO_MODE=workshop` hides the seed and reference-date reset card, whose editable fields would move every figure on a participant's lab sheet, and the pairing-code control, which is meaningless when one person holds both roles in one browser profile. The paid preflight is kept but renamed "Test my setup", since it is the best check a participant has that their configuration works.
+
+Two defects that would have broken a fifty-person workshop: `configure_galileo.py` skipped `clone_and_bind_control` whenever a control of that name already existed tenant-wide, so every participant after the first would have had no guardrail while the script reported success; and `model_factory` built `ChatOpenAI` with no `base_url`, so an OpenAI-compatible endpoint could not be reached at all. Both fixed.
+
+`workshop.py` now refuses to provision when the resulting origin would be plain HTTP on a public address, which `config.py` rejects, rather than starting stacks that cannot boot. `scripts/Caddyfile.workshop` covers TLS with a subdomain per participant.
+
+Backend suite: 47 passed; lint passed; production build passed.

@@ -14,6 +14,7 @@ def model_factory(settings):
             api_key=settings.openai_api_key.get_secret_value(),
             timeout=settings.llm_timeout_seconds,
             max_retries=0,
+            **({"base_url": settings.openai_base_url} if settings.openai_base_url else {}),
             **common,
             **options,
         )

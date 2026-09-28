@@ -28,6 +28,21 @@ class GalileoSetting(StrictModel):
     expected_revision: int = Field(ge=0)
 
 
+class GalileoConnection(StrictModel):
+    """Connection details a workshop participant supplies from the portal.
+
+    Blank fields are left unchanged, so the API key can stay as it is while a project or log
+    stream is corrected.
+    """
+
+    galileo_api_key: str = Field(default="", max_length=400)
+    galileo_project: str = Field(default="", max_length=200)
+    galileo_log_stream: str = Field(default="", max_length=200)
+    galileo_console_url: str = Field(default="", max_length=400)
+    galileo_api_url: str = Field(default="", max_length=400)
+    agent_control_url: str = Field(default="", max_length=400)
+
+
 class DemoSettings(StrictModel):
     scenario: str
     protection: bool
@@ -409,6 +424,43 @@ def create_app(settings=None, model_builder=None, protection_adapter=None):
             await telemetry.check_connection(force=True)
         return envelope(request, {"galileo": dict(telemetry.status)})
 
+    @app.put("/api/demo-admin/galileo/connection")
+    async def set_galileo_connection(request: Request, payload: GalileoConnection):
+        session(request, "admin", True)
+        if telemetry.pending or any(c.lock.locked() for c in chat.conversations.values()):
+            raise HTTPException(409, "Wait for active requests before changing Galileo")
+        for name in ("galileo_console_url", "galileo_api_url", "agent_control_url"):
+            value = getattr(payload, name)
+            if value and not value.startswith(("http://", "https://")):
+                raise HTTPException(422, f"{name} must be an http(s) URL")
+        telemetry.set_connection(payload.model_dump())
+        status = await telemetry.check_connection(force=True) if telemetry.enabled else telemetry.status
+        # The API key is never echoed back; the connection payload reports only whether one is set.
+        return envelope(request, {"galileo": dict(status), "connection": telemetry.connection()})
+
+    @app.post("/api/demo-admin/galileo/setup")
+    async def setup_galileo_project(request: Request):
+        """Enable the metrics on this log stream and bind the transfer control.
+
+        Metrics are enabled per log stream and control bindings are per log stream, so each
+        participant has to do this against their own project even though the judges and the
+        control definition already exist tenant-wide.
+        """
+        session(request, "admin", True)
+        if not telemetry.enabled or not settings.galileo_api_key.get_secret_value():
+            raise HTTPException(409, "Connect to Galileo before setting up the project")
+        job = str(uuid4())
+        jobs[job] = {"state": "running", "result": None}
+
+        async def run():
+            try:
+                jobs[job] = {"state": "complete", "result": await telemetry.setup_project()}
+            except Exception:  # noqa: BLE001 - sanitize credential-bearing SDK errors
+                jobs[job] = {"state": "failed", "result": {"error": "Project setup failed"}}
+
+        asyncio.create_task(run())
+        return envelope(request, {"job_id": job})
+
     @app.post("/api/demo-admin/galileo/check")
     async def check_galileo(request: Request):
         session(request, "admin", True)
@@ -431,6 +483,8 @@ def create_app(settings=None, model_builder=None, protection_adapter=None):
                 "log_stream": settings.galileo_log_stream,
                 "console_url": settings.galileo_console_url or None,
                 "protection_status": protection.status,
+                "demo_mode": settings.demo_mode,
+                "connection": telemetry.connection(),
                 "run": run,
                 "events": events[-10:],
                 "scenarios": SCENARIOS,

@@ -249,3 +249,59 @@ def test_policy_retrieval_exports_a_retriever_span_with_chunks(settings, monkeyp
     citations = {document["citation"] for document in event["evidence"]["policies"]}
     assert "everyday-fees#monthly-fee" in citations
     assert any(child.type == "llm" and child.name == "customer-visible-answer" for child in children)
+
+
+def test_connection_is_settable_at_runtime_and_never_returns_the_key(client):
+    """A workshop participant configures their own project from the portal.
+
+    Without this the API key, project and log stream are env-only and need a restart, so
+    connecting to Galileo would require shell access to the box."""
+    headers = login(client, True)
+    secret = "gal-key-not-to-be-echoed-0123456789"
+    response = client.put(
+        "/api/demo-admin/galileo/connection",
+        headers=headers,
+        json={
+            "galileo_api_key": secret,
+            "galileo_project": "participant-07",
+            "galileo_log_stream": "their-stream",
+            "agent_control_url": "https://agent-control.example.com",
+        },
+    )
+    assert response.status_code == 200, response.text
+    assert secret not in response.text, "the API key must never be echoed back"
+    body = response.json()["connection"]
+    assert body["galileo_project"] == "participant-07"
+    assert body["galileo_log_stream"] == "their-stream"
+    assert body["galileo_api_key_set"] is True
+
+    settings = client.app.state.telemetry.settings
+    assert settings.galileo_project == "participant-07"
+    assert settings.galileo_api_key.get_secret_value() == secret
+
+    # Survives a restart: a new Telemetry over the same data dir reloads what was saved.
+    from app.observability.galileo import Telemetry
+
+    settings.galileo_project = "wiped"
+    Telemetry(settings)
+    assert settings.galileo_project == "participant-07"
+
+    # A blank field leaves the stored value alone, so the key can stay while a stream is fixed.
+    client.put(
+        "/api/demo-admin/galileo/connection",
+        headers=headers,
+        json={"galileo_log_stream": "corrected-stream"},
+    )
+    assert settings.galileo_api_key.get_secret_value() == secret
+    assert settings.galileo_log_stream == "corrected-stream"
+    assert client.get("/api/demo-admin/status", headers=headers).json()["demo_mode"] == "presenter"
+
+
+def test_connection_rejects_a_non_http_url(client):
+    headers = login(client, True)
+    response = client.put(
+        "/api/demo-admin/galileo/connection",
+        headers=headers,
+        json={"agent_control_url": "file:///etc/passwd"},
+    )
+    assert response.status_code == 422

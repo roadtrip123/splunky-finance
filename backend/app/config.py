@@ -16,6 +16,8 @@ class Settings(BaseSettings):
     llm_provider: Literal["openai", "anthropic", "ollama"] = "openai"
     openai_api_key: SecretStr = SecretStr("")
     openai_model: str = "gpt-4o-mini-2024-07-18"
+    # Any OpenAI-compatible endpoint; blank uses OpenAI itself.
+    openai_base_url: str = ""
     anthropic_api_key: SecretStr = SecretStr("")
     anthropic_model: str = "claude-haiku-4-5-20251001"
     ollama_base_url: str = "http://localhost:11434"
@@ -45,6 +47,8 @@ class Settings(BaseSettings):
     session_secret: SecretStr
     session_cookie_secure: bool = False
     allow_private_lan_http: bool = False
+    # "workshop" hides presenter-only controls that confuse a solo lab participant.
+    demo_mode: Literal["presenter", "workshop"] = "presenter"
     app_origin: str = "http://localhost:3000"
     data_dir: Path = Path("../runtime")
     policy_dir: Path = Path("../data/policies")

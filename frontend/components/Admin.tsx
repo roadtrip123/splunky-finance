@@ -41,6 +41,15 @@ type Status = {
   log_stream: string;
   console_url: string | null;
   protection_status: string;
+  demo_mode: "presenter" | "workshop";
+  connection: {
+    galileo_project: string;
+    galileo_log_stream: string;
+    galileo_console_url: string;
+    galileo_api_url: string;
+    agent_control_url: string;
+    galileo_api_key_set: boolean;
+  };
   run: Run | null;
   events: Event[];
   scenarios: Record<string, { prompt: string; evaluation: string | null }>;
@@ -59,6 +68,14 @@ export default function Admin() {
   const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState(false);
   const [expected, setExpected] = useState<Record<string, unknown>>();
+  const [conn, setConn] = useState({
+    galileo_api_key: "",
+    galileo_project: "",
+    galileo_log_stream: "",
+    galileo_console_url: "",
+    galileo_api_url: "",
+    agent_control_url: "",
+  });
   const [seed, setSeed] = useState("42");
   const [date, setDate] = useState("2026-09-15");
   async function refresh() {
@@ -289,7 +306,96 @@ export default function Admin() {
                 </div>
                 <DemoWorkspace onEvidence={refresh} />
                 <section className="admin-card">
-                  <h2>Demo diagnostics</h2>
+                  <h2>Connect to Galileo</h2>
+                  <p className="muted">
+                    Paste your own API key and project. Saved to this instance only and applied
+                    immediately — no restart. The key is never shown again once saved.
+                  </p>
+                  <p>
+                    <strong>
+                      {status.connection.galileo_api_key_set
+                        ? `Key set · project ${status.connection.galileo_project} · stream ${status.connection.galileo_log_stream}`
+                        : "No API key set"}
+                    </strong>{" "}
+                    · {status.galileo.connection}
+                  </p>
+                  <div className="admin-controls">
+                    {(
+                      [
+                        ["galileo_api_key", "API key", "password"],
+                        ["galileo_project", "Project", "text"],
+                        ["galileo_log_stream", "Log stream", "text"],
+                        ["galileo_console_url", "Console URL", "text"],
+                        ["galileo_api_url", "API URL", "text"],
+                        ["agent_control_url", "Agent Control URL", "text"],
+                      ] as const
+                    ).map(([key, label, type]) => (
+                      <div key={key}>
+                        <label htmlFor={key}>{label}</label>
+                        <input
+                          id={key}
+                          type={type}
+                          autoComplete="off"
+                          placeholder={
+                            key === "galileo_api_key"
+                              ? status.connection.galileo_api_key_set
+                                ? "unchanged"
+                                : "paste your key"
+                              : (status.connection[key] as string) || ""
+                          }
+                          value={conn[key]}
+                          onChange={(e) => setConn({ ...conn, [key]: e.target.value })}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                  <div className="admin-actions">
+                    <button
+                      className="button small"
+                      disabled={busy}
+                      onClick={() =>
+                        action(async () => {
+                          await mutate("demo-admin/galileo/connection", conn, true, "PUT");
+                          setConn({ ...conn, galileo_api_key: "" });
+                          setNotice("Galileo connection saved.");
+                        })
+                      }
+                    >
+                      Save and connect
+                    </button>
+                    <button
+                      className="button outline small"
+                      disabled={busy || !status.connection.galileo_api_key_set}
+                      title="Enable the metrics on your log stream and bind the transfer control"
+                      onClick={() =>
+                        action(async () => {
+                          const job = await mutate<{ job_id: string }>(
+                            "demo-admin/galileo/setup",
+                            {},
+                            true,
+                          );
+                          setNotice("Setting up your project...");
+                          let done = false;
+                          while (!done) {
+                            await new Promise((r) => setTimeout(r, 2000));
+                            const result = await api<{ state: string; result: unknown }>(
+                              `demo-admin/preflight/${job.job_id}`,
+                            );
+                            done = result.state !== "running";
+                            if (done)
+                              setNotice(
+                                `Project setup ${result.state}: ${JSON.stringify(result.result)}`,
+                              );
+                          }
+                        })
+                      }
+                    >
+                      Set up my project
+                    </button>
+                  </div>
+                </section>
+                <section className="admin-card">
+                  <h2>{status.demo_mode === "workshop" ? "Check my setup" : "Demo diagnostics"}</h2>
                   <div className="admin-actions">
                     <button
                       className="button outline small"
@@ -320,7 +426,7 @@ export default function Admin() {
                         })
                       }
                     >
-                      Run paid preflight
+                      Test my setup
                     </button>
                     <button
                       className="button outline small"
@@ -393,6 +499,7 @@ export default function Admin() {
                       ))
                   )}
                 </section>
+                {status.demo_mode !== "workshop" && (
                 <section className="admin-card">
                   <h2>Reset synthetic data</h2>
                   <p className="muted">
@@ -446,6 +553,7 @@ export default function Admin() {
                     </button>
                   </div>
                 </section>
+                )}
               </>
             )}
           </>

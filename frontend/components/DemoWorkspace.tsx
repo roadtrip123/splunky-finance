@@ -4,7 +4,7 @@ import { api, mutate } from "@/lib/api";
 
 type Run = { id: string; scenario: string; protection: boolean; revision: number };
 type Scenario = { prompt: string; protection_applicable: boolean };
-type Status = { banking_connection: { state: string; session: string | null }; run: Run | null; scenarios: Record<string, Scenario>; protection_status: string; galileo: { enabled: boolean; connection: string } };
+type Status = { banking_connection: { state: string; session: string | null }; run: Run | null; scenarios: Record<string, Scenario>; protection_status: string; demo_mode: "presenter" | "workshop"; galileo: { enabled: boolean; connection: string } };
 type Answer = { answer: string; conversation_id: string; scenario: string; protection_enabled: boolean; protection_decision: { decision?: string }; };
 type Entry = { question: string; result: Answer };
 const descriptions: Record<string, [string, string]> = {
@@ -96,9 +96,9 @@ export default function DemoWorkspace({ onEvidence }: { onEvidence: () => Promis
     {!run ? <p role="status">Connecting your demo chat…</p> : <>
       <div className="prompt-box">
         <h3>Banking connection</h3>
-        <p role="status">{status?.banking_connection.state === "applied" ? "Applied to connected banking session" : status?.banking_connection.state === "updating" ? "Applying settings to banking session…" : status?.banking_connection.state === "waiting" ? "Waiting for banking chat to acknowledge settings — open My Bank Agent" : status?.banking_connection.state === "disconnected" ? "Banking session disconnected or expired" : "No banking session connected. Open banking in this browser, or pair another computer."}</p>
+        <p role="status">{status?.banking_connection.state === "applied" ? "Applied to connected banking session" : status?.banking_connection.state === "updating" ? "Applying settings to banking session…" : status?.banking_connection.state === "waiting" ? "Waiting for banking chat to acknowledge settings — open My Bank Agent" : status?.banking_connection.state === "disconnected" ? "Banking session disconnected or expired" : (status?.demo_mode === "workshop" ? "No banking session connected. Open banking in another tab of this browser." : "No banking session connected. Open banking in this browser, or pair another computer.")}</p>
         {status?.banking_connection.session && <p>Session: {status.banking_connection.session}</p>}
-        {!status?.banking_connection.session && <button className="button outline small" disabled={busy} onClick={async () => {
+        {!status?.banking_connection.session && status?.demo_mode !== "workshop" && <button className="button outline small" disabled={busy} onClick={async () => {
           try { setPairing(await mutate("demo-admin/pairing", {}, true)); setError(""); }
           catch (e) { setError((e as Error).message); }
         }}>Connect using pairing code</button>}

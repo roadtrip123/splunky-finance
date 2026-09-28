@@ -1,0 +1,45 @@
+# TLS and subdomain routing for a workshop deployment.
+#
+# Required, not optional: config.py rejects an HTTP origin on a public address, so 50 stacks
+# behind a public EC2 IP over plain HTTP will refuse to start. Participants also share a cookie
+# jar when instances differ only by port, because cookies ignore ports but respect hostnames.
+# Subdomains fix both.
+#
+# Path routing does not work here. APP_ORIGIN must have an empty path, so
+# https://demo.example.com/p07 is rejected while https://p07.demo.example.com is fine.
+#
+#   1. Wildcard DNS: *.demo.example.com -> this instance's public IP
+#   2. Wildcard certificate via DNS challenge, or per-host certs if each name resolves publicly
+#   3. Provision with the matching origin scheme:
+#        python3 scripts/workshop.py up --count 50 \
+#          --host demo.example.com --origin-template https://p{n:02d}.demo.example.com \
+#          --bind 127.0.0.1
+#   4. caddy run --config scripts/Caddyfile.workshop
+#
+# Bind participant stacks to 127.0.0.1 so the only public listener is Caddy.
+
+{
+	email you@example.com
+}
+
+# One entry per participant. p01 -> 3101, p02 -> 3102, and so on.
+p01.demo.example.com { reverse_proxy 127.0.0.1:3101 }
+p02.demo.example.com { reverse_proxy 127.0.0.1:3102 }
+p03.demo.example.com { reverse_proxy 127.0.0.1:3103 }
+p04.demo.example.com { reverse_proxy 127.0.0.1:3104 }
+p05.demo.example.com { reverse_proxy 127.0.0.1:3105 }
+
+# For 50 participants, generate the rest rather than typing them:
+#
+#   for i in $(seq -w 1 50); do
+#     printf 'p%s.demo.example.com { reverse_proxy 127.0.0.1:31%s }\n' "$i" "$i"
+#   done >> scripts/Caddyfile.workshop
+#
+# Caddy obtains certificates on demand. With a wildcard DNS record and a DNS-challenge provider
+# module, a single block replaces all fifty:
+#
+#   *.demo.example.com {
+#     tls { dns <provider> <credentials> }
+#     @p host_regexp p ^p(\d{2})\.demo\.example\.com$
+#     handle @p { reverse_proxy 127.0.0.1:31{re.p.1} }
+#   }

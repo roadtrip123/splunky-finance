@@ -29,6 +29,20 @@ PROJECT = "sf-p{n:02d}"
 GENERATED = ("FRONTEND_PORT", "APP_ORIGIN", "SESSION_SECRET", "DEMO_MODE", "FRONTEND_BIND_ADDRESS")
 
 
+def is_local_or_private(host):
+    """Mirror the origin rule in config.py so a doomed provision fails before 50 stacks start."""
+    from ipaddress import ip_address, ip_network
+
+    if host in ("localhost", "127.0.0.1", "::1"):
+        return True
+    try:
+        address = ip_address(host)
+    except ValueError:
+        return False
+    networks = (ip_network("10.0.0.0/8"), ip_network("172.16.0.0/12"), ip_network("192.168.0.0/16"))
+    return address.version == 4 and any(address in network for network in networks)
+
+
 def read_env(path):
     values = {}
     for line in path.read_text().splitlines():
@@ -40,7 +54,18 @@ def read_env(path):
     return values
 
 
-def participant_env(base, index, host, port, bind, mode):
+def participant_origin(template, host, port, index):
+    """Exact origin the participant browses to, matched on every mutating request.
+
+    Plain HTTP is rejected for anything but localhost and RFC1918 addresses, so a public
+    deployment needs an https template pointing at a TLS proxy.
+    """
+    if template:
+        return template.format(n=index, host=host, port=port)
+    return f"http://{host}:{port}"
+
+
+def participant_env(base, index, host, port, bind, mode, origin):
     """Base settings plus the ones that must be unique, written newest-wins."""
     values = dict(base)
     for key in GENERATED:
@@ -50,7 +75,8 @@ def participant_env(base, index, host, port, bind, mode):
         FRONTEND_BIND_ADDRESS=bind,
         # Exact-origin matching rejects mutations whose Origin differs, port included. A wrong
         # value here fails every login with a CSRF error rather than anything more obvious.
-        APP_ORIGIN=f"http://{host}:{port}",
+        APP_ORIGIN=origin,
+        SESSION_COOKIE_SECURE="true" if origin.startswith("https://") else "false",
         SESSION_SECRET=secrets.token_urlsafe(48),
         DEMO_MODE=mode,
     )
@@ -113,10 +139,11 @@ def command_up(args):
         port = args.base_port + index
         project = PROJECT.format(n=index)
         env_file = ENV_DIR / f".env.p{index:02d}"
-        write_env(env_file, participant_env(base, index, args.host, port, args.bind, args.mode))
+        origin = participant_origin(args.origin_template, args.host, port, index)
+        write_env(env_file, participant_env(base, index, args.host, port, args.bind, args.mode, origin))
         code = compose(project, env_file, "up", "-d", "--no-build", dry_run=args.dry_run)
         (started if code == 0 else failed).append((index, port))
-        print(f"  p{index:02d}  http://{args.host}:{port}  {'ok' if code == 0 else 'FAILED'}")
+        print(f"  p{index:02d}  {origin}  {'ok' if code == 0 else 'FAILED'}")
         # Fifty Next.js and uvicorn processes starting at once is the one real CPU spike.
         if index < args.count and not args.dry_run:
             time.sleep(args.stagger)
@@ -168,6 +195,12 @@ def main():
     parser.add_argument("--mode", default="workshop", help="DEMO_MODE for generated stacks")
     parser.add_argument("--stagger", type=float, default=2.0, help="Seconds between starts")
     parser.add_argument("--purge", action="store_true", help="With down: also delete volumes and env files")
+    parser.add_argument(
+        "--origin-template",
+        default="",
+        help="Origin per participant, e.g. https://p{n:02d}.demo.example.com. Defaults to "
+        "http://HOST:PORT, which the app rejects on a public address.",
+    )
     parser.add_argument("--skip-build", action="store_true", help="Images already built; start straight away")
     parser.add_argument("--dry-run", action="store_true", help="Print what would run, change nothing")
     args = parser.parse_args()
@@ -177,6 +210,13 @@ def main():
             raise SystemExit("--count is required for up")
         if not args.host:
             raise SystemExit("--host is required: participants browse to it and it must match APP_ORIGIN")
+        sample = participant_origin(args.origin_template, args.host, args.base_port + 1, 1)
+        if sample.startswith("http://") and not is_local_or_private(args.host):
+            raise SystemExit(
+                f"{sample} will be rejected: plain HTTP is only allowed for localhost and private "
+                "LAN addresses. Put a TLS proxy in front and pass --origin-template "
+                "https://p{n:02d}.your.domain (see scripts/Caddyfile.workshop)."
+            )
         command_up(args)
     elif args.action == "down":
         command_down(args)
