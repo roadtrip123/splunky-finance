@@ -184,3 +184,13 @@ The key is reported as eight bullets plus its last four characters, enough to te
 A fresh participant instance must not inherit the operator's credentials, so `workshop.py` blanks the six Galileo and Agent Control fields rather than copying them from the base env, and sets `SESSION_COOKIE_SECURE` to match the origin scheme. Verified by generating a participant env and by a test asserting a Telemetry over an empty data directory reports no key and blank fields.
 
 Backend suite: 48 passed; lint passed; production build passed.
+
+## Model endpoint selectable from the portal
+
+The Setup tab now selects the model endpoint: OpenAI, Anthropic, Ollama (local), Sharon AI, or a custom OpenAI-compatible URL. Sharon AI and custom both use the openai provider with their own base URL, since the distinction is the endpoint rather than the protocol; the base URL field appears only for the options that need one, and the key field is hidden for local Ollama.
+
+Selection persists beside the Galileo connection in the same runtime file and applies without a restart. `model_name` and `provider_configured` are derived properties, so switching provider swaps which fields the agent reads without losing the others: a test sets an OpenAI-compatible endpoint, switches to Ollama, and asserts the OpenAI base URL survives. Provider keys are returned masked on the same terms as the Galileo key, and the endpoint enforces the startup rule that Ollama mode requires a local runtime.
+
+`workshop.py` also blanks the provider keys and OpenAI base URL for participant instances, so a fresh stack arrives with no credentials of the operator's at all.
+
+Backend suite: 50 passed; lint passed; production build passed.

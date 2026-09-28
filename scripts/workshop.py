@@ -37,6 +37,9 @@ GENERATED = (
 # Blanked rather than inherited: each participant connects their own Galileo project from the
 # portal, so a fresh instance must not arrive holding the operator's credentials or defaults.
 PARTICIPANT_SUPPLIES = (
+    "OPENAI_API_KEY",
+    "OPENAI_BASE_URL",
+    "ANTHROPIC_API_KEY",
     "GALILEO_API_KEY",
     "GALILEO_PROJECT",
     "GALILEO_LOG_STREAM",

@@ -327,3 +327,52 @@ def test_a_fresh_instance_reports_no_galileo_connection(settings, tmp_path):
     assert connection["galileo_api_key_set"] is False
     assert connection["galileo_api_key_masked"] == ""
     assert all(connection[f] == "" for f in ("galileo_project", "galileo_log_stream", "agent_control_url"))
+
+
+def test_model_endpoint_is_settable_and_key_is_masked(client):
+    """Sharon AI and similar are OpenAI-compatible: same provider, their own base URL."""
+    headers = login(client, True)
+    secret = "sk-participant-key-abcd9876"
+    response = client.put(
+        "/api/demo-admin/model",
+        headers=headers,
+        json={
+            "llm_provider": "openai",
+            "api_key": secret,
+            "model": "llama-3.3-70b",
+            "base_url": "https://api.sharonai.example/v1",
+        },
+    )
+    assert response.status_code == 200, response.text
+    assert secret[:-4] not in response.text
+    body = response.json()["model_config"]
+    assert body["llm_provider"] == "openai"
+    assert body["model"] == "llama-3.3-70b"
+    assert body["base_url"] == "https://api.sharonai.example/v1"
+    assert body["api_key_masked"].endswith(secret[-4:])
+
+    settings = client.app.state.telemetry.settings
+    assert settings.openai_base_url == "https://api.sharonai.example/v1"
+    assert settings.model_name == "llama-3.3-70b"
+    assert settings.provider_configured
+
+    # Switching provider swaps which fields the agent reads, without losing the previous ones.
+    client.put(
+        "/api/demo-admin/model",
+        headers=headers,
+        json={"llm_provider": "ollama", "model": "gemma4:e2b", "base_url": "http://ollama:11434"},
+    )
+    assert settings.llm_provider == "ollama"
+    assert settings.model_name == "gemma4:e2b"
+    assert settings.openai_base_url == "https://api.sharonai.example/v1"
+
+
+def test_model_endpoint_rejects_hosted_ollama(client):
+    """Mirrors the startup rule: Ollama mode is for a local runtime."""
+    headers = login(client, True)
+    response = client.put(
+        "/api/demo-admin/model",
+        headers=headers,
+        json={"llm_provider": "ollama", "model": "gpt-oss:120b-cloud", "base_url": ""},
+    )
+    assert response.status_code == 422

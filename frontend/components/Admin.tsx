@@ -51,6 +51,14 @@ type Status = {
     galileo_api_key_set: boolean;
     galileo_api_key_masked: string;
   };
+  model_config: {
+    llm_provider: "openai" | "anthropic" | "ollama";
+    model: string;
+    base_url: string;
+    api_key_set: boolean;
+    api_key_masked: string;
+    configured: boolean;
+  };
   run: Run | null;
   events: Event[];
   scenarios: Record<string, { prompt: string; evaluation: string | null }>;
@@ -69,6 +77,23 @@ export default function Admin() {
   const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState(false);
   const [expected, setExpected] = useState<Record<string, unknown>>();
+  // Sharon AI and "custom" are OpenAI-compatible endpoints: same provider, different base URL.
+  const endpoints = {
+    openai: { label: "OpenAI", provider: "openai", url: "", needsUrl: false, needsKey: true },
+    anthropic: { label: "Anthropic", provider: "anthropic", url: "", needsUrl: false, needsKey: true },
+    ollama: {
+      label: "Ollama (local)",
+      provider: "ollama",
+      url: "http://host.docker.internal:11434",
+      needsUrl: true,
+      needsKey: false,
+    },
+    sharonai: { label: "Sharon AI", provider: "openai", url: "", needsUrl: true, needsKey: true },
+    custom: { label: "Custom (OpenAI-compatible)", provider: "openai", url: "", needsUrl: true, needsKey: true },
+  } as const;
+  type EndpointKey = keyof typeof endpoints;
+  const [endpoint, setEndpoint] = useState<EndpointKey>("openai");
+  const [model, setModel] = useState({ api_key: "", model: "", base_url: "" });
   const [tab, setTab] = useState<"demo" | "evidence" | "setup" | "tools">("demo");
   const landed = useRef(false);
   const [conn, setConn] = useState({
@@ -89,6 +114,20 @@ export default function Admin() {
         if (s.demo_mode === "workshop" && !s.connection.galileo_api_key_set) setTab("setup");
         // Seed the form from what is saved so a participant edits it rather than retyping.
         // The key is never seeded: it only ever arrives masked.
+        const guess: EndpointKey =
+          s.model_config.llm_provider === "anthropic"
+            ? "anthropic"
+            : s.model_config.llm_provider === "ollama"
+              ? "ollama"
+              : s.model_config.base_url
+                ? "custom"
+                : "openai";
+        setEndpoint(guess);
+        setModel({
+          api_key: "",
+          model: s.model_config.model,
+          base_url: s.model_config.base_url,
+        });
         setConn((c) => ({
           ...c,
           galileo_project: s.connection.galileo_project,
@@ -411,7 +450,110 @@ export default function Admin() {
                 </div>
                 <div role="tabpanel" hidden={tab !== "setup"}>
                   <section className="admin-card">
-                    <h2>Connect to Galileo</h2>
+                    <h2>Model endpoint</h2>
+                  <p className="muted">
+                    Which model the agent calls. Sharon AI and other OpenAI-compatible services
+                    use the OpenAI protocol with their own base URL.
+                  </p>
+                  <p>
+                    <strong>
+                      {status.model_config.configured
+                        ? `${status.model_config.llm_provider} · ${status.model_config.model}`
+                        : "Model endpoint not configured"}
+                    </strong>
+                    {status.model_config.api_key_set &&
+                      ` · key ${status.model_config.api_key_masked}`}
+                    {status.model_config.base_url && ` · ${status.model_config.base_url}`}
+                  </p>
+                  <div className="admin-stack">
+                    <div>
+                      <label htmlFor="endpoint">Provider</label>
+                      <select
+                        id="endpoint"
+                        value={endpoint}
+                        onChange={(e) => {
+                          const next = e.target.value as EndpointKey;
+                          setEndpoint(next);
+                          setModel({ ...model, base_url: endpoints[next].url });
+                        }}
+                      >
+                        {(Object.keys(endpoints) as EndpointKey[]).map((key) => (
+                          <option key={key} value={key}>
+                            {endpoints[key].label}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    {endpoints[endpoint].needsUrl && (
+                      <div>
+                        <label htmlFor="base_url">Base URL</label>
+                        <input
+                          id="base_url"
+                          type="text"
+                          autoComplete="off"
+                          placeholder="https://api.example.com/v1"
+                          value={model.base_url}
+                          onChange={(e) => setModel({ ...model, base_url: e.target.value })}
+                        />
+                      </div>
+                    )}
+                    {endpoints[endpoint].needsKey && (
+                      <div>
+                        <label htmlFor="model_key">API key</label>
+                        <input
+                          id="model_key"
+                          type="password"
+                          autoComplete="off"
+                          placeholder={
+                            status.model_config.api_key_set
+                              ? `${status.model_config.api_key_masked} — leave blank to keep`
+                              : "paste your key"
+                          }
+                          value={model.api_key}
+                          onChange={(e) => setModel({ ...model, api_key: e.target.value })}
+                        />
+                      </div>
+                    )}
+                    <div>
+                      <label htmlFor="model_name">Model</label>
+                      <input
+                        id="model_name"
+                        type="text"
+                        autoComplete="off"
+                        placeholder="gpt-4o-mini-2024-07-18"
+                        value={model.model}
+                        onChange={(e) => setModel({ ...model, model: e.target.value })}
+                      />
+                    </div>
+                  </div>
+                  <div className="admin-actions">
+                    <button
+                      className="button small"
+                      disabled={busy}
+                      onClick={() =>
+                        action(async () => {
+                          await mutate(
+                            "demo-admin/model",
+                            {
+                              llm_provider: endpoints[endpoint].provider,
+                              api_key: model.api_key,
+                              model: model.model,
+                              base_url: model.base_url,
+                            },
+                            true,
+                            "PUT",
+                          );
+                          setModel({ ...model, api_key: "" });
+                          setNotice("Model endpoint saved. Use Test my setup to call it.");
+                        })
+                      }
+                    >
+                      Save model endpoint
+                    </button>
+                  </div>
+                </section>
+                <section className="admin-card">
+                  <h2>Connect to Galileo</h2>
                     <p className="muted">
                       Paste your own API key and project. Saved to this instance only and applied
                       immediately — no restart. The key is never shown again once saved.

@@ -3,6 +3,7 @@ import json
 import os
 import time
 from pathlib import Path
+from typing import ClassVar
 
 
 class Telemetry:
@@ -19,6 +20,7 @@ class Telemetry:
             # Saved connection details outrank the environment, so a workshop participant can
             # point their own instance at their own project without editing a file or restarting.
             self.apply_connection(saved.get("connection") or {})
+            self.apply_model(saved.get("model") or {})
         except (OSError, ValueError, TypeError, AttributeError):
             pass
         settings.galileo_enabled = self.enabled
@@ -80,15 +82,21 @@ class Telemetry:
             "galileo_api_key_masked": self.mask(key),
         }
 
-    def _persist(self, connection=None):
+    def _saved(self):
+        try:
+            return json.loads(self.toggle_path.read_text()) or {}
+        except (OSError, ValueError, TypeError, AttributeError):
+            return {}
+
+    def _persist(self, connection=None, model=None):
+        previous = self._saved()
         saved = {"enabled": self.enabled}
-        if connection is None:
-            try:
-                connection = (json.loads(self.toggle_path.read_text()) or {}).get("connection")
-            except (OSError, ValueError, TypeError, AttributeError):
-                connection = None
+        connection = previous.get("connection") if connection is None else connection
+        model = previous.get("model") if model is None else model
         if connection:
             saved["connection"] = connection
+        if model:
+            saved["model"] = model
         self.toggle_path.parent.mkdir(parents=True, exist_ok=True)
         temporary = self.toggle_path.with_suffix(".tmp")
         with temporary.open("w") as stream:
@@ -100,11 +108,7 @@ class Telemetry:
 
     def set_connection(self, values):
         """Save connection details and apply them without a restart."""
-        current = {}
-        try:
-            current = (json.loads(self.toggle_path.read_text()) or {}).get("connection") or {}
-        except (OSError, ValueError, TypeError, AttributeError):
-            pass
+        current = dict(self._saved().get("connection") or {})
         for field in self.CONNECTION_FIELDS:
             value = values.get(field)
             if isinstance(value, str) and value:
@@ -122,6 +126,56 @@ class Telemetry:
             last_checked_at=None,
             last_error=None,
         )
+
+    # Model selection persists in the same runtime file as the Galileo connection. It is not
+    # telemetry, but both are "settings a participant changes from the portal without a restart"
+    # and splitting them across two files buys nothing.
+    MODEL_FIELDS: ClassVar[dict] = {
+        "openai": ("openai_api_key", "openai_model", "openai_base_url"),
+        "anthropic": ("anthropic_api_key", "anthropic_model", None),
+        "ollama": (None, "ollama_model", "ollama_base_url"),
+    }
+
+    def apply_model(self, values):
+        from pydantic import SecretStr
+
+        provider = values.get("llm_provider")
+        if provider in self.MODEL_FIELDS:
+            self.settings.llm_provider = provider
+        for field, value in values.items():
+            if field == "llm_provider" or not isinstance(value, str) or not value:
+                continue
+            if field in {f for group in self.MODEL_FIELDS.values() for f in group if f}:
+                setattr(self.settings, field, SecretStr(value) if field.endswith("_key") else value)
+
+    def model_config_view(self):
+        """Current model selection. Provider keys are only ever returned masked."""
+        s = self.settings
+        key_field, model_field, url_field = self.MODEL_FIELDS[s.llm_provider]
+        key = getattr(s, key_field).get_secret_value() if key_field else ""
+        return {
+            "llm_provider": s.llm_provider,
+            "model": getattr(s, model_field),
+            "base_url": getattr(s, url_field) if url_field else "",
+            "api_key_set": bool(key),
+            "api_key_masked": self.mask(key),
+            "configured": s.provider_configured,
+        }
+
+    def set_model(self, provider, api_key, model, base_url):
+        key_field, model_field, url_field = self.MODEL_FIELDS[provider]
+        values = {"llm_provider": provider}
+        if api_key and key_field:
+            values[key_field] = api_key
+        if model:
+            values[model_field] = model
+        if base_url and url_field:
+            values[url_field] = base_url
+        saved = self._saved()
+        saved_model = dict(saved.get("model") or {})
+        saved_model.update({k: v for k, v in values.items() if v})
+        self.apply_model(saved_model)
+        self._persist(model=saved_model)
 
     def set_enabled(self, enabled):
         self.enabled = enabled

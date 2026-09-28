@@ -87,9 +87,10 @@ python3 scripts/workshop.py down --purge         # stop, delete volumes and env 
 Each is handed one URL, an account number and two passwords. In their own instance they:
 
 1. Sign in to banking, and to `/demo-admin` in another tab of the same browser profile — linking is automatic within one profile
-2. Open **Connect to Galileo** in the portal, paste their own API key, project and log stream, and press **Save and connect** — applied immediately, no restart
-3. Press **Set up my project**, which enables the four metrics on their log stream and binds the transfer control. Both are per log stream, so each participant does this even though the judges and the control already exist tenant-wide
-4. Work through the scenarios and read their own traces
+2. Open the **Setup** tab, choose their model endpoint — OpenAI, Anthropic, Ollama (local), Sharon AI or a custom OpenAI-compatible URL — and save it
+3. In the same tab, paste their own Galileo API key, project and log stream, and press **Save and connect** — applied immediately, no restart
+4. Press **Set up my project**, which enables the four metrics on their log stream and binds the transfer control. Both are per log stream, so each participant does this even though the judges and the control already exist tenant-wide
+5. Work through the scenarios and read their own traces
 
 Generated env files live in `workshop/` with mode 0600. They contain the LLM key and both passwords, and the directory is gitignored. Do not commit it.
 

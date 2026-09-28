@@ -1102,7 +1102,8 @@ td small {
   display: block;
   margin-bottom: 5px;
 }
-.admin-stack input {
+.admin-stack input,
+.admin-stack select {
   width: 100%;
   font-size: 12px;
 }

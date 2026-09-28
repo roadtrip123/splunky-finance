@@ -28,6 +28,18 @@ class GalileoSetting(StrictModel):
     expected_revision: int = Field(ge=0)
 
 
+class ModelSetting(StrictModel):
+    """Model provider a participant selects from the portal.
+
+    Sharon AI and other OpenAI-compatible endpoints use the openai provider with a base URL.
+    """
+
+    llm_provider: Literal["openai", "anthropic", "ollama"]
+    api_key: str = Field(default="", max_length=400)
+    model: str = Field(default="", max_length=200)
+    base_url: str = Field(default="", max_length=400)
+
+
 class GalileoConnection(StrictModel):
     """Connection details a workshop participant supplies from the portal.
 
@@ -424,6 +436,24 @@ def create_app(settings=None, model_builder=None, protection_adapter=None):
             await telemetry.check_connection(force=True)
         return envelope(request, {"galileo": dict(telemetry.status)})
 
+    @app.put("/api/demo-admin/model")
+    async def set_model(request: Request, payload: ModelSetting):
+        session(request, "admin", True)
+        if any(c.lock.locked() for c in chat.conversations.values()):
+            raise HTTPException(409, "Wait for active conversations before changing the model")
+        if payload.base_url and not payload.base_url.startswith(("http://", "https://")):
+            raise HTTPException(422, "Base URL must be an http(s) URL")
+        # Mirrors the startup rule: Ollama mode is for a local runtime, not a hosted one.
+        if payload.llm_provider == "ollama" and (
+            "cloud" in payload.model or "ollama.com" in payload.base_url
+        ):
+            raise HTTPException(422, "Ollama mode requires a local model and local runtime")
+        telemetry.set_model(payload.llm_provider, payload.api_key, payload.model, payload.base_url)
+        chat.provider_status = {
+            "state": "unverified" if settings.provider_configured else "unconfigured"
+        }
+        return envelope(request, {"model_config": telemetry.model_config_view()})
+
     @app.put("/api/demo-admin/galileo/connection")
     async def set_galileo_connection(request: Request, payload: GalileoConnection):
         session(request, "admin", True)
@@ -485,6 +515,7 @@ def create_app(settings=None, model_builder=None, protection_adapter=None):
                 "protection_status": protection.status,
                 "demo_mode": settings.demo_mode,
                 "connection": telemetry.connection(),
+                "model_config": telemetry.model_config_view(),
                 "run": run,
                 "events": events[-10:],
                 "scenarios": SCENARIOS,
