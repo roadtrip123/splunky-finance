@@ -88,7 +88,13 @@ export default function Admin() {
       needsUrl: true,
       needsKey: false,
     },
-    sharonai: { label: "Sharon AI", provider: "openai", url: "", needsUrl: true, needsKey: true },
+    sharonai: {
+      label: "Sharon AI",
+      provider: "openai",
+      url: "https://inference.sharonai.cloud/api/v1",
+      needsUrl: true,
+      needsKey: true,
+    },
     custom: { label: "Custom (OpenAI-compatible)", provider: "openai", url: "", needsUrl: true, needsKey: true },
   } as const;
   type EndpointKey = keyof typeof endpoints;
@@ -120,7 +126,9 @@ export default function Admin() {
             : s.model_config.llm_provider === "ollama"
               ? "ollama"
               : s.model_config.base_url
-                ? "custom"
+                ? s.model_config.base_url.startsWith("https://inference.sharonai.cloud")
+                  ? "sharonai"
+                  : "custom"
                 : "openai";
         setEndpoint(guess);
         setModel({
