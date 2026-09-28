@@ -52,14 +52,13 @@ test("presenter controls apply directly without customer login", async ({ page }
   await page.getByRole("button", { name: "Run example question" }).click();
   await expect(page.locator(".demo-response").last()).toContainText("Your spending is recorded.");
   await expect(page.locator(".demo-response").last()).toContainText("Scenario used: Incomplete Answer");
-  await page.getByRole("button", { name: "Enable Protection Before / After", exact: true }).click();
+  await page.getByRole("button", { name: "Enable Guardrail Money Transfer", exact: true }).click();
+  // Selecting the scenario arms the guardrail, so the transfer is gated before the tool runs.
+  await expect(page.getByText("Guardrail armed")).toBeVisible();
   await page.getByRole("button", { name: "Run example question" }).click();
-  await expect(page.locator(".demo-response").last()).toContainText("unlimited");
-  await page.getByLabel("Check and block unsafe answers").click();
-  await expect(page.getByLabel("Check and block unsafe answers")).toBeChecked();
-  await page.getByRole("button", { name: "Run example question" }).click();
-  await expect(page.locator(".demo-response").last()).toContainText("couldn't verify");
-  await expect(page.locator(".demo-response").last()).toContainText("Could not be checked");
+  await expect(page.locator(".demo-response").last()).toContainText(
+    "Transfer option is not available",
+  );
   await expect(page.locator(".demo-response").first()).toContainText("Scenario used: Incomplete Answer");
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBeTruthy();
 });

@@ -168,3 +168,9 @@ Two defects that would have broken a fifty-person workshop: `configure_galileo.p
 `workshop.py` now refuses to provision when the resulting origin would be plain HTTP on a public address, which `config.py` rejects, rather than starting stacks that cannot boot. `scripts/Caddyfile.workshop` covers TLS with a subdomain per participant.
 
 Backend suite: 47 passed; lint passed; production build passed.
+
+## Presenter portal reorganised into tabs
+
+The portal was one long scroll with no grouping, which put the Galileo connection form below the demo controls and rendered its six credential fields as a wrapping horizontal row that truncated them. It is now four tabs beneath the status cards: Demo, Evidence, Setup and Troubleshooting. Status cards and Reset balance stay above the tabs so they are reachable from anywhere, which matters because the money-transfer scenario needs a reset between runs. The connection form uses a stacked single-column layout. In workshop mode, a portal with no API key opens on Setup, since that is a participant's first task; presenter mode always opens on Demo.
+
+A browser journey still drove the removed `guardrail_before_after` scenario and its checkbox, so it had been failing since that scenario was replaced. It now drives Enable Guardrail Money Transfer and asserts the blocked-transfer message. Playwright cannot run on this host because port 8001 is occupied, so that test is corrected but unverified.

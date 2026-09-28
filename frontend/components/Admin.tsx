@@ -1,6 +1,6 @@
 "use client";
 import DemoWorkspace from "./DemoWorkspace";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Brand from "./Brand";
 import Login from "./Login";
 import { api, mutate, money } from "@/lib/api";
@@ -68,6 +68,8 @@ export default function Admin() {
   const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState(false);
   const [expected, setExpected] = useState<Record<string, unknown>>();
+  const [tab, setTab] = useState<"demo" | "evidence" | "setup" | "tools">("demo");
+  const landed = useRef(false);
   const [conn, setConn] = useState({
     galileo_api_key: "",
     galileo_project: "",
@@ -81,6 +83,10 @@ export default function Admin() {
   async function refresh() {
     try {
       const s = await api<Status>("demo-admin/status");
+      if (!landed.current) {
+        landed.current = true;
+        if (s.demo_mode === "workshop" && !s.connection.galileo_api_key_set) setTab("setup");
+      }
       setStatus(s);
     } catch (e) {
       setError((e as Error).message);
@@ -304,256 +310,289 @@ export default function Admin() {
                     </button>
                   </article>
                 </div>
-                <DemoWorkspace onEvidence={refresh} />
-                <section className="admin-card">
-                  <h2>Connect to Galileo</h2>
-                  <p className="muted">
-                    Paste your own API key and project. Saved to this instance only and applied
-                    immediately — no restart. The key is never shown again once saved.
-                  </p>
-                  <p>
-                    <strong>
-                      {status.connection.galileo_api_key_set
-                        ? `Key set · project ${status.connection.galileo_project} · stream ${status.connection.galileo_log_stream}`
-                        : "No API key set"}
-                    </strong>{" "}
-                    · {status.galileo.connection}
-                  </p>
-                  <div className="admin-controls">
-                    {(
-                      [
-                        ["galileo_api_key", "API key", "password"],
-                        ["galileo_project", "Project", "text"],
-                        ["galileo_log_stream", "Log stream", "text"],
-                        ["galileo_console_url", "Console URL", "text"],
-                        ["galileo_api_url", "API URL", "text"],
-                        ["agent_control_url", "Agent Control URL", "text"],
-                      ] as const
-                    ).map(([key, label, type]) => (
-                      <div key={key}>
-                        <label htmlFor={key}>{label}</label>
+                <nav className="admin-tabs" role="tablist" aria-label="Presenter sections">
+                  {(
+                    [
+                      ["demo", "Demo"],
+                      ["evidence", "Evidence"],
+                      ["setup", "Setup"],
+                      ["tools", "Troubleshooting"],
+                    ] as const
+                  ).map(([key, label]) => (
+                    <button
+                      key={key}
+                      role="tab"
+                      className="admin-tab"
+                      aria-selected={tab === key}
+                      onClick={() => setTab(key)}
+                    >
+                      {label}
+                      {key === "setup" && !status.connection.galileo_api_key_set && (
+                        <span className="tab-dot" title="No Galileo API key set yet">
+                          ●
+                        </span>
+                      )}
+                    </button>
+                  ))}
+                </nav>
+                <div role="tabpanel" hidden={tab !== "demo"}>
+                  <DemoWorkspace onEvidence={refresh} />
+                </div>
+                <div role="tabpanel" hidden={tab !== "evidence"}>
+                  <section className="admin-card">
+                    <h2>Latest chat evidence</h2>
+                    <button
+                      className="button outline small"
+                      disabled={busy}
+                      onClick={() =>
+                        action(() =>
+                          mutate("demo-admin/evaluations/refresh", {}, true),
+                        )
+                      }
+                    >
+                      Fetch actual Galileo scores
+                    </button>
+                    {!status.events.length ? (
+                      <p className="muted">
+                        No demo responses yet. No scores or decisions are
+                        fabricated.
+                      </p>
+                    ) : (
+                      status.events
+                        .slice()
+                        .reverse()
+                        .map((e) => (
+                          <details className="event" key={e.run_id}>
+                            <summary>
+                              {e.scenario} · {String(e.decision.decision)} ·{" "}
+                              {e.action_decisions?.length
+                                ? `action ${String(e.action_decisions[0].decision)}`
+                                : "live model + optional injection"}
+                            </summary>
+                            <p className="mono">
+                              Run {e.run_id}
+                              <br />
+                              Trace {e.trace_id || "unavailable"}
+                              <br />
+                              Candidate hash {e.candidate_hash}
+                            </p>
+                            <h3>Raw model output</h3>
+                            <p>{e.raw_model_output}</p>
+                            <h3>Candidate output</h3>
+                            <p>{e.candidate_output}</p>
+                            <h3>Customer-visible answer</h3>
+                            <p>{e.final_output}</p>
+                            <pre>
+                              {JSON.stringify(
+                                {
+                                  decision: e.decision,
+                                  evaluation: e.evaluation,
+                                  action_decisions: e.action_decisions,
+                                },
+                                null,
+                                2,
+                              )}
+                            </pre>
+                          </details>
+                        ))
+                    )}
+                  </section>
+                </div>
+                <div role="tabpanel" hidden={tab !== "setup"}>
+                  <section className="admin-card">
+                    <h2>Connect to Galileo</h2>
+                    <p className="muted">
+                      Paste your own API key and project. Saved to this instance only and applied
+                      immediately — no restart. The key is never shown again once saved.
+                    </p>
+                    <p>
+                      <strong>
+                        {status.connection.galileo_api_key_set
+                          ? `Key set · project ${status.connection.galileo_project} · stream ${status.connection.galileo_log_stream}`
+                          : "No API key set"}
+                      </strong>{" "}
+                      · {status.galileo.connection}
+                    </p>
+                    <div className="admin-stack">
+                      {(
+                        [
+                          ["galileo_api_key", "API key", "password"],
+                          ["galileo_project", "Project", "text"],
+                          ["galileo_log_stream", "Log stream", "text"],
+                          ["galileo_console_url", "Console URL", "text"],
+                          ["galileo_api_url", "API URL", "text"],
+                          ["agent_control_url", "Agent Control URL", "text"],
+                        ] as const
+                      ).map(([key, label, type]) => (
+                        <div key={key}>
+                          <label htmlFor={key}>{label}</label>
+                          <input
+                            id={key}
+                            type={type}
+                            autoComplete="off"
+                            placeholder={
+                              key === "galileo_api_key"
+                                ? status.connection.galileo_api_key_set
+                                  ? "unchanged"
+                                  : "paste your key"
+                                : (status.connection[key] as string) || ""
+                            }
+                            value={conn[key]}
+                            onChange={(e) => setConn({ ...conn, [key]: e.target.value })}
+                          />
+                        </div>
+                      ))}
+                    </div>
+                    <div className="admin-actions">
+                      <button
+                        className="button small"
+                        disabled={busy}
+                        onClick={() =>
+                          action(async () => {
+                            await mutate("demo-admin/galileo/connection", conn, true, "PUT");
+                            setConn({ ...conn, galileo_api_key: "" });
+                            setNotice("Galileo connection saved.");
+                          })
+                        }
+                      >
+                        Save and connect
+                      </button>
+                      <button
+                        className="button outline small"
+                        disabled={busy || !status.connection.galileo_api_key_set}
+                        title="Enable the metrics on your log stream and bind the transfer control"
+                        onClick={() =>
+                          action(async () => {
+                            const job = await mutate<{ job_id: string }>(
+                              "demo-admin/galileo/setup",
+                              {},
+                              true,
+                            );
+                            setNotice("Setting up your project...");
+                            let done = false;
+                            while (!done) {
+                              await new Promise((r) => setTimeout(r, 2000));
+                              const result = await api<{ state: string; result: unknown }>(
+                                `demo-admin/preflight/${job.job_id}`,
+                              );
+                              done = result.state !== "running";
+                              if (done)
+                                setNotice(
+                                  `Project setup ${result.state}: ${JSON.stringify(result.result)}`,
+                                );
+                            }
+                          })
+                        }
+                      >
+                        Set up my project
+                      </button>
+                    </div>
+                  </section>
+                </div>
+                <div role="tabpanel" hidden={tab !== "tools"}>
+                  <section className="admin-card">
+                    <h2>{status.demo_mode === "workshop" ? "Check my setup" : "Demo diagnostics"}</h2>
+                    <div className="admin-actions">
+                      <button
+                        className="button outline small"
+                        disabled={busy}
+                        onClick={() =>
+                          action(async () => {
+                            const job = await mutate<{ job_id: string }>(
+                              "demo-admin/preflight",
+                              {},
+                              true,
+                            );
+                            setNotice(
+                              "Preflight started. This explicitly makes model API calls.",
+                            );
+                            let done = false;
+                            while (!done) {
+                              await new Promise((r) => setTimeout(r, 1500));
+                              const result = await api<{
+                                state: string;
+                                result: unknown;
+                              }>(`demo-admin/preflight/${job.job_id}`);
+                              done = result.state !== "running";
+                              if (done)
+                                setNotice(
+                                  `Preflight ${result.state}: ${JSON.stringify(result.result)}`,
+                                );
+                            }
+                          })
+                        }
+                      >
+                        Test my setup
+                      </button>
+                      <button
+                        className="button outline small"
+                        onClick={() =>
+                          action(async () =>
+                            setExpected(await api("demo-admin/expected-results")),
+                          )
+                        }
+                      >
+                        Inspect expected results
+                      </button>
+                    </div>
+                    {expected && <pre>{JSON.stringify(expected, null, 2)}</pre>}
+                  </section>
+                  {status.demo_mode !== "workshop" && (
+                  <section className="admin-card">
+                    <h2>Reset synthetic data</h2>
+                    <p className="muted">
+                      Reseeding replaces the dataset and invalidates conversations
+                      and before/after comparisons.
+                    </p>
+                    <div className="admin-controls">
+                      <div>
+                        <label htmlFor="seed">Seed</label>
                         <input
-                          id={key}
-                          type={type}
-                          autoComplete="off"
-                          placeholder={
-                            key === "galileo_api_key"
-                              ? status.connection.galileo_api_key_set
-                                ? "unchanged"
-                                : "paste your key"
-                              : (status.connection[key] as string) || ""
-                          }
-                          value={conn[key]}
-                          onChange={(e) => setConn({ ...conn, [key]: e.target.value })}
+                          id="seed"
+                          type="number"
+                          value={seed}
+                          onChange={(e) => setSeed(e.target.value)}
                         />
                       </div>
-                    ))}
-                  </div>
-                  <div className="admin-actions">
-                    <button
-                      className="button small"
-                      disabled={busy}
-                      onClick={() =>
-                        action(async () => {
-                          await mutate("demo-admin/galileo/connection", conn, true, "PUT");
-                          setConn({ ...conn, galileo_api_key: "" });
-                          setNotice("Galileo connection saved.");
-                        })
-                      }
-                    >
-                      Save and connect
-                    </button>
-                    <button
-                      className="button outline small"
-                      disabled={busy || !status.connection.galileo_api_key_set}
-                      title="Enable the metrics on your log stream and bind the transfer control"
-                      onClick={() =>
-                        action(async () => {
-                          const job = await mutate<{ job_id: string }>(
-                            "demo-admin/galileo/setup",
-                            {},
-                            true,
-                          );
-                          setNotice("Setting up your project...");
-                          let done = false;
-                          while (!done) {
-                            await new Promise((r) => setTimeout(r, 2000));
-                            const result = await api<{ state: string; result: unknown }>(
-                              `demo-admin/preflight/${job.job_id}`,
-                            );
-                            done = result.state !== "running";
-                            if (done)
-                              setNotice(
-                                `Project setup ${result.state}: ${JSON.stringify(result.result)}`,
-                              );
-                          }
-                        })
-                      }
-                    >
-                      Set up my project
-                    </button>
-                  </div>
-                </section>
-                <section className="admin-card">
-                  <h2>{status.demo_mode === "workshop" ? "Check my setup" : "Demo diagnostics"}</h2>
-                  <div className="admin-actions">
-                    <button
-                      className="button outline small"
-                      disabled={busy}
-                      onClick={() =>
-                        action(async () => {
-                          const job = await mutate<{ job_id: string }>(
-                            "demo-admin/preflight",
-                            {},
-                            true,
-                          );
-                          setNotice(
-                            "Preflight started. This explicitly makes model API calls.",
-                          );
-                          let done = false;
-                          while (!done) {
-                            await new Promise((r) => setTimeout(r, 1500));
-                            const result = await api<{
-                              state: string;
-                              result: unknown;
-                            }>(`demo-admin/preflight/${job.job_id}`);
-                            done = result.state !== "running";
-                            if (done)
-                              setNotice(
-                                `Preflight ${result.state}: ${JSON.stringify(result.result)}`,
-                              );
-                          }
-                        })
-                      }
-                    >
-                      Test my setup
-                    </button>
-                    <button
-                      className="button outline small"
-                      onClick={() =>
-                        action(async () =>
-                          setExpected(await api("demo-admin/expected-results")),
-                        )
-                      }
-                    >
-                      Inspect expected results
-                    </button>
-                  </div>
-                  {expected && <pre>{JSON.stringify(expected, null, 2)}</pre>}
-                </section>
-                <section className="admin-card">
-                  <h2>Latest chat evidence</h2>
-                  <button
-                    className="button outline small"
-                    disabled={busy}
-                    onClick={() =>
-                      action(() =>
-                        mutate("demo-admin/evaluations/refresh", {}, true),
-                      )
-                    }
-                  >
-                    Fetch actual Galileo scores
-                  </button>
-                  {!status.events.length ? (
-                    <p className="muted">
-                      No demo responses yet. No scores or decisions are
-                      fabricated.
-                    </p>
-                  ) : (
-                    status.events
-                      .slice()
-                      .reverse()
-                      .map((e) => (
-                        <details className="event" key={e.run_id}>
-                          <summary>
-                            {e.scenario} · {String(e.decision.decision)} ·{" "}
-                            {e.action_decisions?.length
-                              ? `action ${String(e.action_decisions[0].decision)}`
-                              : "live model + optional injection"}
-                          </summary>
-                          <p className="mono">
-                            Run {e.run_id}
-                            <br />
-                            Trace {e.trace_id || "unavailable"}
-                            <br />
-                            Candidate hash {e.candidate_hash}
-                          </p>
-                          <h3>Raw model output</h3>
-                          <p>{e.raw_model_output}</p>
-                          <h3>Candidate output</h3>
-                          <p>{e.candidate_output}</p>
-                          <h3>Customer-visible answer</h3>
-                          <p>{e.final_output}</p>
-                          <pre>
-                            {JSON.stringify(
-                              {
-                                decision: e.decision,
-                                evaluation: e.evaluation,
-                                action_decisions: e.action_decisions,
-                              },
-                              null,
-                              2,
-                            )}
-                          </pre>
-                        </details>
-                      ))
-                  )}
-                </section>
-                {status.demo_mode !== "workshop" && (
-                <section className="admin-card">
-                  <h2>Reset synthetic data</h2>
-                  <p className="muted">
-                    Reseeding replaces the dataset and invalidates conversations
-                    and before/after comparisons.
-                  </p>
-                  <div className="admin-controls">
-                    <div>
-                      <label htmlFor="seed">Seed</label>
-                      <input
-                        id="seed"
-                        type="number"
-                        value={seed}
-                        onChange={(e) => setSeed(e.target.value)}
-                      />
-                    </div>
-                    <div>
-                      <label htmlFor="reference">Reference date</label>
-                      <input
-                        id="reference"
-                        type="date"
-                        value={date}
-                        onChange={(e) => setDate(e.target.value)}
-                      />
-                    </div>
-                    <button
-                      className="button outline small"
-                      disabled={busy}
-                      onClick={() => {
-                        if (
-                          confirm(
-                            "Replace the synthetic dataset and clear all conversations and comparisons?",
+                      <div>
+                        <label htmlFor="reference">Reference date</label>
+                        <input
+                          id="reference"
+                          type="date"
+                          value={date}
+                          onChange={(e) => setDate(e.target.value)}
+                        />
+                      </div>
+                      <button
+                        className="button outline small"
+                        disabled={busy}
+                        onClick={() => {
+                          if (
+                            confirm(
+                              "Replace the synthetic dataset and clear all conversations and comparisons?",
+                            )
                           )
-                        )
-                          action(() =>
-                            mutate(
-                              "demo-admin/dataset/reset",
-                              {
-                                confirmed: true,
-                                expected_version:
-                                  status.dataset.dataset_version,
-                                seed: Number(seed),
-                                reference_date: date,
-                              },
-                              true,
-                            ),
-                          );
-                      }}
-                    >
-                      Confirm and reset data
-                    </button>
-                  </div>
-                </section>
-                )}
+                            action(() =>
+                              mutate(
+                                "demo-admin/dataset/reset",
+                                {
+                                  confirmed: true,
+                                  expected_version:
+                                    status.dataset.dataset_version,
+                                  seed: Number(seed),
+                                  reference_date: date,
+                                },
+                                true,
+                              ),
+                            );
+                        }}
+                      >
+                        Confirm and reset data
+                      </button>
+                    </div>
+                  </section>
+                  )}
+                </div>
               </>
             )}
           </>

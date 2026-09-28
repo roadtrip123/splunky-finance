@@ -1091,6 +1091,51 @@ td small {
   gap: 12px;
   margin-top: 20px;
 }
+/* One field per row. Credentials are long enough that a wrapping row truncates them. */
+.admin-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  max-width: 520px;
+}
+.admin-stack label {
+  display: block;
+  margin-bottom: 5px;
+}
+.admin-stack input {
+  width: 100%;
+  font-size: 12px;
+}
+.admin-tabs {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+  border-bottom: 1px solid var(--line);
+  margin: 4px 0 25px;
+}
+.admin-tab {
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 13px;
+  letter-spacing: 0.3px;
+  padding: 11px 16px;
+  cursor: pointer;
+  margin-bottom: -1px;
+}
+.admin-tab:hover {
+  color: var(--text, #e8e8e8);
+}
+.admin-tab[aria-selected="true"] {
+  color: var(--text, #e8e8e8);
+  border-bottom-color: #7bb661;
+}
+.admin-tab .tab-dot {
+  color: #d98b4a;
+  margin-left: 6px;
+}
 .prompt-box {
   background: #111316;
   border: 1px solid var(--line);
