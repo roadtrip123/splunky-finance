@@ -92,7 +92,19 @@ Each is handed one URL, an account number and two passwords. In their own instan
 4. Press **Set up my project**, which enables the four metrics on their log stream and binds the transfer control. Both are per log stream, so each participant does this even though the judges and the control already exist tenant-wide
 5. Work through the scenarios and read their own traces
 
-Generated env files live in `workshop/` with mode 0600. They contain the LLM key and both passwords, and the directory is gitignored. Do not commit it.
+Generated env files live in `workshop/` with mode 0600, and the directory is gitignored. They hold both passwords and a session secret, but **no API keys**: the provider and Galileo credentials are blanked so a participant starts from an empty Setup tab rather than inheriting yours.
+
+## Rehearse before the day
+
+Provision two stacks on a private address and work one all the way through:
+
+```bash
+python3 scripts/workshop.py up --count 2 --host 10.0.0.5 --base-port 3200
+```
+
+Then on one of them: connect a model endpoint, connect Galileo, press **Set up my project**, run the four scenarios and the guardrail transfer. That exercises the whole participant path, including the parts that only fail against a real tenant — metric enablement on a new log stream, and control binding.
+
+`python3 scripts/workshop.py down --count 2 --purge` clears it.
 
 ## Things that bite
 
