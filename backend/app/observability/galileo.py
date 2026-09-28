@@ -59,16 +59,25 @@ class Telemetry:
                 continue
             setattr(self.settings, field, SecretStr(value) if field.endswith("_key") else value)
 
+    @staticmethod
+    def mask(secret):
+        """Enough of the key to recognise which one is loaded, never enough to use it."""
+        if not secret:
+            return ""
+        return "\u2022" * 8 + secret[-4:] if len(secret) > 8 else "\u2022" * 8
+
     def connection(self):
-        """Current connection details. The API key is reported as set or not, never returned."""
+        """Current connection details. The API key is only ever returned masked."""
         s = self.settings
+        key = s.galileo_api_key.get_secret_value()
         return {
             "galileo_project": s.galileo_project,
             "galileo_log_stream": s.galileo_log_stream,
             "galileo_console_url": s.galileo_console_url,
             "galileo_api_url": s.galileo_api_url,
             "agent_control_url": s.agent_control_url,
-            "galileo_api_key_set": bool(s.galileo_api_key.get_secret_value()),
+            "galileo_api_key_set": bool(key),
+            "galileo_api_key_masked": self.mask(key),
         }
 
     def _persist(self, connection=None):

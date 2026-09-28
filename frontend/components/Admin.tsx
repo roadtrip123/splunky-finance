@@ -49,6 +49,7 @@ type Status = {
     galileo_api_url: string;
     agent_control_url: string;
     galileo_api_key_set: boolean;
+    galileo_api_key_masked: string;
   };
   run: Run | null;
   events: Event[];
@@ -86,6 +87,16 @@ export default function Admin() {
       if (!landed.current) {
         landed.current = true;
         if (s.demo_mode === "workshop" && !s.connection.galileo_api_key_set) setTab("setup");
+        // Seed the form from what is saved so a participant edits it rather than retyping.
+        // The key is never seeded: it only ever arrives masked.
+        setConn((c) => ({
+          ...c,
+          galileo_project: s.connection.galileo_project,
+          galileo_log_stream: s.connection.galileo_log_stream,
+          galileo_console_url: s.connection.galileo_console_url,
+          galileo_api_url: s.connection.galileo_api_url,
+          agent_control_url: s.connection.agent_control_url,
+        }));
       }
       setStatus(s);
     } catch (e) {
@@ -408,7 +419,7 @@ export default function Admin() {
                     <p>
                       <strong>
                         {status.connection.galileo_api_key_set
-                          ? `Key set · project ${status.connection.galileo_project} · stream ${status.connection.galileo_log_stream}`
+                          ? `API key ${status.connection.galileo_api_key_masked}`
                           : "No API key set"}
                       </strong>{" "}
                       · {status.galileo.connection}
@@ -433,9 +444,9 @@ export default function Admin() {
                             placeholder={
                               key === "galileo_api_key"
                                 ? status.connection.galileo_api_key_set
-                                  ? "unchanged"
+                                  ? `${status.connection.galileo_api_key_masked} — leave blank to keep`
                                   : "paste your key"
-                                : (status.connection[key] as string) || ""
+                                : ""
                             }
                             value={conn[key]}
                             onChange={(e) => setConn({ ...conn, [key]: e.target.value })}

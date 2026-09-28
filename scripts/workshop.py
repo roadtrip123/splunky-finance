@@ -26,7 +26,24 @@ ROOT = Path(__file__).resolve().parents[1]
 ENV_DIR = ROOT / "workshop"
 PROJECT = "sf-p{n:02d}"
 # Inherited from the base env unless listed here; these must differ per participant.
-GENERATED = ("FRONTEND_PORT", "APP_ORIGIN", "SESSION_SECRET", "DEMO_MODE", "FRONTEND_BIND_ADDRESS")
+GENERATED = (
+    "FRONTEND_PORT",
+    "APP_ORIGIN",
+    "SESSION_SECRET",
+    "DEMO_MODE",
+    "FRONTEND_BIND_ADDRESS",
+    "SESSION_COOKIE_SECURE",
+)
+# Blanked rather than inherited: each participant connects their own Galileo project from the
+# portal, so a fresh instance must not arrive holding the operator's credentials or defaults.
+PARTICIPANT_SUPPLIES = (
+    "GALILEO_API_KEY",
+    "GALILEO_PROJECT",
+    "GALILEO_LOG_STREAM",
+    "GALILEO_CONSOLE_URL",
+    "GALILEO_API_URL",
+    "AGENT_CONTROL_URL",
+)
 
 
 def is_local_or_private(host):
@@ -70,6 +87,8 @@ def participant_env(base, index, host, port, bind, mode, origin):
     values = dict(base)
     for key in GENERATED:
         values.pop(key, None)
+    for key in PARTICIPANT_SUPPLIES:
+        values[key] = ""
     values.update(
         FRONTEND_PORT=str(port),
         FRONTEND_BIND_ADDRESS=bind,

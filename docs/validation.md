@@ -174,3 +174,13 @@ Backend suite: 47 passed; lint passed; production build passed.
 The portal was one long scroll with no grouping, which put the Galileo connection form below the demo controls and rendered its six credential fields as a wrapping horizontal row that truncated them. It is now four tabs beneath the status cards: Demo, Evidence, Setup and Troubleshooting. Status cards and Reset balance stay above the tabs so they are reachable from anywhere, which matters because the money-transfer scenario needs a reset between runs. The connection form uses a stacked single-column layout. In workshop mode, a portal with no API key opens on Setup, since that is a participant's first task; presenter mode always opens on Demo.
 
 A browser journey still drove the removed `guardrail_before_after` scenario and its checkbox, so it had been failing since that scenario was replaced. It now drives Enable Guardrail Money Transfer and asserts the blocked-transfer message. Playwright cannot run on this host because port 8001 is occupied, so that test is corrected but unverified.
+
+## Connection panel corrections
+
+The panel showed saved values only as grey placeholder text, so it read as empty even when configured. It now seeds the form from the saved connection, so a participant edits what is there instead of retyping it. The API key is never seeded, because it only ever arrives masked.
+
+The key is reported as eight bullets plus its last four characters, enough to tell which key is loaded and not enough to use it. A regression asserts the masked form is returned and that no part of the key beyond those four characters appears anywhere in the response.
+
+A fresh participant instance must not inherit the operator's credentials, so `workshop.py` blanks the six Galileo and Agent Control fields rather than copying them from the base env, and sets `SESSION_COOKIE_SECURE` to match the origin scheme. Verified by generating a participant env and by a test asserting a Telemetry over an empty data directory reports no key and blank fields.
+
+Backend suite: 48 passed; lint passed; production build passed.

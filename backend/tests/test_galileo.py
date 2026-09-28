@@ -271,6 +271,9 @@ def test_connection_is_settable_at_runtime_and_never_returns_the_key(client):
     assert response.status_code == 200, response.text
     assert secret not in response.text, "the API key must never be echoed back"
     body = response.json()["connection"]
+    # Enough of the key to tell which one is loaded, never enough to use it.
+    assert body["galileo_api_key_masked"] == "\u2022" * 8 + secret[-4:]
+    assert secret[:-4] not in response.text
     assert body["galileo_project"] == "participant-07"
     assert body["galileo_log_stream"] == "their-stream"
     assert body["galileo_api_key_set"] is True
@@ -305,3 +308,22 @@ def test_connection_rejects_a_non_http_url(client):
         json={"agent_control_url": "file:///etc/passwd"},
     )
     assert response.status_code == 422
+
+
+def test_a_fresh_instance_reports_no_galileo_connection(settings, tmp_path):
+    """A workshop participant must arrive at a blank form, not the operator's credentials."""
+    from pydantic import SecretStr
+
+    from app.observability.galileo import Telemetry
+
+    settings.data_dir = tmp_path
+    settings.galileo_api_key = SecretStr("")
+    settings.galileo_project = ""
+    settings.galileo_log_stream = ""
+    settings.galileo_console_url = ""
+    settings.galileo_api_url = ""
+    settings.agent_control_url = ""
+    connection = Telemetry(settings).connection()
+    assert connection["galileo_api_key_set"] is False
+    assert connection["galileo_api_key_masked"] == ""
+    assert all(connection[f] == "" for f in ("galileo_project", "galileo_log_stream", "agent_control_url"))
