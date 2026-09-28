@@ -8,18 +8,31 @@ Production frontend build and desktop/mobile browser journeys passed. Backend te
 
 One live OpenAI tool-backed turn and its Galileo model/tool span export have been verified. Anthropic/Ollama calls, Galileo judges, and tenant-bound Agent Control remain unverified. Docker image builds require access to the server's Docker daemon; the current user does not yet have that access.
 
-## Run on Ubuntu with Docker Compose
+## Install on Ubuntu
 
-Install Docker Engine with Compose. From the repository root:
+From a clean machine:
 
 ```bash
+sudo apt-get update && sudo apt-get install -y docker.io docker-compose-v2 git
+sudo usermod -aG docker $USER && newgrp docker
+
+git clone https://github.com/roadtrip123/splunky-finance.git
+cd splunky-finance
 python3 scripts/setup_env.py
-# Edit .env locally: select provider, add API key, and replace demo passwords.
+```
+
+`setup_env.py` writes a private `.env` with random passwords. Edit it to select a model provider and add its key, or leave those blank and set them later from the presenter portal. Then:
+
+```bash
 docker compose up --build -d
 docker compose logs --tail=100 backend frontend
 ```
 
-Open http://localhost:3000, sign in with account `12345678`, and the customer password configured in `.env`. The setup script generates random initial demo passwords; read them from the private `.env` and replace them before sharing access. Presenter login is at `/demo-admin` and uses its independent password. `.env` is private, ignored by Git, and created with permissions 0600. Setup never overwrites an existing file.
+Open http://localhost:3000, sign in with account `12345678`, and the customer password configured in `.env`.
+
+Running more than one stack on the same machine needs a distinct `FRONTEND_PORT` and matching `APP_ORIGIN` per stack. For a workshop, `scripts/workshop.py` generates those and provisions any number of isolated stacks in one command — see [docs/workshop.md](docs/workshop.md).
+
+The setup script generates random initial demo passwords; read them from the private `.env` and replace them before sharing access. Presenter login is at `/demo-admin` and uses its independent password. `.env` is private, ignored by Git, and created with permissions 0600. Setup never overwrites an existing file.
 
 For a remote server, configure `APP_ORIGIN` to its exact HTTPS URL and `SESSION_COOKIE_SECURE=true`. Put a TLS reverse proxy in front of frontend port 3000. Compose binds that port to loopback by default and keeps backend internal. Use one backend process because session/run state is in memory. Dataset JSON persists in the `runtime-data` volume. Do not scale backend workers without a shared session store.
 
@@ -66,7 +79,9 @@ After pulling changes, deploy from the project root with `sudo docker compose up
 
 ## Providers
 
-Configure `LLM_PROVIDER=openai|anthropic|ollama` and the corresponding model/key in `.env`; restart backend after changes. Defaults: OpenAI `gpt-4o-mini-2024-07-18`, Anthropic `claude-haiku-4-5-20251001`, and local Ollama `gemma4:e2b`. Calls have bounded time, output, model iterations, and tool iterations. Provider errors are reported safely without exposing keys. No fallback provider is selected automatically.
+Choose the endpoint in the presenter portal under **Setup**: OpenAI, Anthropic, Ollama (local), Sharon AI, or a custom OpenAI-compatible URL. That applies immediately and needs no restart. Sharon AI and custom use the OpenAI protocol with their own base URL, set through `OPENAI_BASE_URL`.
+
+The same settings can be preset in `.env` with `LLM_PROVIDER=openai|anthropic|ollama` and the corresponding model and key; changes made that way need a backend restart. Defaults: OpenAI `gpt-4o-mini-2024-07-18`, Anthropic `claude-haiku-4-5-20251001`, and local Ollama `gemma4:e2b`. Calls have bounded time, output, model iterations, and tool iterations. Provider errors are reported safely without exposing keys. No fallback provider is selected automatically.
 
 For Ollama:
 
@@ -79,7 +94,9 @@ Set `LLM_PROVIDER=ollama` and keep `OLLAMA_BASE_URL=http://ollama:11434`. The op
 
 ## Galileo and protection
 
-Set `GALILEO_ENABLED=true`, API key, tenant console/API URLs where required, project and log stream, and `AGENT_CONTROL_URL`. Runtime evaluation uses the dedicated runtime-token header and a resolved log-stream target. Obtain these values from your Galileo tenant; do not guess its gateway URL.
+Connect from the presenter portal under **Setup**: API key, project, log stream, console and API URLs, and `AGENT_CONTROL_URL`. Saved to the instance and applied without a restart, so a workshop participant configures their own project without shell access. The key is only ever displayed masked. **Set up my project** then enables the metrics on that log stream and binds the transfer control, both of which are per log stream even though the judges and control definition are tenant-wide.
+
+The same values can be preset in `.env` as `GALILEO_ENABLED`, `GALILEO_API_KEY`, `GALILEO_PROJECT`, `GALILEO_LOG_STREAM`, `GALILEO_CONSOLE_URL`, `GALILEO_API_URL` and `AGENT_CONTROL_URL`. Runtime evaluation uses the dedicated runtime-token header and a resolved log-stream target. Obtain these values from your Galileo tenant; do not guess its gateway URL.
 
 Explicit remote setup is available from backend:
 

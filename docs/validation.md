@@ -200,3 +200,9 @@ Backend suite: 50 passed; lint passed; production build passed.
 The span carrying an injected answer was named `controlled-fault-writer` and tagged `simulation: true`, which marked the fabrication as staged everywhere it appeared in Galileo. It is now named after the chat model class, like the agent's own calls, so a trace shows the failure the way a genuine model failure would look. The demonstration depends on that: a trace that labels the fault as injected undercuts the thing it is meant to show.
 
 The honest record moves entirely to the presenter evidence, which was always the authoritative one: it keeps `raw_model_output` beside `candidate_output` and reports `fault_method`. A regression asserts the span is named like a model call, carries no simulation marker, still holds the turn's evidence so the evaluator judges it against the tool results, and that the evidence retains both answers and the method.
+
+## README install instructions
+
+The install section assumed a checked-out repository and said only "Install Docker Engine with Compose" with no commands, so it did not cover standing the project up on a new machine. It now runs from a clean Ubuntu host: package install, Docker group, clone, `setup_env.py`, then compose. `FRONTEND_PORT` is documented in `.env.example`, and the note about running several stacks points at `scripts/workshop.py` and `docs/workshop.md`.
+
+The Providers and Galileo sections still described `.env` plus a restart as the only route. Both now lead with the presenter portal, which applies changes without a restart, and keep the environment variables as the preset path.
