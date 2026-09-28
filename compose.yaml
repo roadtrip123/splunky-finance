@@ -1,11 +1,12 @@
 name: splunky-finance
 services:
   frontend:
+    image: splunky-finance-frontend:latest
     build:
       context: .
       dockerfile: frontend/Dockerfile
     ports:
-      - "${FRONTEND_BIND_ADDRESS:-127.0.0.1}:3000:3000"
+      - "${FRONTEND_BIND_ADDRESS:-127.0.0.1}:${FRONTEND_PORT:-3000}:3000"
     environment:
       BACKEND_URL: http://backend:8000
     depends_on:
@@ -18,6 +19,7 @@ services:
       timeout: 5s
       retries: 3
   backend:
+    image: splunky-finance-backend:latest
     build:
       context: .
       dockerfile: backend/Dockerfile

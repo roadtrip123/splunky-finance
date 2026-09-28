@@ -144,3 +144,13 @@ A live run moved money with the guardrail unarmed. The scenario button and the a
 A blocked transfer now returns "Transfer option is not available from My Bank Agent." rather than the answer gate's fallback, which spoke about verifying an answer and said nothing about the transfer not happening. The override keys on the gate's decision being `deny` or `unavailable` rather than on an action label, which a test double had omitted.
 
 Backend suite: 45 passed; lint passed; production build passed.
+
+## Workshop provisioning
+
+`scripts/workshop.py up --count N --host H` provisions one compose project per participant, each on port base+N with its own dataset volume, session secret and exact `APP_ORIGIN`. Shared settings are inherited from a base env file so the LLM endpoint, passwords and dataset seed stay identical across the room.
+
+Two changes were needed for stacks to coexist. `compose.override.yaml` pinned every project to port 3100 with `!override` and was removed; the port is now `${FRONTEND_PORT:-3000}` and the repository's own stack sets 3100 in `.env`. Both services also carry fixed `image:` tags, because without them each compose project builds and tags its own copy and fifty participants would trigger fifty builds of identical source. The script builds once and starts participants with `--no-build`.
+
+Verified on this host: two stacks provisioned on ports 3201 and 3202, both serving, with separate `sf-p01_runtime-data` and `sf-p02_runtime-data` volumes; `list` reporting both; `down --purge` removing containers, volumes and generated env files; and the repository's own stack on 3100 unaffected throughout. Generated env files are written 0600 into a gitignored `workshop/` directory.
+
+Not yet done: the portal cannot set Galileo credentials, so connecting to Galileo still requires editing an env file. That is the remaining blocker for a zero-SSH participant experience.

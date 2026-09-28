@@ -107,6 +107,8 @@ npm test
 
 Browser testing starts dedicated offline backend and production frontend processes; ensure ports 8001 and 3000 are free. Test data is stored under ignored `runtime/browser-tests`.
 
+For a workshop, [docs/workshop.md](docs/workshop.md) provisions one isolated stack per participant on a single EC2 instance with `scripts/workshop.py`.
+
 See [DEMO-SCRIPT.md](DEMO-SCRIPT.md) for presentation steps, [docs/evaluators.md](docs/evaluators.md) for which Galileo metrics to enable and why, and [docs/architecture.md](docs/architecture.md) for data and security contracts. This private repository has no license grant pending the owner's license choice.
 
 ## Private LAN deployment
