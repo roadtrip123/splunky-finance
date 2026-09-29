@@ -112,6 +112,23 @@ The custom judges are unaffected by this. They read `evidence` from the trace ou
 
 Ask each scenario's displayed example question anyway. That is what each Part is written around, and the policy question is the only one that exercises the retriever span.
 
+## Comparing models
+
+Configure each endpoint once under **Setup**, then switch between them with one click on the **Demo** tab. The switch applies to your next message; a turn already running keeps the endpoint it started with.
+
+To show the difference, ask the same question twice:
+
+1. Select a model, send the question, note the reply time in the chat
+2. Switch model, send the **identical** question
+3. Open Galileo — the two traces are named `bank-chat-turn · <model>`, so they are distinguishable in the list without opening either
+
+Per trace you get latency, tokens in and out, and time to first token. Latest chat evidence shows the endpoint and duration per turn as well.
+
+Two things to have ready:
+
+- **Cost usually reads 0.00.** Galileo prices recognised model names; a locally hosted model has no list price. Absence of a cost figure is not a claim that the model was free.
+- **This is not a benchmark.** Two single runs, different token counts, and a cold start on the first. It shows a difference in kind, not a measured ranking. Say so before someone asks.
+
 ## Part 1 — ordinary customer banking
 
 In the customer tab:

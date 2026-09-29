@@ -95,7 +95,7 @@ def test_real_sdk_callback_exports_model_and_tool_under_one_trace(settings, monk
     monkeypatch.setattr("galileo.log_streams.get_log_stream", lambda **kwargs: object())
     settings.galileo_enabled = True
     settings.galileo_api_key = settings.openai_api_key
-    with TestClient(create_app(settings, model_builder=lambda s: FakeModel())) as client:
+    with TestClient(create_app(settings, model_builder=lambda s, endpoint=None: FakeModel())) as client:
         headers = login(client)
         response = client.post(
             "/api/chat", headers=headers, json={"message": "How much did I spend on restaurants last month?"}
@@ -158,7 +158,7 @@ def test_injected_answer_reads_as_an_ordinary_model_call(settings, monkeypatch):
     monkeypatch.setattr("galileo.log_streams.get_log_stream", lambda **kwargs: object())
     settings.galileo_enabled = True
     settings.galileo_api_key = settings.openai_api_key
-    with TestClient(create_app(settings, model_builder=lambda s: FakeModel())) as client:
+    with TestClient(create_app(settings, model_builder=lambda s, endpoint=None: FakeModel())) as client:
         headers = login(client, True)
         run = client.post("/api/demo-admin/workspace", headers=headers).json()
         run = client.put(
@@ -247,7 +247,7 @@ def test_policy_retrieval_exports_a_retriever_span_with_chunks(settings, monkeyp
     monkeypatch.setattr("galileo.log_streams.get_log_stream", lambda **kwargs: object())
     settings.galileo_enabled = True
     settings.galileo_api_key = settings.openai_api_key
-    with TestClient(create_app(settings, model_builder=lambda s: FakeModel())) as client:
+    with TestClient(create_app(settings, model_builder=lambda s, endpoint=None: FakeModel())) as client:
         headers = login(client)
         response = client.post(
             "/api/chat",
@@ -349,50 +349,100 @@ def test_a_fresh_instance_reports_no_galileo_connection(settings, tmp_path):
     assert all(connection[f] == "" for f in ("galileo_project", "galileo_log_stream", "agent_control_url"))
 
 
-def test_model_endpoint_is_settable_and_key_is_masked(client):
-    """Sharon AI and similar are OpenAI-compatible: same provider, their own base URL."""
+def test_endpoints_are_saved_switched_and_keys_masked(client):
+    """Several endpoints are configured once, then switched between mid-demo.
+
+    Sharon AI and similar are OpenAI-compatible: same provider, their own base URL, so two
+    endpoints can share a provider and differ only by host and model."""
     headers = login(client, True)
     secret = "sk-participant-key-abcd9876"
-    response = client.put(
-        "/api/demo-admin/model",
+    first = client.put(
+        "/api/demo-admin/endpoints",
         headers=headers,
         json={
-            "llm_provider": "openai",
+            "name": "Sharon AI · llama",
+            "provider": "openai",
             "api_key": secret,
             "model": "llama-3.3-70b",
-            "base_url": "https://api.sharonai.example/v1",
+            "base_url": "https://inference.sharonai.cloud/api/v1",
         },
     )
-    assert response.status_code == 200, response.text
-    assert secret[:-4] not in response.text
-    body = response.json()["model_config"]
-    assert body["llm_provider"] == "openai"
-    assert body["model"] == "llama-3.3-70b"
-    assert body["base_url"] == "https://api.sharonai.example/v1"
-    assert body["api_key_masked"].endswith(secret[-4:])
-
-    settings = client.app.state.telemetry.settings
-    assert settings.openai_base_url == "https://api.sharonai.example/v1"
-    assert settings.model_name == "llama-3.3-70b"
-    assert settings.provider_configured
-
-    # Switching provider swaps which fields the agent reads, without losing the previous ones.
+    assert first.status_code == 200, first.text
+    assert secret[:-4] not in first.text
     client.put(
-        "/api/demo-admin/model",
+        "/api/demo-admin/endpoints",
         headers=headers,
-        json={"llm_provider": "ollama", "model": "gemma4:e2b", "base_url": "http://ollama:11434"},
+        json={"name": "Ollama · gemma4", "provider": "ollama", "model": "gemma4:e2b",
+              "base_url": "http://ollama:11434"},
     )
+    view = client.get("/api/demo-admin/status", headers=headers).json()["endpoints"]
+    assert len(view["endpoints"]) == 2
+    sharon = next(e for e in view["endpoints"] if e["provider"] == "openai")
+    ollama = next(e for e in view["endpoints"] if e["provider"] == "ollama")
+    assert sharon["api_key_masked"].endswith(secret[-4:])
+    assert sharon["active"] and not ollama["active"]
+
+    telemetry = client.app.state.telemetry
+    settings = telemetry.settings
+    assert telemetry.active_endpoint()["model"] == "llama-3.3-70b"
+
+    # Switching points the agent at the other endpoint without losing the first one's key.
+    switched = client.post(
+        "/api/demo-admin/endpoints/active", headers=headers, json={"id": ollama["id"]}
+    )
+    assert switched.status_code == 200, switched.text
+    assert telemetry.active_endpoint()["model"] == "gemma4:e2b"
     assert settings.llm_provider == "ollama"
-    assert settings.model_name == "gemma4:e2b"
-    assert settings.openai_base_url == "https://api.sharonai.example/v1"
+    client.post("/api/demo-admin/endpoints/active", headers=headers, json={"id": sharon["id"]})
+    assert telemetry.active_endpoint()["api_key"] == secret
+
+    # Editing without a key keeps the stored one.
+    client.put(
+        "/api/demo-admin/endpoints",
+        headers=headers,
+        json={"id": sharon["id"], "name": "Sharon AI · llama", "provider": "openai",
+              "model": "llama-3.1-8b", "base_url": "https://inference.sharonai.cloud/api/v1"},
+    )
+    assert telemetry.active_endpoint()["api_key"] == secret
+    assert telemetry.active_endpoint()["model"] == "llama-3.1-8b"
+
+    removed = client.delete(f"/api/demo-admin/endpoints/{sharon['id']}", headers=headers)
+    assert removed.status_code == 200
+    remaining = removed.json()["endpoints"]
+    assert len(remaining) == 1 and remaining[0]["active"]
 
 
-def test_model_endpoint_rejects_hosted_ollama(client):
+def test_endpoint_rejects_hosted_ollama(client):
     """Mirrors the startup rule: Ollama mode is for a local runtime."""
     headers = login(client, True)
     response = client.put(
-        "/api/demo-admin/model",
+        "/api/demo-admin/endpoints",
         headers=headers,
-        json={"llm_provider": "ollama", "model": "gpt-oss:120b-cloud", "base_url": ""},
+        json={"provider": "ollama", "model": "gpt-oss:120b-cloud", "base_url": ""},
     )
     assert response.status_code == 422
+
+
+def test_a_turn_uses_the_endpoint_resolved_when_it_started(client):
+    """A switch must not change the model under a request already running."""
+    seen = []
+
+    def builder(settings, endpoint=None):
+        from conftest import FakeModel
+
+        seen.append((endpoint or {}).get("model"))
+        return FakeModel()
+
+    headers = login(client, True)
+    client.put(
+        "/api/demo-admin/endpoints",
+        headers=headers,
+        json={"name": "A", "provider": "ollama", "model": "model-a", "base_url": "http://a:11434"},
+    )
+    client.app.state.chat.model_builder = builder
+    client.post("/api/chat", headers=login(client), json={"message": "What is my savings balance?"})
+    assert seen and all(m == "model-a" for m in seen), seen
+    event = client.app.state.chat.events[-1]
+    assert event["model"] == "model-a"
+    assert event["endpoint"] == "A"
+

@@ -91,7 +91,7 @@ def settings(tmp_path):
 
 @pytest.fixture
 def client(settings):
-    with TestClient(create_app(settings, model_builder=lambda s: FakeModel())) as client:
+    with TestClient(create_app(settings, model_builder=lambda s, endpoint=None: FakeModel())) as client:
         yield client
 
 

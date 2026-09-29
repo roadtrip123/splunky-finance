@@ -21,6 +21,9 @@ type Event = {
   trace_id: string | null;
   decision: Record<string, unknown>;
   action_decisions: Record<string, unknown>[];
+  endpoint: string;
+  model: string;
+  duration_seconds: number;
   evaluation: Record<string, unknown>;
 };
 type Status = {
@@ -51,13 +54,18 @@ type Status = {
     galileo_api_key_set: boolean;
     galileo_api_key_masked: string;
   };
-  model_config: {
-    llm_provider: "openai" | "anthropic" | "ollama";
-    model: string;
-    base_url: string;
-    api_key_set: boolean;
-    api_key_masked: string;
-    configured: boolean;
+  endpoints: {
+    endpoints: {
+      id: string;
+      name: string;
+      provider: "openai" | "anthropic" | "ollama";
+      model: string;
+      base_url: string;
+      api_key_set: boolean;
+      api_key_masked: string;
+      active: boolean;
+    }[];
+    active_endpoint: string;
   };
   run: Run | null;
   events: Event[];
@@ -99,7 +107,7 @@ export default function Admin() {
   } as const;
   type EndpointKey = keyof typeof endpoints;
   const [endpoint, setEndpoint] = useState<EndpointKey>("openai");
-  const [model, setModel] = useState({ api_key: "", model: "", base_url: "" });
+  const [model, setModel] = useState({ id: "", name: "", api_key: "", model: "", base_url: "" });
   const [tab, setTab] = useState<"demo" | "evidence" | "setup" | "tools">("demo");
   const landed = useRef(false);
   const [conn, setConn] = useState({
@@ -120,22 +128,6 @@ export default function Admin() {
         if (s.demo_mode === "workshop" && !s.connection.galileo_api_key_set) setTab("setup");
         // Seed the form from what is saved so a participant edits it rather than retyping.
         // The key is never seeded: it only ever arrives masked.
-        const guess: EndpointKey =
-          s.model_config.llm_provider === "anthropic"
-            ? "anthropic"
-            : s.model_config.llm_provider === "ollama"
-              ? "ollama"
-              : s.model_config.base_url
-                ? s.model_config.base_url.startsWith("https://inference.sharonai.cloud")
-                  ? "sharonai"
-                  : "custom"
-                : "openai";
-        setEndpoint(guess);
-        setModel({
-          api_key: "",
-          model: s.model_config.model,
-          base_url: s.model_config.base_url,
-        });
         setConn((c) => ({
           ...c,
           galileo_project: s.connection.galileo_project,
@@ -394,6 +386,28 @@ export default function Admin() {
                   ))}
                 </nav>
                 <div role="tabpanel" hidden={tab !== "demo"}>
+                  {status.endpoints.endpoints.length > 1 && (
+                    <div className="switcher">
+                      <span className="mini-label">MODEL</span>
+                      {status.endpoints.endpoints.map((e) => (
+                        <button
+                          key={e.id}
+                          className={`button ${e.active ? "" : "outline"} small`}
+                          aria-pressed={e.active}
+                          disabled={busy || e.active}
+                          title={`${e.model}${e.base_url ? ` · ${e.base_url}` : ""}`}
+                          onClick={() =>
+                            action(async () => {
+                              await mutate("demo-admin/endpoints/active", { id: e.id }, true);
+                              setNotice(`Switched to ${e.name}. Applies to your next message.`);
+                            })
+                          }
+                        >
+                          {e.name}
+                        </button>
+                      ))}
+                    </div>
+                  )}
                   <DemoWorkspace onEvidence={refresh} />
                 </div>
                 <div role="tabpanel" hidden={tab !== "evidence"}>
@@ -422,7 +436,7 @@ export default function Admin() {
                         .map((e) => (
                           <details className="event" key={e.run_id}>
                             <summary>
-                              {e.scenario} · {String(e.decision.decision)} ·{" "}
+                              {e.scenario} · {e.endpoint || e.model} · {e.duration_seconds}s ·{" "}
                               {e.action_decisions?.length
                                 ? `action ${String(e.action_decisions[0].decision)}`
                                 : "live model + optional injection"}
@@ -463,17 +477,88 @@ export default function Admin() {
                     Which model the agent calls. Sharon AI and other OpenAI-compatible services
                     use the OpenAI protocol with their own base URL.
                   </p>
-                  <p>
-                    <strong>
-                      {status.model_config.configured
-                        ? `${status.model_config.llm_provider} · ${status.model_config.model}`
-                        : "Model endpoint not configured"}
-                    </strong>
-                    {status.model_config.api_key_set &&
-                      ` · key ${status.model_config.api_key_masked}`}
-                    {status.model_config.base_url && ` · ${status.model_config.base_url}`}
-                  </p>
+                  <ul className="endpoint-list">
+                    {status.endpoints.endpoints.length === 0 && (
+                      <li className="muted">No endpoints saved yet.</li>
+                    )}
+                    {status.endpoints.endpoints.map((e) => (
+                      <li key={e.id} className={e.active ? "endpoint active" : "endpoint"}>
+                        <label>
+                          <input
+                            type="radio"
+                            name="active-endpoint"
+                            checked={e.active}
+                            disabled={busy}
+                            onChange={() =>
+                              action(async () => {
+                                await mutate("demo-admin/endpoints/active", { id: e.id }, true);
+                                setNotice(`Switched to ${e.name}. Applies to your next message.`);
+                              })
+                            }
+                          />
+                          <strong>{e.name}</strong>
+                        </label>
+                        <span className="muted">
+                          {e.model}
+                          {e.base_url && ` · ${e.base_url}`}
+                          {e.api_key_set && ` · key ${e.api_key_masked}`}
+                        </span>
+                        <span className="endpoint-actions">
+                          <button
+                            className="text-button"
+                            disabled={busy}
+                            onClick={() => {
+                              setModel({
+                                id: e.id,
+                                name: e.name,
+                                api_key: "",
+                                model: e.model,
+                                base_url: e.base_url,
+                              });
+                              setEndpoint(
+                                e.provider === "anthropic"
+                                  ? "anthropic"
+                                  : e.provider === "ollama"
+                                    ? "ollama"
+                                    : e.base_url.startsWith("https://inference.sharonai.cloud")
+                                      ? "sharonai"
+                                      : e.base_url
+                                        ? "custom"
+                                        : "openai",
+                              );
+                            }}
+                          >
+                            Edit
+                          </button>
+                          <button
+                            className="text-button"
+                            disabled={busy}
+                            onClick={() => {
+                              if (confirm(`Remove ${e.name}?`))
+                                action(() =>
+                                  mutate(`demo-admin/endpoints/${e.id}`, {}, true, "DELETE"),
+                                );
+                            }}
+                          >
+                            Remove
+                          </button>
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                  <h3>{model.id ? "Edit endpoint" : "Add an endpoint"}</h3>
                   <div className="admin-stack">
+                    <div>
+                      <label htmlFor="ep_name">Name</label>
+                      <input
+                        id="ep_name"
+                        type="text"
+                        autoComplete="off"
+                        placeholder="Ollama · gemma4"
+                        value={model.name}
+                        onChange={(e) => setModel({ ...model, name: e.target.value })}
+                      />
+                    </div>
                     <div>
                       <label htmlFor="endpoint">Provider</label>
                       <select
@@ -512,11 +597,7 @@ export default function Admin() {
                           id="model_key"
                           type="password"
                           autoComplete="off"
-                          placeholder={
-                            status.model_config.api_key_set
-                              ? `${status.model_config.api_key_masked} — leave blank to keep`
-                              : "paste your key"
-                          }
+                          placeholder={model.id ? "leave blank to keep" : "paste your key"}
                           value={model.api_key}
                           onChange={(e) => setModel({ ...model, api_key: e.target.value })}
                         />
@@ -541,9 +622,11 @@ export default function Admin() {
                       onClick={() =>
                         action(async () => {
                           await mutate(
-                            "demo-admin/model",
+                            "demo-admin/endpoints",
                             {
-                              llm_provider: endpoints[endpoint].provider,
+                              id: model.id,
+                              name: model.name,
+                              provider: endpoints[endpoint].provider,
                               api_key: model.api_key,
                               model: model.model,
                               base_url: model.base_url,
@@ -551,13 +634,24 @@ export default function Admin() {
                             true,
                             "PUT",
                           );
-                          setModel({ ...model, api_key: "" });
-                          setNotice("Model endpoint saved. Use Test my setup to call it.");
+                          setModel({ id: "", name: "", api_key: "", model: "", base_url: "" });
+                          setNotice("Endpoint saved. Use Test my setup to call it.");
                         })
                       }
                     >
-                      Save model endpoint
+                      {model.id ? "Save changes" : "Add endpoint"}
                     </button>
+                    {model.id && (
+                      <button
+                        className="button outline small"
+                        disabled={busy}
+                        onClick={() =>
+                          setModel({ id: "", name: "", api_key: "", model: "", base_url: "" })
+                        }
+                      >
+                        Cancel
+                      </button>
+                    )}
                   </div>
                 </section>
                 <section className="admin-card">

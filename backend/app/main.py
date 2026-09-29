@@ -28,16 +28,23 @@ class GalileoSetting(StrictModel):
     expected_revision: int = Field(ge=0)
 
 
-class ModelSetting(StrictModel):
-    """Model provider a participant selects from the portal.
+class ModelEndpoint(StrictModel):
+    """One saved model endpoint.
 
-    Sharon AI and other OpenAI-compatible endpoints use the openai provider with a base URL.
+    Sharon AI and other OpenAI-compatible services use the openai provider with a base URL, so
+    several endpoints can share a provider and differ only by host and model.
     """
 
-    llm_provider: Literal["openai", "anthropic", "ollama"]
+    id: str = Field(default="", max_length=64)
+    name: str = Field(default="", max_length=120)
+    provider: Literal["openai", "anthropic", "ollama"]
     api_key: str = Field(default="", max_length=400)
     model: str = Field(default="", max_length=200)
     base_url: str = Field(default="", max_length=400)
+
+
+class ActiveEndpoint(StrictModel):
+    id: str = Field(min_length=1, max_length=64)
 
 
 class GalileoConnection(StrictModel):
@@ -436,23 +443,46 @@ def create_app(settings=None, model_builder=None, protection_adapter=None):
             await telemetry.check_connection(force=True)
         return envelope(request, {"galileo": dict(telemetry.status)})
 
-    @app.put("/api/demo-admin/model")
-    async def set_model(request: Request, payload: ModelSetting):
-        session(request, "admin", True)
-        if any(c.lock.locked() for c in chat.conversations.values()):
-            raise HTTPException(409, "Wait for active conversations before changing the model")
+    def _endpoint_guard(payload):
         if payload.base_url and not payload.base_url.startswith(("http://", "https://")):
             raise HTTPException(422, "Base URL must be an http(s) URL")
         # Mirrors the startup rule: Ollama mode is for a local runtime, not a hosted one.
-        if payload.llm_provider == "ollama" and (
-            "cloud" in payload.model or "ollama.com" in payload.base_url
-        ):
+        if payload.provider == "ollama" and ("cloud" in payload.model or "ollama.com" in payload.base_url):
             raise HTTPException(422, "Ollama mode requires a local model and local runtime")
-        telemetry.set_model(payload.llm_provider, payload.api_key, payload.model, payload.base_url)
-        chat.provider_status = {
-            "state": "unverified" if settings.provider_configured else "unconfigured"
-        }
-        return envelope(request, {"model_config": telemetry.model_config_view()})
+
+    def _busy():
+        if any(c.lock.locked() for c in chat.conversations.values()):
+            raise HTTPException(409, "Wait for active conversations before changing the model")
+
+    @app.put("/api/demo-admin/endpoints")
+    async def save_endpoint(request: Request, payload: ModelEndpoint):
+        session(request, "admin", True)
+        _busy()
+        _endpoint_guard(payload)
+        telemetry.save_endpoint(payload.model_dump())
+        chat.provider_status = {"state": "unverified" if settings.provider_configured else "unconfigured"}
+        return envelope(request, telemetry.endpoints_view())
+
+    @app.post("/api/demo-admin/endpoints/active")
+    async def activate_endpoint(request: Request, payload: ActiveEndpoint):
+        """Switch the model mid-demo. The next turn resolves this once and passes it explicitly,
+        so a switch cannot change the model under a request already running."""
+        session(request, "admin", True)
+        _busy()
+        try:
+            telemetry.set_active_endpoint(payload.id)
+        except KeyError:
+            raise HTTPException(404, "Unknown endpoint") from None
+        chat.provider_status = {"state": "unverified" if settings.provider_configured else "unconfigured"}
+        return envelope(request, telemetry.endpoints_view())
+
+    @app.delete("/api/demo-admin/endpoints/{identifier}")
+    async def remove_endpoint(request: Request, identifier: str):
+        session(request, "admin", True)
+        _busy()
+        telemetry.delete_endpoint(identifier)
+        chat.provider_status = {"state": "unverified" if settings.provider_configured else "unconfigured"}
+        return envelope(request, telemetry.endpoints_view())
 
     @app.put("/api/demo-admin/galileo/connection")
     async def set_galileo_connection(request: Request, payload: GalileoConnection):
@@ -515,7 +545,7 @@ def create_app(settings=None, model_builder=None, protection_adapter=None):
                 "protection_status": protection.status,
                 "demo_mode": settings.demo_mode,
                 "connection": telemetry.connection(),
-                "model_config": telemetry.model_config_view(),
+                "endpoints": telemetry.endpoints_view(),
                 "run": run,
                 "events": events[-10:],
                 "scenarios": SCENARIOS,

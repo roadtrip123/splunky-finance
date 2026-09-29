@@ -19,4 +19,4 @@ settings = Settings(
     data_dir=root / "runtime/browser-tests",
     policy_dir=root / "data/policies",
 )
-app = create_app(settings, model_builder=lambda s: FakeModel())
+app = create_app(settings, model_builder=lambda s, endpoint=None: FakeModel())

@@ -133,12 +133,16 @@ class ChatService:
             enabled = run["protection"] if run else self.settings.galileo_protection_enabled
             dataset = banking.dataset
             event_id = str(uuid4())
+            # Resolved once. Both the agent and the fault writer use this same endpoint, so a
+            # switch part-way through cannot change the model under a running turn.
+            endpoint = self.telemetry.active_endpoint()
             metadata = {
                 "run_id": event_id,
                 "conversation_id": identifier,
                 "scenario": scenario,
-                "provider": self.settings.llm_provider,
-                "model": self.settings.model_name,
+                "provider": endpoint["provider"],
+                "model": endpoint["model"],
+                "endpoint": endpoint.get("name") or endpoint["model"],
                 "seed": dataset.manifest.seed,
                 "reference_date": str(dataset.manifest.reference_date),
                 "dataset_version": dataset.manifest.dataset_version,
@@ -181,7 +185,7 @@ class ChatService:
                     f"{start} inclusive to {end} exclusive; previous month {previous_start} to {previous_end}."
                 )
                 agent = create_agent(
-                    self.model_builder(self.settings),
+                    self.model_builder(self.settings, endpoint),
                     tools=tools,
                     system_prompt=system,
                     middleware=[
@@ -232,7 +236,7 @@ class ChatService:
                         message,
                         raw,
                         evidence,
-                        self.model_builder(self.settings),
+                        self.model_builder(self.settings, endpoint),
                         timeout=min(30, self.settings.llm_timeout_seconds),
                         # No callbacks: this pass is logged explicitly below, so the span reads
                         # as an ordinary model call rather than announcing itself.

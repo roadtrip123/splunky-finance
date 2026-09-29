@@ -206,3 +206,15 @@ The honest record moves entirely to the presenter evidence, which was always the
 The install section assumed a checked-out repository and said only "Install Docker Engine with Compose" with no commands, so it did not cover standing the project up on a new machine. It now runs from a clean Ubuntu host: package install, Docker group, clone, `setup_env.py`, then compose. `FRONTEND_PORT` is documented in `.env.example`, and the note about running several stacks points at `scripts/workshop.py` and `docs/workshop.md`.
 
 The Providers and Galileo sections still described `.env` plus a restart as the only route. Both now lead with the presenter portal, which applies changes without a restart, and keep the environment variables as the preset path.
+
+## Multiple model endpoints
+
+Several endpoints are saved and switched between from the portal. `model_factory(settings, endpoint)` now takes an explicit spec and `ChatService.answer` resolves the active endpoint once per turn, passing the same one to the agent and the fault writer. Previously both read process-global settings, so a switch part-way through a turn would have changed the model under a running request, and in a workshop one participant's switch would have landed on another's. A regression drives a turn and asserts every model built used the endpoint resolved at the start.
+
+Endpoints persist beside the Galileo connection with a migration from the single-endpoint shape that preceded them. Keys are masked on read and a blank key on edit keeps the stored one, matching the connection panel. The Setup tab manages the list; the Demo tab carries a one-click switcher, since that is where a presenter stands mid-demo.
+
+Traces are named `bank-chat-turn · <endpoint>` so two runs of the same question are distinguishable in the trace list without opening either, and the turn metadata carries the endpoint name alongside provider and model. Latest chat evidence shows endpoint and duration per turn.
+
+Token counts and time-to-first-token were already exported per span and were confirmed populated on a live trace. Cost reads 0.0: Galileo prices recognised model names, and the LangChain callback reports the agent's own spans as `chat-ollama` rather than the model. Whether cost populates for a priced hosted model is untested.
+
+Backend suite: 51 passed; lint passed; production build passed.
