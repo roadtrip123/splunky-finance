@@ -118,6 +118,13 @@ Configure each endpoint once under **Setup**, then switch between them with one 
 
 Switching also starts a fresh conversation. That matters for the comparison: without it the second model would be handed the first model's answer as history, see a larger prompt, and both turns would land in one Galileo session. A fresh conversation gives each model the same clean input and its own session.
 
+Two consequences worth knowing before you present:
+
+- **Follow-up questions only work within one model.** Asking "and the month before?" straight after a switch will confuse the new model, which has no idea what you are referring to. Ask complete questions after switching.
+- **You cannot demonstrate memory and switch models in the same conversation.** If conversational memory is part of the story, show it on one model first, then start comparing.
+
+The visible transcript is kept either way; only the model's context is cleared, so the audience still sees both answers side by side.
+
 To show the difference, ask the same question twice:
 
 1. Select a model, send the question, note the reply time in the chat
@@ -273,7 +280,7 @@ With protection on and Agent Control unreachable, the application blocks the tra
 
 Unlike every other scenario, this one changes the data. **Reset balance** on the DATASET card before each rehearsal, or the second run starts from an already-reduced balance and the comparison loses its force. It restores the seeded ledger without touching the seed or reference date, so the figures in this guide keep matching.
 
-## Reading the evidence panel## Reading the evidence panel
+## Reading the evidence panel
 
 | Field | Meaning |
 | --- | --- |
@@ -288,6 +295,21 @@ Unlike every other scenario, this one changes the data. **Reset balance** on the
 | Evaluation | Actual fetched metrics, pending/unconfigured, or failed; never invented |
 | Decision | Disabled, verified allow/deny, or unavailable fail-closed result |
 | Action decisions | Verdicts from the pre-execution gate, one per gated tool call: disabled, verified allow/deny, or unavailable |
+
+## Conversation memory
+
+Staying on one model, the agent is given the **last 8 messages** of the conversation as history, trimmed further if they exceed 7,000 characters, oldest pairs dropped first. So follow-up questions work: "and the month before?" resolves against what was already asked. Every turn in that conversation shares one Galileo session, because sessions are keyed by conversation.
+
+Anything that resets the conversation starts a new session and clears that memory:
+
+| Action | Resets the conversation |
+| --- | --- |
+| Switching model | Yes |
+| Changing scenario | Yes |
+| Toggling the guardrail | Yes |
+| **New conversation** | Yes |
+| One hour idle | Yes, conversations are pruned |
+| Presenter logout, or a backend restart | Yes |
 
 ## Reset controls
 

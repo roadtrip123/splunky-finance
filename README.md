@@ -77,6 +77,12 @@ Sessions are isolated from other presenters. Refreshing preserves valid server-s
 
 After pulling changes, deploy from the project root with `sudo docker compose up --build -d`.
 
+## Model endpoints and conversation memory
+
+Several model endpoints are configured under **Setup** in the presenter portal and switched with one click on the **Demo** tab, which makes it possible to ask the same question of two models and compare the traces in Galileo. Traces are named `bank-chat-turn · <endpoint>` so they are distinguishable in the trace list.
+
+Within one model the agent keeps the last 8 messages as conversation history, and every turn shares one Galileo session. Switching model clears that history and starts a new session, so each model answers the same clean question rather than inheriting the other's answer. Changing scenario, toggling the guardrail, an hour of inactivity, and a backend restart clear it too.
+
 ## Providers
 
 Choose the endpoint in the presenter portal under **Setup**: OpenAI, Anthropic, Ollama (local), Sharon AI, or a custom OpenAI-compatible URL. That applies immediately and needs no restart. Sharon AI and custom use the OpenAI protocol with their own base URL, set through `OPENAI_BASE_URL`.

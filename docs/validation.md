@@ -224,3 +224,11 @@ Backend suite: 51 passed; lint passed; production build passed.
 Switching endpoints kept the conversation, so both turns shared one Galileo session and, more importantly, the second model received the first model's answer as history. It saw a larger prompt than the first model did, could refer back to an answer it had not written, and the token and latency figures were not comparable — which defeats the purpose of the switch.
 
 A switch now clears conversations and bumps the run revision, exactly as a scenario change does, so the presenter workspace resets and each model answers the same clean question in its own session. A regression asserts the revision advances and conversations are cleared.
+
+## Conversation memory documented
+
+The walkthrough gained a Conversation memory section and the README a short equivalent. Within one model the agent receives the last 8 messages, trimmed at 7,000 characters, and every turn in that conversation shares one Galileo session. Switching model, changing scenario, toggling the guardrail, an hour idle, a presenter logout or a backend restart all clear it and start a new session.
+
+Two presenting consequences are called out: a follow-up question straight after a switch will confuse the new model, which has no history; and conversational memory cannot be demonstrated in the same conversation as a model comparison. The visible transcript survives either way, so both answers stay on screen.
+
+Also repaired a duplicated "Reading the evidence panel" heading left by an earlier edit to Part 7.
