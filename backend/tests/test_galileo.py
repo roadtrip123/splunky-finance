@@ -406,6 +406,15 @@ def test_endpoints_are_saved_switched_and_keys_masked(client):
     assert telemetry.active_endpoint()["api_key"] == secret
     assert telemetry.active_endpoint()["model"] == "llama-3.1-8b"
 
+    # A switch must start a fresh conversation, or the next model is handed the previous
+    # model's answer as history and both turns land in one Galileo session.
+    run = client.post("/api/demo-admin/workspace", headers=headers).json()
+    before = run["revision"]
+    client.post("/api/demo-admin/endpoints/active", headers=headers, json={"id": ollama["id"]})
+    assert client.get("/api/demo-admin/status", headers=headers).json()["run"]["revision"] > before
+    assert not client.app.state.chat.conversations
+    client.post("/api/demo-admin/endpoints/active", headers=headers, json={"id": sharon["id"]})
+
     removed = client.delete(f"/api/demo-admin/endpoints/{sharon['id']}", headers=headers)
     assert removed.status_code == 200
     remaining = removed.json()["endpoints"]

@@ -218,3 +218,9 @@ Traces are named `bank-chat-turn · <endpoint>` so two runs of the same question
 Token counts and time-to-first-token were already exported per span and were confirmed populated on a live trace. Cost reads 0.0: Galileo prices recognised model names, and the LangChain callback reports the agent's own spans as `chat-ollama` rather than the model. Whether cost populates for a priced hosted model is untested.
 
 Backend suite: 51 passed; lint passed; production build passed.
+
+## Model switch resets the conversation
+
+Switching endpoints kept the conversation, so both turns shared one Galileo session and, more importantly, the second model received the first model's answer as history. It saw a larger prompt than the first model did, could refer back to an answer it had not written, and the token and latency figures were not comparable — which defeats the purpose of the switch.
+
+A switch now clears conversations and bumps the run revision, exactly as a scenario change does, so the presenter workspace resets and each model answers the same clean question in its own session. A regression asserts the revision advances and conversations are cleared.

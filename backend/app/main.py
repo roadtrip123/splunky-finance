@@ -467,12 +467,20 @@ def create_app(settings=None, model_builder=None, protection_adapter=None):
     async def activate_endpoint(request: Request, payload: ActiveEndpoint):
         """Switch the model mid-demo. The next turn resolves this once and passes it explicitly,
         so a switch cannot change the model under a request already running."""
-        session(request, "admin", True)
+        current = session(request, "admin", True)
         _busy()
         try:
             telemetry.set_active_endpoint(payload.id)
         except KeyError:
             raise HTTPException(404, "Unknown endpoint") from None
+        # Start a fresh conversation, as a scenario change does. Otherwise the next model is
+        # handed the previous model's answer as history: it sees a larger prompt, may refer back
+        # to an answer it did not write, and both traces land in one Galileo session, so the
+        # comparison the switch exists for is contaminated.
+        chat.clear(current)
+        run = chat.run(current)
+        if run:
+            run["revision"] += 1
         chat.provider_status = {"state": "unverified" if settings.provider_configured else "unconfigured"}
         return envelope(request, telemetry.endpoints_view())
 

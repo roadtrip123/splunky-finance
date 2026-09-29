@@ -116,6 +116,8 @@ Ask each scenario's displayed example question anyway. That is what each Part is
 
 Configure each endpoint once under **Setup**, then switch between them with one click on the **Demo** tab. The switch applies to your next message; a turn already running keeps the endpoint it started with.
 
+Switching also starts a fresh conversation. That matters for the comparison: without it the second model would be handed the first model's answer as history, see a larger prompt, and both turns would land in one Galileo session. A fresh conversation gives each model the same clean input and its own session.
+
 To show the difference, ask the same question twice:
 
 1. Select a model, send the question, note the reply time in the chat
