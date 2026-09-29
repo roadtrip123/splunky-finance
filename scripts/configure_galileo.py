@@ -120,16 +120,25 @@ async def main():
         runtime_token_header=s.agent_control_runtime_token_header,
     ) as client:
         for name, definition in CONTROLS.items():
-            existing = await list_controls(client, name=name, limit=10)
-            found = (existing.get("controls") or [None])[0]
-            if found:
-                identifier = found.get("control_id") or found.get("id")
-                print(f"{name}: reusing existing control.")
-            else:
+            existing = (await list_controls(client, name=name, limit=25)).get("controls") or []
+            # clone_and_bind_control clones as well as binds, so calling it for a control that
+            # already has a clone leaves another copy behind. Bind the original once; a clone
+            # already present means the binding was attempted before.
+            original = next((c for c in existing if not c.get("cloned_from_control_id")), None)
+            clones = [c for c in existing if c.get("cloned_from_control_id")]
+            if not original:
                 identifier = (await create_control(client, name=name, data=definition))["control_id"]
                 print(f"{name}: created.")
-            # Bind every time. The control is tenant-wide but the binding is per log stream, so
-            # skipping this for an existing control leaves that stream with no guardrail at all.
+            else:
+                identifier = original.get("control_id") or original.get("id")
+                print(f"{name}: reusing control {identifier}.")
+            if clones:
+                print(
+                    f"{name}: {len(clones)} clone(s) already present "
+                    f"({', '.join(str(c.get('id')) for c in clones)}); not binding again. "
+                    "Remove spares in the console if this is unexpected."
+                )
+                continue
             await clone_and_bind_control(
                 client,
                 control_id=identifier,
@@ -137,7 +146,7 @@ async def main():
                 target_id=str(logger.log_stream_id),
                 enabled=True,
             )
-            print(f"{name}: bound to {s.galileo_log_stream}.")
+            print(f"{name}: bind requested for {s.galileo_log_stream}. Confirm it in the console.")
     print(
         "Metric setup requested. Verify sampling, metric scores, and control binding in the tenant console."
     )

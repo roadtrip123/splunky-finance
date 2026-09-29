@@ -4,6 +4,14 @@ FALLBACK = "I couldn't verify that answer against the bank's policies. Please ch
 BLOCKED = "Transfer option is not available from My Bank Agent."
 
 
+class ControlNotEvaluated(Exception):
+    """No usable verdict came back. Carries why, so the three causes stay distinguishable."""
+
+    def __init__(self, diagnosis):
+        super().__init__(diagnosis.get("cause", "unknown"))
+        self.diagnosis = diagnosis
+
+
 class Protection:
     """Explicit candidate and action evaluation. No SDK-global toggles or model-selected protection tool."""
 
@@ -11,14 +19,17 @@ class Protection:
         self.settings = settings
         self.status = "unverified"
 
-    def _unavailable(self, reason):
-        return {
+    def _unavailable(self, reason, diagnosis=None):
+        details = {
             "decision": "unavailable",
             "source": "application",
             "verified": False,
             "action": "safe_fallback",
             "reason": reason,
         }
+        if diagnosis:
+            details["diagnosis"] = diagnosis
+        return details
 
     def _configured(self, logger):
         s = self.settings
@@ -65,9 +76,25 @@ class Protection:
             response.raise_for_status()
             result = EvaluationResponse.model_validate(response.json())
         # Empty results do not prove a bound control ran. Errors always fail closed.
+        #
+        # Three very different causes used to collapse into one message: the request failing, the
+        # control erroring, and nothing selecting the control at all. Each needs a different fix,
+        # so the diagnosis travels with the decision rather than being guessed at afterwards.
         evaluated = (result.matches or []) + (result.non_matches or [])
         if result.errors or not evaluated:
-            raise ValueError("No verified control evaluation")
+            raise ControlNotEvaluated(
+                {
+                    "cause": "control_errored" if result.errors else "no_control_selected",
+                    "matches": len(result.matches or []),
+                    "non_matches": len(result.non_matches or []),
+                    "errors": [str(e)[:200] for e in (result.errors or [])],
+                    "agent_name": s.agent_control_agent_name,
+                    "target": f"log_stream/{target_id}",
+                    "stage": stage,
+                    "step_type": step_type,
+                    "step_name": step_name,
+                }
+            )
         return result, evaluated
 
     def _details(self, result, evaluated, allow_action, deny_action):
@@ -123,7 +150,9 @@ class Protection:
         if not enabled:
             return True, {"decision": "disabled", "source": "application", "verified": False}
         if not self._configured(logger):
-            return False, self._unavailable("Protection is not fully configured")
+            return False, self._unavailable(
+                "Protection is not fully configured", {"cause": "not_configured"}
+            )
         try:
             result, evaluated = await self._evaluate(
                 logger,
@@ -138,15 +167,22 @@ class Protection:
             self._log_controls(logger, evaluated, result, arguments, "tool_call", "pre", details)
             self.status = "verified"
             return result.is_safe, details
-        except Exception:  # noqa: BLE001 - isolate SDK failures without exposing credential-bearing errors
+        except ControlNotEvaluated as exc:
             self.status = "failed"
-            return False, self._unavailable("Protection request failed or no control was evaluated")
+            return False, self._unavailable("No control evaluated this action", exc.diagnosis)
+        except Exception as exc:  # noqa: BLE001 - sanitize credential-bearing SDK errors
+            self.status = "failed"
+            return False, self._unavailable(
+                "Protection request failed", {"cause": "request_failed", "error": type(exc).__name__}
+            )
 
     async def check(self, candidate, prompt, evidence, logger, enabled):
         if not enabled:
             return candidate, {"decision": "disabled", "source": "application", "verified": False}
         if not self._configured(logger):
-            return FALLBACK, self._unavailable("Protection is not fully configured")
+            return FALLBACK, self._unavailable(
+                "Protection is not fully configured", {"cause": "not_configured"}
+            )
         try:
             result, evaluated = await self._evaluate(
                 logger,
@@ -161,6 +197,11 @@ class Protection:
             self._log_controls(logger, evaluated, result, candidate, "llm_call", "post", details)
             self.status = "verified"
             return candidate if result.is_safe else FALLBACK, details
-        except Exception:  # noqa: BLE001 - isolate SDK failures without exposing credential-bearing errors
+        except ControlNotEvaluated as exc:
             self.status = "failed"
-            return FALLBACK, self._unavailable("Protection request failed or no control was evaluated")
+            return FALLBACK, self._unavailable("No control evaluated this answer", exc.diagnosis)
+        except Exception as exc:  # noqa: BLE001 - sanitize credential-bearing SDK errors
+            self.status = "failed"
+            return FALLBACK, self._unavailable(
+                "Protection request failed", {"cause": "request_failed", "error": type(exc).__name__}
+            )

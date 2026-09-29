@@ -204,3 +204,43 @@ def test_demo_setting_change_clears_conversation_and_rejects_stale_send(client):
         ).status_code
         == 422
     )
+
+
+def test_a_blocked_action_says_why_it_could_not_be_verified(settings):
+    """Three causes used to collapse into one message, so a blocked transfer could not be told
+    apart from a broken request. Each needs a different fix, so each is named."""
+    import asyncio
+    from types import SimpleNamespace
+
+    from app.observability.protection import ControlNotEvaluated, Protection
+
+    protection = Protection(settings)
+    logger = SimpleNamespace(log_stream_id="stream-1")
+
+    async def no_control(*args, **kwargs):
+        raise ControlNotEvaluated(
+            {"cause": "no_control_selected", "matches": 0, "non_matches": 0, "errors": []}
+        )
+
+    protection._evaluate = no_control
+    settings.agent_control_url = "https://agent-control.example.com"
+    settings.galileo_enabled = True
+    settings.galileo_api_key = settings.openai_api_key
+    allowed, decision = asyncio.run(
+        protection.check_action("transfer_funds", {"amount_cents": 450000}, logger, True)
+    )
+    # Blocked either way; what changes is being able to say why.
+    assert allowed is False
+    assert decision["verified"] is False
+    assert decision["diagnosis"]["cause"] == "no_control_selected"
+
+    async def request_failed(*args, **kwargs):
+        raise TimeoutError
+
+    protection._evaluate = request_failed
+    allowed, decision = asyncio.run(
+        protection.check_action("transfer_funds", {"amount_cents": 450000}, logger, True)
+    )
+    assert allowed is False
+    assert decision["diagnosis"]["cause"] == "request_failed"
+    assert decision["diagnosis"]["error"] == "TimeoutError"

@@ -463,15 +463,18 @@ class Telemetry:
                 runtime_token_header=s.agent_control_runtime_token_header,
             ) as client:
                 for name, definition in CONTROLS.items():
-                    existing = await list_controls(client, name=name, limit=10)
-                    found = (existing.get("controls") or [None])[0]
+                    existing = (await list_controls(client, name=name, limit=25)).get("controls") or []
+                    # clone_and_bind_control clones as well as binds, so pressing this twice
+                    # would leave another copy behind. Bind the original once.
+                    original = next((c for c in existing if not c.get("cloned_from_control_id")), None)
+                    if any(c.get("cloned_from_control_id") for c in existing):
+                        bound.append(f"{name} (already bound)")
+                        continue
                     identifier = (
-                        (found.get("control_id") or found.get("id"))
-                        if found
+                        (original.get("control_id") or original.get("id"))
+                        if original
                         else (await create_control(client, name=name, data=definition))["control_id"]
                     )
-                    # Always bind: the definition is tenant-wide but the binding is per log
-                    # stream, so reusing one without binding leaves this stream unguarded.
                     await clone_and_bind_control(
                         client,
                         control_id=identifier,

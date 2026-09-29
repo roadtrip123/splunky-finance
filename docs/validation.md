@@ -232,3 +232,13 @@ The walkthrough gained a Conversation memory section and the README a short equi
 Two presenting consequences are called out: a follow-up question straight after a switch will confuse the new model, which has no history; and conversational memory cannot be demonstrated in the same conversation as a model comparison. The visible transcript survives either way, so both answers stay on screen.
 
 Also repaired a duplicated "Reading the evidence panel" heading left by an earlier edit to Part 7.
+
+## Why a block could not be attributed
+
+A blocked transfer reported `unavailable` with the message "Protection request failed or no control was evaluated", which covered four different causes: the HTTP request failing, a control erroring, nothing selecting the control, and protection not being configured. Each needs a different fix, and the single string made them indistinguishable, so a genuine control denial could not be told apart from a broken request.
+
+Each cause now travels with the decision as a `diagnosis`: `request_failed` with the exception type, `control_errored` with the error strings, `no_control_selected` with the match and non-match counts plus the agent name, target, stage and step it asked about, and `not_configured`. A test asserts the first two are reported distinctly and that both still block.
+
+Observed against the live tenant before this change: the pre-execution gate works — an armed transfer produced no `transfer_funds` span, so the tool never ran and no balance moved — but the decision was `unavailable`, and no control span has ever been written, because `_log_controls` only writes one when evaluated controls come back. Two `splunky-transfer-deny` controls exist, both enabled with `stages: ["pre"]` and `step_types: ["tool"]`, and both report `used_by_agents_count: 0`.
+
+`clone_and_bind_control` clones as well as binds, so calling it for a control that already has a clone leaves another copy behind; that is where the duplicate came from. Both the setup script and the portal's project setup now bind only when no clone exists, and report what they found rather than claiming a binding they have not confirmed.

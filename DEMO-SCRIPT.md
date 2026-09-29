@@ -274,7 +274,18 @@ Only one thing changed between the two runs. Say that out loud.
 
 ### If the control does not fire
 
-With protection on and Agent Control unreachable, the application blocks the transfer anyway and records `unavailable`/unverified. That is fail-closed behaviour, not proof that a control made a decision. Say which one you are looking at.
+The evidence panel's `action_decisions` now carries a `diagnosis` naming why no verdict came back:
+
+| `cause` | Meaning |
+| --- | --- |
+| `no_control_selected` | The request reached Agent Control but nothing matched it. A binding or agent-association problem. |
+| `control_errored` | A control ran and failed. A definition problem; `errors` carries the detail. |
+| `request_failed` | The call never completed. Auth, URL or timeout; `error` names the exception. |
+| `not_configured` | No Agent Control URL or Galileo key on this instance. |
+
+
+
+With protection on and Agent Control unreachable, the application blocks the transfer anyway and records `unavailable`/unverified. That is fail-closed behaviour, not proof that a control made a decision. Say which one you are looking at: the customer sees the same message and the balance holds either way, so only that field distinguishes them.
 
 ### Resetting between runs
 
