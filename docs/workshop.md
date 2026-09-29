@@ -8,13 +8,13 @@ Each participant gets their own compose project, so their dataset, sessions and 
 
 | | |
 | --- | --- |
-| Type | `r7i.2xlarge` (8 vCPU, 64 GiB) for 50 participants |
-| Disk | 50 GB gp3 — not the 8 GB default |
+| Type | `r7i.2xlarge` (8 vCPU, 64 GiB) for 50, `r7i.4xlarge` (16 vCPU, 128 GiB) for 100 |
+| Disk | 50 GB gp3 for 50 participants, 100 GB for 100 — not the 8 GB default |
 | OS | Ubuntu 24.04 |
 | Security group | SSH from your address; 443 from wherever participants sit |
 | DNS | Wildcard `*.demo.example.com` pointing at the instance |
 
-Sizing: each stack measured 229 MiB idle (frontend 48, backend 181), and roughly 500 MiB after an hour of use. Fifty stacks plus the host is about 26.5 GB, leaving 2.4× headroom. The app is almost entirely IO-wait because the model runs elsewhere, so memory rather than CPU is the binding constraint. Avoid burstable instance types: a workshop is exactly when CPU credits run out.
+Sizing: each stack measured 229 MiB idle (frontend 48, backend 181), and roughly 500 MiB after an hour of use. Fifty stacks plus the host is about 26.5 GB on a 64 GiB box, leaving 2.4× headroom. A hundred stacks is 200 containers and about 51.5 GB, which needs 128 GiB: on 64 GiB that is 80% committed, too close for a live session. At a hundred, drop `--stagger` to 1 or the start takes nearly seven minutes. The app is almost entirely IO-wait because the model runs elsewhere, so memory rather than CPU is the binding constraint. Avoid burstable instance types: a workshop is exactly when CPU credits run out.
 
 Ports are `base + N`, so participant 7 is `3107` with the default base of 3100.
 
@@ -87,10 +87,15 @@ python3 scripts/workshop.py down --purge         # stop, delete volumes and env 
 Each is handed one URL, an account number and two passwords. In their own instance they:
 
 1. Sign in to banking, and to `/demo-admin` in another tab of the same browser profile — linking is automatic within one profile
-2. Open the **Setup** tab, choose their model endpoint — OpenAI, Anthropic, Ollama (local), Sharon AI or a custom OpenAI-compatible URL — and save it
-3. In the same tab, paste their own Galileo API key, project and log stream, and press **Save and connect** — applied immediately, no restart
-4. Press **Set up my project**, which enables the four metrics on their log stream and binds the transfer control. Both are per log stream, so each participant does this even though the judges and the control already exist tenant-wide
-5. Work through the scenarios and read their own traces
+2. Create their own Galileo API key, project and log stream in the console — this comes first, because the app cannot connect to a project that does not exist
+3. Open the **Setup** tab, choose a model endpoint and save it, then paste their Galileo details and press **Save and connect**
+4. Build the evaluators themselves in the Galileo console: enable Context Adherence and create the three custom judges
+5. Build and bind the guardrail control themselves
+6. Work through the scenarios and read their own traces
+
+Steps 4 and 5 are the lab, so **Set up my project** — which would do both for them — is hidden in workshop mode. [docs/workshop-lab.md](workshop-lab.md) is the participant guide and carries the judge prompts and the control definition ready to paste.
+
+**Custom metrics are tenant-wide.** Fifty people each creating `SplunkyRightCustomer` will collide in one namespace, so the lab guide tells them to suffix every metric with their initials. Worth repeating out loud before they start.
 
 Generated env files live in `workshop/` with mode 0600, and the directory is gitignored. They hold both passwords and a session secret, but **no API keys**: the provider and Galileo credentials are blanked so a participant starts from an empty Setup tab rather than inheriting yours.
 

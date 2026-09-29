@@ -656,6 +656,12 @@ export default function Admin() {
                 </section>
                 <section className="admin-card">
                   <h2>Connect to Galileo</h2>
+                  {status.demo_mode === "workshop" && (
+                    <p className="muted">
+                      Create the project, log stream, evaluators and guardrail in the Galileo
+                      console yourself — that is the lab. This panel only points the app at them.
+                    </p>
+                  )}
                     <p className="muted">
                       Paste your own API key and project. Saved to this instance only and applied
                       immediately — no restart. The key is never shown again once saved.
@@ -712,6 +718,9 @@ export default function Admin() {
                       >
                         Save and connect
                       </button>
+                      {/* Workshop participants create metrics and controls themselves; that is
+                          the lab. This shortcut would skip it. */}
+                      {status.demo_mode !== "workshop" && (
                       <button
                         className="button outline small"
                         disabled={busy || !status.connection.galileo_api_key_set}
@@ -741,6 +750,7 @@ export default function Admin() {
                       >
                         Set up my project
                       </button>
+                    )}
                     </div>
                   </section>
                 </div>

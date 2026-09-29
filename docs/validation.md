@@ -242,3 +242,13 @@ Each cause now travels with the decision as a `diagnosis`: `request_failed` with
 Observed against the live tenant before this change: the pre-execution gate works — an armed transfer produced no `transfer_funds` span, so the tool never ran and no balance moved — but the decision was `unavailable`, and no control span has ever been written, because `_log_controls` only writes one when evaluated controls come back. Two `splunky-transfer-deny` controls exist, both enabled with `stages: ["pre"]` and `step_types: ["tool"]`, and both report `used_by_agents_count: 0`.
 
 `clone_and_bind_control` clones as well as binds, so calling it for a control that already has a clone leaves another copy behind; that is where the duplicate came from. Both the setup script and the portal's project setup now bind only when no clone exists, and report what they found rather than claiming a binding they have not confirmed.
+
+## Workshop scope: participants build the Galileo side
+
+The lab is now configuring Galileo, not having the app configure it. **Set up my project**, which enables metrics and binds the control in one press, is hidden in workshop mode because it performs exactly the exercise; the Connect panel says so in its place. Presenter mode keeps it.
+
+[docs/workshop-lab.md](workshop-lab.md) is the participant guide: create an API key, project and log stream first, point the app at them, then build four evaluators and a guardrail control by hand, then run the scenarios and read the traces. The three judge prompts and the control definition are included ready to paste, and a check confirms the pasted prompts are byte-identical to what `setup_definitions.py` registers, so the guide cannot drift from the code silently.
+
+Two things the guide has to say that are not obvious. Custom metrics are tenant-wide, so fifty participants each creating `SplunkyRightCustomer` collide in one namespace and every metric needs a per-participant suffix. And the two instructions in each judge prompt that look like padding are there because of observed failures: without "the absence of a claim is not a failure" an answer with its total removed was reported as having a wrong total, and without "judge only the single property described above" a judge would establish its own subject was fine and then fail the answer for a different defect.
+
+Sizing for 100 participants: 200 containers, about 51.5 GB working set, which needs `r7i.4xlarge` at 128 GiB. On the 64 GiB box sized for 50 that is 80% committed, too close for a live session. Disk goes to 100 GB and `--stagger` should drop to 1, or starting 200 containers takes nearly seven minutes.
