@@ -252,3 +252,13 @@ The lab is now configuring Galileo, not having the app configure it. **Set up my
 Two things the guide has to say that are not obvious. Custom metrics are tenant-wide, so fifty participants each creating `SplunkyRightCustomer` collide in one namespace and every metric needs a per-participant suffix. And the two instructions in each judge prompt that look like padding are there because of observed failures: without "the absence of a claim is not a failure" an answer with its total removed was reported as having a wrong total, and without "judge only the single property described above" a judge would establish its own subject was fine and then fail the answer for a different defect.
 
 Sizing for 100 participants: 200 containers, about 51.5 GB working set, which needs `r7i.4xlarge` at 128 GiB. On the 64 GiB box sized for 50 that is 80% committed, too close for a live session. Disk goes to 100 GB and `--stagger` should drop to 1, or starting 200 containers takes nearly seven minutes.
+
+## Sharon AI cannot drive the agent yet
+
+Tested directly against `https://inference.sharonai.cloud/api/v1` with `shared-gpt-oss-120b`. The endpoint answers chat requests and fills `content`, but **emits no tool call when one is offered**. Every scenario depends on the model calling a banking tool, so the endpoint cannot back the demo until tool calling is enabled; a request to enable it is with the provider.
+
+An earlier probe with a small `max_tokens` also returned empty `content` with the text in `reasoning_content`, which is how a reasoning model spends its budget before producing output. With a realistic limit `content` was populated, so that was a budget artefact rather than a format incompatibility — worth re-checking if the model changes.
+
+The supplied config gives `api_key_value` as `"Bearer tv-pat-..."`, a full header value. The OpenAI client adds `Bearer` itself, so pasting it verbatim produces a doubled prefix: confirmed 200 with the bare key and 401 with the doubled one. The saved endpoint on this instance holds the bare key correctly.
+
+`scripts/check_endpoint.py` runs these three checks — reachable, fills `content`, emits a tool call — so an endpoint can be cleared before a workshop rather than during one.

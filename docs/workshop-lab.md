@@ -46,6 +46,8 @@ In `/demo-admin`, open the **Setup** tab.
 
 The Galileo status should read `connected`. If it does not, check the project and log stream names match exactly what you created.
 
+> If your endpoint is OpenAI-compatible, paste the key **without** any `Bearer ` prefix. Some providers hand you a full header value like `Bearer tv-pat-...`; the client adds `Bearer` itself, and a doubled prefix fails with 401.
+
 **Check it works.** On the **Troubleshooting** tab press **Test my setup**. It makes one real model call and asks the agent to use a banking tool. A successful result lists an observed tool call.
 
 Then send a question in the customer tab:

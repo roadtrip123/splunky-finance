@@ -115,6 +115,14 @@ Then on one of them: connect a model endpoint, connect Galileo, press **Set up m
 
 **Cookies ignore ports.** `host:3101` and `host:3102` share a cookie jar. Each participant using one port is unaffected, but moving between instances to help people will log you out repeatedly. Use a separate browser profile, or put a reverse proxy with subdomains in front if you have DNS.
 
+**Check the endpoint can drive the agent before the day.** Answering a chat request is not enough: every scenario depends on the model emitting a tool call, and some reasoning models return their text in `reasoning_content` leaving `content` empty. Both look like a healthy endpoint from a plain request.
+
+```bash
+python3 scripts/check_endpoint.py --base-url <url> --model <model> --api-key <key>
+```
+
+Pass the key without any `Bearer ` prefix; the client adds it. A provider config that hands you a full header value such as `"Bearer tv-pat-..."` needs the prefix stripped, or you get a doubled header and a 401.
+
 **One LLM endpoint for fifty people** is the most likely thing to spoil the session — well ahead of anything about instance sizing. Check the endpoint's rate limits against fifty concurrent turns of roughly 2,500 input tokens each, and confirm it handles tool calling properly: this agent depends entirely on well-formed tool calls, and an endpoint that is chat-compatible but weak on tools fails every scenario.
 
 **Evaluation cost** runs about $0.035 per turn across the four enabled metrics. Fifty participants at eight turns each is roughly $14.
