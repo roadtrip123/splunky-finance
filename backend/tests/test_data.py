@@ -1,9 +1,10 @@
+import json
 from datetime import date
 
 import pytest
 
 from app.demo.expected_results import previous_months, spending
-from app.demo.generator import generate
+from app.demo.generator import GENERATOR_VERSION, generate
 from app.schemas import Dataset, Transaction
 from app.storage import Storage
 
@@ -33,6 +34,21 @@ def test_corruption_not_regenerated(settings):
     assert after.dataset is None and after.error
     assert after.path.read_text() == '{"broken": true}'
     assert after.reset(0).manifest.dataset_version == 1
+
+
+def test_older_generator_version_regenerates(settings):
+    """A dataset built by an earlier shape is rebuilt, not reported as corrupt.
+
+    Adding a field changes the content hash of every stored dataset, so without this an upgrade
+    bricks every existing instance with the corruption message.
+    """
+    storage = Storage(settings)
+    stored = json.loads(storage.path.read_text())
+    stored["manifest"]["generator_version"] = "0.0.1"
+    storage.path.write_text(json.dumps(stored))
+    after = Storage(settings)
+    assert after.error is None
+    assert after.dataset.manifest.generator_version == GENERATOR_VERSION
 
 
 def test_invalid_ledger_and_duplicate_ids():

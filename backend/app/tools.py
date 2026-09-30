@@ -210,7 +210,7 @@ def build_tools(banking: Banking, evidence: dict):
         owner = (
             banking.dataset.customer["name"]
             if account.customer_id == banking.dataset.customer["id"]
-            else account.name
+            else (account.owner_name or account.name)
         )
         result = {
             "account_number": account.masked_number,

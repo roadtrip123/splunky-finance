@@ -5,7 +5,7 @@ from pathlib import Path
 
 from filelock import FileLock
 
-from app.demo.generator import content_hash, generate
+from app.demo.generator import GENERATOR_VERSION, content_hash, generate
 from app.schemas import Dataset
 
 
@@ -20,7 +20,7 @@ class Storage:
         self.dataset: Dataset | None = None
         try:
             with self.lock:
-                if self.path.exists():
+                if self.path.exists() and not self._built_by_older_generator():
                     self.dataset = self.read()
                 else:
                     self.dataset = generate(
@@ -31,6 +31,23 @@ class Storage:
             self.error = (
                 "Dataset is corrupt or unavailable; restore a valid file or use confirmed admin reset"
             )
+
+    def _built_by_older_generator(self):
+        """True when the stored file was produced by a different generator version.
+
+        A dataset is rebuilt on an upgrade rather than validated against the current code. Adding
+        a field changes the content hash of every stored file, so without this an upgrade would
+        look like corruption and every existing instance would refuse to start. The rebuild is
+        deterministic from the same seed and reference date, so the figures participants were
+        given do not move; only uncommitted demo state such as a transfer is discarded.
+
+        A missing or unreadable version is corruption, not an upgrade, and still fails visibly.
+        """
+        try:
+            version = json.loads(self.path.read_text())["manifest"]["generator_version"]
+        except (OSError, ValueError, TypeError, KeyError):
+            return False
+        return isinstance(version, str) and bool(version) and version != GENERATOR_VERSION
 
     def read(self):
         dataset = Dataset.model_validate_json(self.path.read_text())

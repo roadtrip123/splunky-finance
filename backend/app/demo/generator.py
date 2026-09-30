@@ -7,7 +7,7 @@ from decimal import ROUND_HALF_UP, Decimal
 from app.demo.expected_results import month_shift, previous_months, spending
 from app.schemas import Account, Dataset, Manifest, Transaction
 
-GENERATOR_VERSION = "1.1.0"
+GENERATOR_VERSION = "1.3.0"
 POOLS = {
     "groceries": (["Woolworths", "Coles", "Aldi"], 4500, 18500),
     "restaurants": (
@@ -138,8 +138,9 @@ def generate(seed: int, reference: date, timezone: str = "Australia/Brisbane", v
             id="tom-everyday",
             customer_id="syn-tom",
             name="Tom Whitfield Everyday",
+            owner_name="Tom Whitfield",
             type="everyday",
-            masked_number="1234",
+            masked_number="•••• 1234",
             opening_balance_cents=312450,
             posted_balance_cents=312450,
         )

@@ -10,7 +10,7 @@ Three accounts represent Everyday, Savings, and credit card. All amounts are int
 
 Seed and frozen reference date reproduce the dataset. Last month means the previous complete calendar month, inclusive start/exclusive end. Spending counts posted purchase debits, subtracts refunds, and excludes internal transfers, card repayments, interest, fees, and pending entries. Largest transactions sort by amount then date and ID. Percentage change uses exact Decimal arithmetic; a zero baseline returns no fabricated percentage.
 
-Dataset version and hash protect reproducibility. Corrupt files cause a visible unhealthy dataset state; startup never silently regenerates them. Explicit confirmed reset uses expected-version checks, atomically replaces JSON, and invalidates conversations and comparisons. Account ownership, unique IDs, temporal bounds, pair integrity, and ledger totals are validated.
+Dataset version and hash protect reproducibility. Corrupt files cause a visible unhealthy dataset state; startup never silently regenerates them. The one exception is a generator version change, which rebuilds the dataset deterministically from the same seed: adding a field alters the content hash of every stored file, so without it an upgrade would brick every existing instance with the corruption message. Figures do not move; uncommitted demo state such as a transfer is discarded. Explicit confirmed reset uses expected-version checks, atomically replaces JSON, and invalidates conversations and comparisons. Account ownership, unique IDs, temporal bounds, pair integrity, and ledger totals are validated.
 
 ## Routes
 

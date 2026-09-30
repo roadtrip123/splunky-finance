@@ -14,6 +14,9 @@ class Account(StrictModel):
     type: Literal["everyday", "savings", "credit_card"]
     name: str
     masked_number: str
+    # Only set on another customer's account, where there is no customer record to read a name
+    # from. The authenticated customer's own name comes from `Dataset.customer`.
+    owner_name: str | None = None
     currency: Literal["AUD"] = "AUD"
     opening_balance_cents: int
     posted_balance_cents: int

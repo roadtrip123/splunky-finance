@@ -269,5 +269,5 @@ def test_a_transfer_credits_the_destination_account(client):
     result = tools["transfer_funds"].invoke(
         {"to_account": "1234", "amount_cents": 10000, "description": "test"}
     )
-    assert result["credited_account"] == "1234"
+    assert result["credited_account"] == "•••• 1234"
     assert banking.by_number("1234").posted_balance_cents == before + 10000
