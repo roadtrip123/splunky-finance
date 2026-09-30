@@ -75,18 +75,20 @@ Each is an LLM given written instructions. Create them as **boolean**, **trace-l
 **`SplunkyAnswerWholeQuestion-<initials>`** — did the answer address the whole question?
 
 ```
-Decide whether candidate_output answers every part the input asked for. Derive the required
-parts from the input itself; do not assume a fixed list. Return false only when a part of the
-question is left unanswered. An answer that addresses every part is covered even when its
-content is incorrect: whether a stated figure is right, and whether it describes the right
-customer, are not this metric's concern. Evaluate candidate_output, not final_output. The trace
-output is JSON containing candidate_output and evidence. A part of the question that
-candidate_output does not address is exactly what this metric measures. An omission is a failure
-here, whatever other metrics make of it. Judge only the single property described above. An
-answer can be wrong in ways this metric does not measure: a wrong amount, an invented rule, a
-misnamed customer. Each of those is measured by a different metric. When the property you are
-judging is correct, return true even if the answer is obviously wrong for some other reason, and
-say so in your reasoning rather than failing it.
+Decide whether candidate_output answers every part the question asked for. The question is the
+`question` field of the trace output JSON; use that text, never an implied or reconstructed
+question, and if it is missing return true rather than guessing. Derive the required parts from
+that question; do not assume a fixed list. Return false when a part of the question is left
+unanswered. An answer that addresses every part is covered even when its content is incorrect:
+whether a stated figure is right, and whether it describes the right customer, are not this
+metric's concern. Evaluate candidate_output, not final_output. The trace output is JSON
+containing question, candidate_output and evidence. A part of the question that candidate_output
+does not address is exactly what this metric measures. An omission is a failure here, whatever
+other metrics make of it. Judge only the single property described above. An answer can be wrong
+in ways this metric does not measure: a wrong amount, an invented rule, a misnamed customer.
+Each of those is measured by a different metric. When the property you are judging is correct,
+return true even if the answer is obviously wrong for some other reason, and say so in your
+reasoning rather than failing it.
 ```
 
 **`SplunkyNumericalCorrectness-<initials>`** — do the numbers match the ledger?
@@ -97,12 +99,12 @@ evidence.calculations, which holds integer AUD cents; a dollar is 100 cents. Ret
 when a stated figure disagrees with that evidence. If candidate_output states no money amount
 and no count, return true: there is nothing to contradict, and an answer that omits a figure is
 a different fault measured by another metric. Evaluate candidate_output, not final_output. The
-trace output is JSON containing candidate_output and evidence. Judge only what candidate_output
-actually claims: the absence of a claim is not a failure. Judge only the single property
-described above. An answer can be wrong in ways this metric does not measure: an omitted part,
-an invented rule, a misnamed customer. Each of those is measured by a different metric. When the
-property you are judging is correct, return true even if the answer is obviously wrong for some
-other reason, and say so in your reasoning rather than failing it.
+trace output is JSON containing question, candidate_output and evidence. Judge only what
+candidate_output actually claims: the absence of a claim is not a failure. Judge only the single
+property described above. An answer can be wrong in ways this metric does not measure: an
+omitted part, an invented rule, a misnamed customer. Each of those is measured by a different
+metric. When the property you are judging is correct, return true even if the answer is
+obviously wrong for some other reason, and say so in your reasoning rather than failing it.
 ```
 
 **`SplunkyRightCustomer-<initials>`** — is this even the right customer?
@@ -113,7 +115,7 @@ matches evidence.customer and evidence.accounts. Return false only when the cand
 different person, or cites an account the authenticated customer does not own. If
 candidate_output names no person and cites no account number, return true: identity was not
 misstated. A wrong amount, count or date is not an identity error and must not make this metric
-fail. Evaluate candidate_output, not final_output. The trace output is JSON containing
+fail. Evaluate candidate_output, not final_output. The trace output is JSON containing question,
 candidate_output and evidence. Judge only what candidate_output actually claims: the absence of
 a claim is not a failure. Judge only the single property described above. An answer can be wrong
 in ways this metric does not measure: a wrong amount, an omitted part, an invented rule. Each of

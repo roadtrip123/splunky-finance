@@ -478,3 +478,33 @@ def test_the_completeness_judge_is_not_told_to_ignore_omissions():
     for name in JUDGES:
         assert JUDGES[name] in judge_prompt(name)
         assert "Judge only the single property described above" in judge_prompt(name)
+
+
+def test_the_question_travels_in_the_payload_the_judges_read(client):
+    """SplunkyAnswerWholeQuestion needs the question; the other two need only the evidence.
+
+    The trace input carries the question, but a trace-level custom judge is not reliably given
+    it: this judge scored a genuinely incomplete answer as complete on every model, reasoning
+    about an "implied question" it had reconstructed from the answer. The other two judges were
+    unaffected because they compare against evidence, which was always in the payload.
+    """
+    from conftest import login
+
+    headers = login(client, True)
+    run = client.post("/api/demo-admin/workspace", headers=headers).json()
+    question = "How much did I spend on restaurants last month and what was the largest purchase?"
+    client.post(
+        "/api/demo-admin/chat",
+        headers=headers,
+        json={"run_id": run["id"], "expected_revision": run["revision"], "message": question},
+    )
+    assert client.app.state.chat.events[-1]["question"] == question
+
+
+def test_the_completeness_judge_reads_the_question_from_the_payload():
+    from app.observability.setup_definitions import judge_prompt
+
+    whole = judge_prompt("SplunkyAnswerWholeQuestion")
+    assert "`question` field of the trace output JSON" in whole
+    assert "never an implied or reconstructed question" in whole
+    assert "question, candidate_output and evidence" in whole

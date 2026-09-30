@@ -330,3 +330,15 @@ With the corrected judge, Incomplete Answer scored false on OpenAI and still tru
 Verified live: both models, two runs each of the two-part question, all four `deterministic_fault` and none mentioning the largest purchase. The scenario is now model-independent by construction rather than by luck.
 
 Backend suite: 68 passed; lint passed; production build passed.
+
+## The completeness judge never saw the question
+
+After the prompt fix, Incomplete Answer still scored true on three of four runs with the candidate verified incomplete on both models. Reproducing the judge directly on `gpt-4.1-mini` with the real trace payload settled it in two experiments: given the question alongside the output it returned false 6/6, with and without `raw_model_output` present — which also disproves the contamination theory properly. Given only the output payload it returned true 6/6, and its stated reasoning named an "implied question" it had reconstructed from the answer.
+
+The trace input is set correctly: a diagnostic trace logged the way the app logs one and fetched back through `Traces.get_trace` returned the question verbatim in its `input` field. So the input exists and the trace-level custom judge is not reliably given it.
+
+That also explains why only this judge was affected. `SplunkyNumericalCorrectness` and `SplunkyRightCustomer` compare the candidate against `evidence`, which has always been in the output payload; they never needed the question. `SplunkyAnswerWholeQuestion` cannot do its job without it, and with nothing to compare against it inferred a question the answer happened to satisfy.
+
+The record now carries a `question` field, and the judge is told to read it from the trace output JSON, never an implied question, and to return true rather than guess if it is absent. Verified with the judge given only the output payload: false 3/3 on the incomplete answer, true 3/3 on the complete one. Published as version 2.
+
+Backend suite: 70 passed; lint passed; production build passed.

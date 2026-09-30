@@ -63,8 +63,10 @@ CONTROLS = {
 # a wrong total and a wrong customer.
 JUDGES = {
     "SplunkyAnswerWholeQuestion": (
-        "Decide whether candidate_output answers every part the input asked for. Derive the "
-        "required parts from the input itself; do not assume a fixed list. Return false only when "
+        "Decide whether candidate_output answers every part the question asked for. The question "
+        "is the `question` field of the trace output JSON; use that text, never an implied or "
+        "reconstructed question, and if it is missing return true rather than guessing. Derive "
+        "the required parts from that question; do not assume a fixed list. Return false when "
         "a part of the question is left unanswered. An answer that addresses every part is covered "
         "even when its content is incorrect: whether a stated figure is right, and whether it "
         "describes the right customer, are not this metric's concern. Evaluate candidate_output, "
@@ -114,7 +116,7 @@ def judge_prompt(name):
     others = _OTHER_FAULTS.get(name, "a wrong amount, an invented rule, a misnamed customer")
     return (
         JUDGES[name]
-        + " The trace output is JSON containing candidate_output and evidence."
+        + " The trace output is JSON containing question, candidate_output and evidence."
         + _ABSENCE.get(name, _DEFAULT_ABSENCE)
         + " Judge only the single property described above. An answer can be wrong in ways this"
         + f" metric does not measure: {others}."

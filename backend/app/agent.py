@@ -286,6 +286,13 @@ class ChatService:
                 citations = list({doc["citation"]: doc for doc in evidence.get("policies", [])}.values())
                 record = {
                     **metadata,
+                    # The customer's question, inside the payload the judges read. The trace input
+                    # carries it too, but a trace-level custom judge is not reliably given that:
+                    # SplunkyAnswerWholeQuestion is the only judge needing the question rather
+                    # than the evidence, and it was the only one scoring a genuinely incomplete
+                    # answer as complete, reasoning about an "implied question" it had inferred
+                    # from the answer itself.
+                    "question": message,
                     # What actually produced the candidate, not what was planned: a model that
                     # ignored the instruction is reported as `deterministic_fault`.
                     "fault_method": fault_method,
