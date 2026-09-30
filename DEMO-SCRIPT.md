@@ -87,6 +87,8 @@ Read it as the shape to expect, not a guarantee. The greens matter as much as th
 
 The `incomplete_answer` row was verified before the judge-scoping change and has not been re-run since; the other three were verified after it.
 
+**The `wrong_customer` row is from before that scenario was rewritten and has not been re-run.** It used a fabricated answer with invented figures, which is why NumericalCorrectness rejected it. The scenario now quotes Dan Whitfield's real account and real balance, so the expected shape is `✅ true | ✅ true | 🔴 false | [0,0,0]` — one red, not two. Treat that as expected rather than observed until you have run it.
+
 ### Reading the numbers on screen
 
 **Context Adherence shows a mix even on a correct answer**, such as `false 2 / true 1`. Galileo scores every model call in the trace, and a normal turn has four: one to choose the tool, one to write the answer, the fault writer when a scenario is active, and the delivered answer. Two of those score low for reasons that are not the answer's fault:

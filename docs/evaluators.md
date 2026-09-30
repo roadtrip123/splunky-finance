@@ -42,7 +42,7 @@ Custom judges are worth their cost only where no built-in can know the rule. Eac
 
 ## Reading the scores
 
-**A judge fails only on a contradiction it can point to.** An answer with its total removed is not a wrong total and not a wrong customer; it is an incomplete answer. Each judge returns true when its subject is simply absent, so most scenarios light exactly one judge. Wrong Customer lights two by design: its candidate misstates both the identity and the figures. If you edit a judge prompt or settings, the change only reaches the tenant with `--apply --refresh-judges`, which publishes a new version of each judge and makes it the default. Versioning rather than delete-and-recreate: deletion is refused for anyone but a metric's original creator, and versioning keeps the scoring history.
+**A judge fails only on a contradiction it can point to.** An answer with its total removed is not a wrong total and not a wrong customer; it is an incomplete answer. Each judge returns true when its subject is simply absent, so every scenario lights exactly one judge. Wrong Customer is the sharpest case: its candidate quotes Dan Whitfield's real account and real balance, so the figures are correct and the question is answered. Only `SplunkyRightCustomer` rejects it. A metric that went red there would be grading outside its remit. If you edit a judge prompt or settings, the change only reaches the tenant with `--apply --refresh-judges`, which publishes a new version of each judge and makes it the default. Versioning rather than delete-and-recreate: deletion is refused for anyone but a metric's original creator, and versioning keeps the scoring history.
 
 **Each judge is scoped to one property and told to ignore the others.** Without that, a judge that had correctly established its own subject was fine would fail the answer anyway on noticing a different defect. `SplunkyRightCustomer` said in its own reasoning that "misnaming a person doesn't apply here" and then returned false because the total was wrong. A judge must return true when its property holds, even when the answer is obviously wrong for a reason another metric owns.
 
@@ -96,8 +96,8 @@ A further lever, not yet taken: the custom judges each consume around 9,000 toke
 | --- | --- |
 | Incomplete Answer | `SplunkyAnswerWholeQuestion` |
 | Incorrect Total | `SplunkyNumericalCorrectness` |
-| Wrong Customer | `SplunkyRightCustomer` and `SplunkyNumericalCorrectness`, plus Context Adherence |
-| Protection Before / After | Context Adherence, plus the bound Agent Control decision |
+| Wrong Customer | `SplunkyRightCustomer`, plus Context Adherence |
+| Guardrail Cross-Customer Access | No evaluator. The pre-execution Agent Control decision is the result |
 
 ## Agent Control
 
