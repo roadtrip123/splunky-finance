@@ -508,3 +508,17 @@ def test_the_completeness_judge_reads_the_question_from_the_payload():
     assert "`question` field of the trace output JSON" in whole
     assert "never an implied or reconstructed question" in whole
     assert "question, candidate_output and evidence" in whole
+
+
+def test_the_completeness_judge_is_told_to_ignore_the_agent_spans():
+    """The judge is handed the whole normalised trace, not just its output.
+
+    Its published template is `{normalized_input_json}` over a trace object with every span, so
+    the agent's own llm spans -- which carry the complete answer before the fault was injected --
+    are in front of it. Without this instruction it reads one and passes the turn.
+    """
+    from app.observability.setup_definitions import judge_prompt
+
+    whole = judge_prompt("SplunkyAnswerWholeQuestion")
+    assert "Ignore every span" in whole
+    assert "Judge only the trace-level candidate_output" in whole

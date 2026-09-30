@@ -342,3 +342,17 @@ That also explains why only this judge was affected. `SplunkyNumericalCorrectnes
 The record now carries a `question` field, and the judge is told to read it from the trace output JSON, never an implied question, and to return true rather than guess if it is absent. Verified with the judge given only the output payload: false 3/3 on the incomplete answer, true 3/3 on the complete one. Published as version 2.
 
 Backend suite: 70 passed; lint passed; production build passed.
+
+## What the judge actually reads: the whole trace, spans included
+
+After the `question` field was added, 5 of 8 runs scored correctly. Reproducing the judge on the full 3,381-character record returned false 9/9, so the prompt and the payload were not the problem — which meant the reproduction itself was wrong.
+
+Reading the published scorer version settled it. The template is `{normalized_input_json}` and the system prompt describes a **trace object with every span**, not the trace output alone. So the judge is also handed the agent's own llm spans, whose outputs carry the complete answer as the agent wrote it, before the fault was injected. A judge that reads one sees the largest purchase present and passes the turn. Every reproduction until now had handed it only the trace output JSON, which is why the fault never appeared in simulation.
+
+This is the contamination the earlier `raw_model_output` theory was reaching for and missing: the leak is the spans, not the record. Removing `raw_model_output` would not have fixed it.
+
+The spans have to stay, because the trace has to look like an ordinary agent run. So the judge is now told explicitly that the trace contains the agent's own spans, that their outputs may hold a fuller draft than the customer received, to ignore every span, and that a part answered in a span but not in `candidate_output` was never delivered and is an omission. Published as version 3.
+
+Confidence is lower here than on the previous fixes: the instruction is verified present in the published version, but it cannot be checked in simulation without reconstructing a full normalised trace. The tenant run is the test.
+
+Backend suite: 71 passed; lint passed.

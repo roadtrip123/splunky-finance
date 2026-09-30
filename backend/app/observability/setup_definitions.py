@@ -99,6 +99,14 @@ _ABSENCE = {
     "SplunkyAnswerWholeQuestion": (
         " A part of the question that candidate_output does not address is exactly what this"
         " metric measures. An omission is a failure here, whatever other metrics make of it."
+        # The judge is handed the whole normalised trace, not just its output. The agent's own
+        # llm spans carry a fuller draft than the customer received, and a judge that reads one
+        # concludes the question was answered. Naming that explicitly is the only lever here:
+        # the spans have to stay, because the trace has to look like an ordinary agent run.
+        " This trace also contains the agent's own spans, and their outputs may include a fuller"
+        " draft than the customer received. Ignore every span. Judge only the trace-level"
+        " candidate_output. If part of the question is answered somewhere in a span but not in"
+        " candidate_output, it was never delivered and the answer is incomplete: return false."
     )
 }
 _DEFAULT_ABSENCE = (

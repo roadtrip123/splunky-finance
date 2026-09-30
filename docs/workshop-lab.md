@@ -84,11 +84,14 @@ whether a stated figure is right, and whether it describes the right customer, a
 metric's concern. Evaluate candidate_output, not final_output. The trace output is JSON
 containing question, candidate_output and evidence. A part of the question that candidate_output
 does not address is exactly what this metric measures. An omission is a failure here, whatever
-other metrics make of it. Judge only the single property described above. An answer can be wrong
-in ways this metric does not measure: a wrong amount, an invented rule, a misnamed customer.
-Each of those is measured by a different metric. When the property you are judging is correct,
-return true even if the answer is obviously wrong for some other reason, and say so in your
-reasoning rather than failing it.
+other metrics make of it. This trace also contains the agent's own spans, and their outputs may
+include a fuller draft than the customer received. Ignore every span. Judge only the trace-level
+candidate_output. If part of the question is answered somewhere in a span but not in
+candidate_output, it was never delivered and the answer is incomplete: return false. Judge only
+the single property described above. An answer can be wrong in ways this metric does not
+measure: a wrong amount, an invented rule, a misnamed customer. Each of those is measured by a
+different metric. When the property you are judging is correct, return true even if the answer
+is obviously wrong for some other reason, and say so in your reasoning rather than failing it.
 ```
 
 **`SplunkyNumericalCorrectness-<initials>`** — do the numbers match the ledger?
