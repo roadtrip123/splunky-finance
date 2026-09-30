@@ -36,7 +36,9 @@ SCENARIOS = {
         "version": 1,
         "prompt": SPENDING_PROMPT,
         "evaluation": "SplunkyRightCustomer",
-        "protection_applicable": True,
+        # An evaluation scenario: the judges catch it. Arming the guardrail here only replaced
+        # the fabricated answer with the gate's fallback, hiding what is being demonstrated.
+        "protection_applicable": False,
     },
     "money_transfer": {
         "version": 1,
