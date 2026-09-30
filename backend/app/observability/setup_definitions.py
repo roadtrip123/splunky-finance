@@ -5,8 +5,31 @@ backend/app and data/; a workshop participant runs setup from the portal, where 
 not present.
 """
 
+from app.demo.generator import OTHER_CUSTOMERS
+
+
+def _foreign_account_pattern():
+    """Regex matching a tool call that names an account the authenticated customer does not own.
+
+    A deny-list of protected identifiers, which is what this kind of control looks like in
+    practice. Matching everything instead would make the guardrail a feature switch: own-account
+    balance checks and transfers between the customer's own accounts would be refused too, and a
+    guardrail that breaks the product is not one anybody ships.
+    """
+    terms = []
+    for other in OTHER_CUSTOMERS:
+        digits = "".join(ch for ch in other["masked_number"] if ch.isdigit())
+        if digits:
+            terms.append(digits)
+        terms.append(other["owner_name"])
+        terms.append(other["owner_name"].split()[0])
+    # Longest first so "Tom Whitfield" is preferred over "Tom" in the reported match.
+    unique = sorted(set(terms), key=len, reverse=True)
+    return "(?i)\\b(" + "|".join(t.replace(" ", "\\s+") for t in unique) + ")\\b"
+
+
 def _tool_deny_control(tool_name):
-    """Server-side deny on a tool call, evaluated before the tool runs.
+    """Server-side deny on a tool call naming another customer's account, before the tool runs.
 
     The `pre` stage is what makes this a guardrail rather than an audit trail: at `post` the tool
     has already executed and the money has already moved. The step carries no output at this stage,
@@ -15,7 +38,7 @@ def _tool_deny_control(tool_name):
     return {
         "condition": {
             "selector": {"path": "input"},
-            "evaluator": {"name": "regex", "config": {"pattern": "(?i).+"}},
+            "evaluator": {"name": "regex", "config": {"pattern": _foreign_account_pattern()}},
         },
         "execution": "server",
         "scope": {"step_types": ["tool"], "step_names": [tool_name], "stages": ["pre"]},
@@ -24,8 +47,8 @@ def _tool_deny_control(tool_name):
     }
 
 
-# One control. The two earlier regex controls matched answer text at the `post` stage, which can
-# only suppress a sentence describing an action that has already happened.
+# Two controls, one per gated action. The earlier regex controls matched answer text at the `post`
+# stage, which can only suppress a sentence describing an action that has already happened.
 CONTROLS = {
     "splunky-transfer-deny": _tool_deny_control("transfer_funds"),
     # Reading another customer's balance cannot be undone by refusing the answer afterwards,

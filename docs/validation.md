@@ -276,3 +276,19 @@ Also fixed: `wrong_customer` carried `protection_applicable: True` from when it 
 Tests: account 1234 is confirmed to belong to another customer and be reachable, a denied lookup discloses no balance by any route, and a transfer credits the destination.
 
 Backend suite: 54 passed; lint passed; production build passed.
+
+## Dataset migration, Dan, and a guardrail that is not a kill switch
+
+Adding `other_accounts` changed every stored dataset's content hash, so `Storage.read()` raised, startup reported corruption and the backend never became healthy. The manifest already carried `generator_version`; nothing compared it. Startup now rebuilds when the stored version differs from the current one, deterministically from the same seed and reference date, so published figures do not move and only uncommitted demo state is lost. A missing or unreadable version is still corruption and still fails visibly. `docs/architecture.md` states the exception.
+
+Separately, the agent refused to call its own lookup tool — *"I cannot access Tom's account information"* — with nothing blocking it. `get_account_balance` has no ownership check by design; the model invented the privacy rule. Same fix as the earlier `transfer_funds` refusal: the tool description and system prompt now say plainly that the tool covers every account at the bank.
+
+**Dan Whitfield is now a real customer** on `•••• 4127` with $4,806.20, alongside Tom on `•••• 1234`. Both resolve by account number or by name: digits win over names so "Tom's account 4127" resolves to Dan, and full names are matched before first names because the two share a surname. `transfer_funds` credits either, and an internal transfer between the customer's own accounts now writes both ledger rows under a shared `transfer_pair_id` — a credit with no matching row would fail the reconciliation validator on the next read, which is exactly how `other_accounts` bricked the app.
+
+Wrong Customer now answers *"How much is in my account?"* with Dan's **real** account and **real** balance, read from the dataset rather than invented. The leak is genuine data. It also sharpens the evaluation story: only `SplunkyRightCustomer` goes red, because the figure is internally consistent and the question was answered. One metric aimed at one property catches a breach every other metric is right to wave through.
+
+**The control is now a deny-list rather than `(?i).+`.** Matching everything made the guardrail a feature switch: the customer's own balance checks and own transfers were refused too. The pattern is generated from `OTHER_CUSTOMERS`, so the tenant definition cannot drift from the dataset. `configure_galileo.py` now pushes the current definition with `set_control_data` on both the original and every bound clone — it previously only reused an existing control, so a definition change never reached the tenant. Verified live: controls 886, 887, 1029 and 1030 all carry the new pattern.
+
+Tests: resolution by number and by name including the surname collision, ledger reconciliation after an internal transfer, the deny-list matching only foreign accounts, and the injected answer quoting Dan's real figures.
+
+Backend suite: 59 passed; lint passed; production build passed. The guardrail's allowed paths are verified by unit test and by the live control definitions, not yet by a live armed run.

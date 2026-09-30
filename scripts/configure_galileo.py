@@ -109,6 +109,7 @@ async def main():
         clone_and_bind_control,
         create_control,
         list_controls,
+        set_control_data,
     )
 
     async with AgentControlClient(
@@ -131,7 +132,17 @@ async def main():
                 print(f"{name}: created.")
             else:
                 identifier = original.get("control_id") or original.get("id")
-                print(f"{name}: reusing control {identifier}.")
+                # Push the current definition rather than only reusing the control. CONTROLS is
+                # the source of truth, and a control created before the definition changed would
+                # otherwise keep enforcing the old rule with no sign anything was stale.
+                await set_control_data(client, control_id=int(identifier), data=definition)
+                print(f"{name}: reusing control {identifier}, definition refreshed.")
+            # The clone is what the log stream actually evaluates, so it carries its own copy of
+            # the definition. Refreshing only the original would leave the old rule in force.
+            for clone in clones:
+                clone_id = clone.get("control_id") or clone.get("id")
+                await set_control_data(client, control_id=int(clone_id), data=definition)
+                print(f"{name}: bound clone {clone_id} refreshed.")
             if clones:
                 print(
                     f"{name}: {len(clones)} clone(s) already present "

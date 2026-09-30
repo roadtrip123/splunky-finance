@@ -61,7 +61,7 @@ Open `/demo-admin` and sign in with the presenter password. Sign into customer b
 
 For another computer or incognito session, click **Connect using pairing code** in the portal. In My Bank Agent, expand **Demo connection**, enter the code, and click **Connect demo**. Codes expire after five minutes and can be used only once. A presenter controls one banking session; an existing connection is never silently replaced. Use **Disconnect banking session** or **Disconnect demo** before changing targets. Explicit disconnect disables automatic relinking; use a new pairing code to reconnect.
 
-Click **Enable Incomplete Answer**, **Enable Incorrect Total**, **Enable Wrong Customer**, or **Enable Money Transfer**. The connected banking chat receives changes automatically (approximately once per second while open). The portal confirms **Applied to connected banking session** only after that browser acknowledges the current setting.
+Click **Enable Incomplete Answer**, **Enable Incorrect Total**, **Enable Wrong Customer**, or **Enable Guardrail Cross-Customer Access**. The connected banking chat receives changes automatically (approximately once per second while open). The portal confirms **Applied to connected banking session** only after that browser acknowledges the current setting.
 
 The chat footer keeps the exact words **Fictional banking data only**, with no icons or layout change:
 
@@ -71,7 +71,7 @@ The chat footer keeps the exact words **Fictional banking data only**, with no i
 
 Ask the scenario's example question in the existing banking conversation. Switching **Normal Answers** restores normal tool-backed responses. The transcript remains visible, but model context starts fresh when settings change. An answer already underway finishes using its original scenario. Stale sends are rejected rather than silently using the wrong setting.
 
-**Enable Guardrail Money Transfer** selects the scenario and arms the guardrail together. The transfer is evaluated before the tool runs and a denial stops it, leaving balances untouched. Selecting it does not by itself prove a control evaluated. The optional integrated presenter chat remains available for rehearsal. Detailed scenario, protection, and evaluation evidence stays in the portal, not the customer transcript.
+**Enable Guardrail Cross-Customer Access** selects the scenario and arms the guardrail together. Transfers and balance lookups are evaluated before the tool runs, and a denial stops the call, leaving balances untouched. The bound control is a deny-list on the other customers' accounts, so the customer's own balance checks and own transfers still succeed while the guardrail is armed. Selecting it does not by itself prove a control evaluated. The optional integrated presenter chat remains available for rehearsal. Detailed scenario, protection, and evaluation evidence stays in the portal, not the customer transcript.
 
 Sessions are isolated from other presenters. Refreshing preserves valid server-side links; restart, logout, or expiry may require pairing again. Closed banking chats do not acknowledge settings until reopened. Follow [the presenter walkthrough](DEMO-SCRIPT.md) for the live demo sequence.
 

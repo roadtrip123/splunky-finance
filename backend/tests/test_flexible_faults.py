@@ -1,10 +1,16 @@
 import asyncio
+import re
+from datetime import date
 
 import pytest
 from conftest import login
 from langchain_core.messages import AIMessage
 
-from app.demo.scenarios import inject
+from app.demo.generator import OTHER_CUSTOMERS, generate
+from app.demo.scenarios import WRONG_CUSTOMER_ANSWER, inject
+from app.observability.setup_definitions import _foreign_account_pattern
+from app.schemas import Dataset
+from app.tools import Banking, build_tools
 
 
 @pytest.mark.parametrize("scenario", ["incomplete_answer", "incorrect_total"])
@@ -216,7 +222,7 @@ def test_toms_balance_is_reachable_and_the_guardrail_stops_it(client, monkeypatc
 
     dataset = client.app.state.storage.dataset
     banking = Banking(dataset, client.app.state.telemetry.settings.policy_dir)
-    tom = banking.by_number("1234")
+    tom = banking.resolve("1234")
     assert tom is not None and tom.customer_id != dataset.customer["id"]
 
     headers = login(client, True)
@@ -264,10 +270,75 @@ def test_a_transfer_credits_the_destination_account(client):
     banking = Banking(
         dataset, client.app.state.telemetry.settings.policy_dir, client.app.state.storage
     )
-    before = banking.by_number("1234").posted_balance_cents
+    before = banking.resolve("1234").posted_balance_cents
     tools = {t.name: t for t in build_tools(banking, {})}
     result = tools["transfer_funds"].invoke(
         {"to_account": "1234", "amount_cents": 10000, "description": "test"}
     )
     assert result["credited_account"] == "•••• 1234"
-    assert banking.by_number("1234").posted_balance_cents == before + 10000
+    assert banking.resolve("1234").posted_balance_cents == before + 10000
+
+
+def test_other_customers_resolve_by_number_and_by_name(client):
+    """Tom and Dan are real accounts, reachable the way a customer would name them."""
+    dataset = client.app.state.storage.dataset
+    banking = Banking(
+        dataset, client.app.state.telemetry.settings.policy_dir, client.app.state.storage
+    )
+    for text, owner in (
+        ("1234", "Tom Whitfield"),
+        ("4127", "Dan Whitfield"),
+        ("Tom", "Tom Whitfield"),
+        ("Dan Whitfield", "Dan Whitfield"),
+        ("How much is in Dan's everyday account?", "Dan Whitfield"),
+    ):
+        assert banking.resolve(text).owner_name == owner, text
+    # A number the customer does supply wins over a name that happens to appear in the sentence.
+    assert banking.resolve("Tom's account number 4127").owner_name == "Dan Whitfield"
+
+
+def test_internal_transfer_keeps_the_ledger_reconciled(client):
+    """A move between the customer's own accounts writes both rows.
+
+    A credit with no matching transaction would make the whole dataset fail to load on the next
+    read, which is exactly how the `other_accounts` change bricked the app.
+    """
+    dataset = client.app.state.storage.dataset
+    banking = Banking(
+        dataset, client.app.state.telemetry.settings.policy_dir, client.app.state.storage
+    )
+    tools = {t.name: t for t in build_tools(banking, {})}
+    savings_before = banking.account("savings").posted_balance_cents
+    everyday_before = banking.account("everyday").posted_balance_cents
+    result = tools["transfer_funds"].invoke(
+        {"to_account": "my savings account", "amount_cents": 10000, "description": "test"}
+    )
+    assert result["belongs_to_authenticated_customer"] is True
+    assert banking.account("savings").posted_balance_cents == savings_before + 10000
+    assert banking.account("everyday").posted_balance_cents == everyday_before - 10000
+    Dataset.model_validate(dataset.model_dump())
+
+
+def test_guardrail_pattern_denies_only_other_customers():
+    """The control is a deny-list, not a feature switch.
+
+    Matching everything would refuse the customer's own balance checks and own transfers too, and
+    the demo would show the guardrail breaking the product rather than preventing a harm.
+    """
+    pattern = _foreign_account_pattern()
+    for denied in ('{"account_number": "1234"}', '{"account_number": "4127"}',
+                   '{"to_account": "Dan"}', '{"to_account": "Tom Whitfield"}'):
+        assert re.search(pattern, denied), denied
+    for allowed in ('{"account_number": "2058"}', '{"account_number": "1042"}',
+                    '{"to_account": "my savings account"}'):
+        assert not re.search(pattern, allowed), allowed
+
+
+def test_wrong_customer_answer_quotes_dans_real_account():
+    """The leak is real data, not invented text: Dan's account and balance come from the dataset."""
+    dan = next(o for o in OTHER_CUSTOMERS if o["owner_name"] == "Dan Whitfield")
+    assert dan["masked_number"] in WRONG_CUSTOMER_ANSWER
+    assert f"${dan['balance_cents'] / 100:,.2f}" in WRONG_CUSTOMER_ANSWER
+    generated = generate(42, date(2026, 9, 15))
+    account = next(a for a in generated.other_accounts if a.owner_name == "Dan Whitfield")
+    assert account.posted_balance_cents == dan["balance_cents"]

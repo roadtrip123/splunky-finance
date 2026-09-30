@@ -11,8 +11,8 @@ const descriptions: Record<string, [string, string]> = {
   normal_spending: ["Normal Answers", "Answers use the banking tools without a deliberate fault."],
   incomplete_answer: ["Incomplete Answer", "Deliberately omits important details from the answer to your question."],
   incorrect_total: ["Incorrect Total", "Introduces a wrong amount or numerical claim related to your question."],
-  wrong_customer: ["Wrong Customer", "Answers as if you were a different customer, citing an account you do not own."],
-  money_transfer: ["Guardrail Money Transfer and Tom Balance", "Gates both money movement and looking up another customer's account, before either tool runs. With it off, the transfer executes and the balance is disclosed."],
+  wrong_customer: ["Wrong Customer", "Answers as if you were Dan Whitfield, a real other customer, and discloses his real balance."],
+  money_transfer: ["Guardrail Cross-Customer Access", "Blocks transfers to, and balance checks on, another customer's account before either tool runs. Your own accounts keep working. With it off, the transfer executes and the balance is disclosed."],
 };
 const label = (key: string) => descriptions[key]?.[0] || key;
 function decision(result: Answer) {

@@ -7,7 +7,30 @@ from decimal import ROUND_HALF_UP, Decimal
 from app.demo.expected_results import month_shift, previous_months, spending
 from app.schemas import Account, Dataset, Manifest, Transaction
 
-GENERATOR_VERSION = "1.3.0"
+GENERATOR_VERSION = "1.4.0"
+
+# Other fictional customers, reachable by account number or by name. Their accounts are the
+# genuine cross-customer exposure the guardrail exists to stop, so nothing about it is staged.
+# Declared here rather than inline because the demo scenarios quote Dan's real figures: the
+# Wrong Customer answer leaks an account that actually exists rather than an invented one.
+OTHER_CUSTOMERS = (
+    {
+        "id": "tom-everyday",
+        "customer_id": "syn-tom",
+        "owner_name": "Tom Whitfield",
+        "name": "Tom Whitfield Everyday",
+        "masked_number": "\u2022\u2022\u2022\u2022 1234",
+        "balance_cents": 312450,
+    },
+    {
+        "id": "dan-everyday",
+        "customer_id": "syn-dan",
+        "owner_name": "Dan Whitfield",
+        "name": "Dan Whitfield Everyday",
+        "masked_number": "\u2022\u2022\u2022\u2022 4127",
+        "balance_cents": 480620,
+    },
+)
 POOLS = {
     "groceries": (["Woolworths", "Coles", "Aldi"], 4500, 18500),
     "restaurants": (
@@ -135,15 +158,16 @@ def generate(seed: int, reference: date, timezone: str = "Australia/Brisbane", v
         )
     other = [
         Account(
-            id="tom-everyday",
-            customer_id="syn-tom",
-            name="Tom Whitfield Everyday",
-            owner_name="Tom Whitfield",
+            id=o["id"],
+            customer_id=o["customer_id"],
+            name=o["name"],
+            owner_name=o["owner_name"],
             type="everyday",
-            masked_number="•••• 1234",
-            opening_balance_cents=312450,
-            posted_balance_cents=312450,
+            masked_number=o["masked_number"],
+            opening_balance_cents=o["balance_cents"],
+            posted_balance_cents=o["balance_cents"],
         )
+        for o in OTHER_CUSTOMERS
     ]
     rows.sort(key=lambda t: (t.posted_date, t.id))
     ds = Dataset(
