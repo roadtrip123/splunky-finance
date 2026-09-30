@@ -2,6 +2,7 @@ import asyncio
 import json
 import os
 import time
+from contextlib import suppress
 from pathlib import Path
 from typing import ClassVar
 from uuid import uuid4
@@ -544,6 +545,83 @@ class Telemetry:
             "ollama": "ChatOllama",
         }.get(self.settings.llm_provider, "ChatOpenAI")
 
+    @staticmethod
+    def _rewrite_value(value, genuine, candidate):
+        """Replace `genuine` with `candidate` anywhere inside a span field. Returns (value, hit).
+
+        Span payloads arrive in several shapes -- a plain string, a message object, a list of
+        messages, a serialised dict -- so this walks whatever it is given rather than assuming.
+        """
+        if isinstance(value, str):
+            return (value.replace(genuine, candidate), True) if genuine in value else (value, False)
+        content = getattr(value, "content", None)
+        if isinstance(content, str) and genuine in content:
+            value.content = content.replace(genuine, candidate)
+            return value, True
+        hit = False
+        if isinstance(value, list):
+            for index, item in enumerate(value):
+                value[index], found = Telemetry._rewrite_value(item, genuine, candidate)
+                hit = hit or found
+        elif isinstance(value, dict):
+            for key, item in value.items():
+                value[key], found = Telemetry._rewrite_value(item, genuine, candidate)
+                hit = hit or found
+        return value, hit
+
+    @staticmethod
+    def _rewrite_spans(spans, genuine, candidate):
+        """Replace `genuine` in every span input and output, depth first. Returns a count.
+
+        Inputs matter as much as outputs: the middleware spans carry the whole message list, so
+        the agent's complete answer reappears there as chat history even once its own output has
+        been rewritten.
+        """
+        replaced = 0
+        for span in spans or []:
+            for field in ("input", "output"):
+                value = getattr(span, field, None)
+                if value is None:
+                    continue
+                new, hit = Telemetry._rewrite_value(value, genuine, candidate)
+                if not hit:
+                    continue
+                if new is not value:
+                    # A string is replaced wholesale; a message or list was edited in place, and
+                    # a field that refuses assignment keeps that in-place edit either way.
+                    with suppress(Exception):
+                        setattr(span, field, new)
+                replaced += 1
+            replaced += Telemetry._rewrite_spans(getattr(span, "spans", None), genuine, candidate)
+        return replaced
+
+    def mask_genuine_answer(self, turn, genuine, candidate):
+        """Rewrite the agent's own answer in the trace to the one the customer received.
+
+        Without this the trace tells two stories: the agent's llm span holds the complete answer
+        and `customer-visible-answer` holds the faulty one. That is a tell for anyone reading the
+        trace, and it silently contaminates evaluation -- a custom judge is handed the whole
+        normalised trace, spans included, so a completeness judge reads the agent's fuller draft
+        and concludes the question was answered. Three rounds of prompt instructions telling it
+        to ignore the spans did not hold.
+
+        Spans are held in memory until `flush`, so this edits them in place before export. The
+        honest record is unaffected: the presenter evidence still keeps the genuine answer beside
+        the injected one and names the method that produced it.
+        """
+        if not turn or not genuine.strip() or genuine.strip() == candidate.strip():
+            return 0
+        try:
+            traces = getattr(turn["logger"], "traces", None) or []
+            if not traces:
+                return 0
+            return self._rewrite_spans(
+                getattr(traces[-1], "spans", None), genuine.strip(), candidate
+            )
+        except Exception:  # noqa: BLE001 - isolate SDK failures without exposing credential-bearing errors
+            self.status["last_error"] = "A telemetry event could not be recorded"
+            return 0
+
     def fault_span(self, turn, scenario, prompt, candidate, evidence=None, usage=None):
         """Log the controlled fault writer as its own named span.
 
@@ -606,9 +684,14 @@ class Telemetry:
         if not turn:
             return
         logger = turn["logger"]
+        # The genuine answer stays out of the trace entirely. Masking the spans is only half of
+        # it: the trace output is this record, and `raw_model_output` carries the complete answer
+        # straight back into what every judge reads. The presenter evidence keeps it -- that has
+        # always been the honest record -- but the trace shows one answer, the delivered one.
+        exported = {k: v for k, v in record.items() if k != "raw_model_output"}
         try:
             logger.conclude(
-                output=json.dumps(record, default=str),
+                output=json.dumps(exported, default=str),
                 duration_ns=time.perf_counter_ns() - turn["started"],
                 conclude_all=True,
             )

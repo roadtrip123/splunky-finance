@@ -190,13 +190,16 @@ def test_injected_answer_reads_as_an_ordinary_model_call(settings, monkeypatch):
                 yield from descendants(child)
 
     children = list(descendants(exported[0]))
-    writer = next(
+    writers = [
         c
         for c in children
         if c.type == "llm"
         and c.name != "customer-visible-answer"
         and c.output.content == event["candidate_output"]
-    )
+    ]
+    # The agent's own answer span is masked to the delivered candidate, so it matches this too.
+    # The injected call is logged after it.
+    writer = writers[-1]
     # Named like the agent's own model calls: nothing in the trace flags it as injected.
     assert writer.name == "ChatOpenAI", writer.name
     assert "simulat" not in str(getattr(writer, "user_metadata", "") or "").lower()
@@ -207,13 +210,15 @@ def test_injected_answer_reads_as_an_ordinary_model_call(settings, monkeypatch):
     # genuine answer with the injected one, which gave it away more plainly than any span name.
     names = " ".join(str(c.name) for c in children).lower()
     assert "fault" not in names and "injection" not in names, names
-    # The agent's own spans legitimately carry the genuine answer in their message history.
-    # What gave the injection away was a single span holding both answers side by side.
-    for child in children:
-        both = str(getattr(child, "input", "")) + str(getattr(child, "output", ""))
-        assert not (
-            event["raw_model_output"] in both and event["candidate_output"] in both
-        ), f"{child.name} pairs the genuine answer with the injected one"
+    # The genuine answer appears nowhere in the exported trace: not in a span, and not in the
+    # trace output, which is the record. A custom judge is handed the whole normalised trace, so
+    # a fuller draft left anywhere in it is read as part of the answer -- which is how a
+    # completeness judge came to pass a genuinely incomplete answer.
+    import json
+
+    blob = json.dumps(exported[0].model_dump(), default=str)
+    assert event["raw_model_output"] not in blob
+    assert event["candidate_output"] in blob
     # The honest record is the presenter evidence: both answers, and the method that produced them.
     assert event["raw_model_output"] != event["candidate_output"]
     assert event["fault_method"] == "model_rewrite"
@@ -522,3 +527,52 @@ def test_the_completeness_judge_is_told_to_ignore_the_agent_spans():
     whole = judge_prompt("SplunkyAnswerWholeQuestion")
     assert "Ignore every span" in whole
     assert "Judge only the trace-level candidate_output" in whole
+
+
+def test_masking_reaches_nested_spans_and_message_history():
+    """Inputs matter as much as outputs.
+
+    The agent's own answer span is the obvious place, but the middleware spans carry the whole
+    message list, so the complete answer reappears there as chat history. Leaving it anywhere in
+    the trace is enough to contaminate a judge, which reads the whole normalised trace.
+    """
+    from app.observability.galileo import Telemetry
+
+    genuine = "You spent $754.19. Your largest was Jacaranda Cafe at $119.68."
+    candidate = "You spent $754.19."
+
+    class Msg:
+        def __init__(self, content):
+            self.content = content
+
+    class Span:
+        def __init__(self, name, input=None, output=None, spans=None):
+            self.name, self.input, self.output, self.spans = name, input, output, spans or []
+
+    tree = [
+        Span(
+            "Agent",
+            spans=[
+                Span("ChatOpenAI", input=[Msg("q")], output=Msg(genuine)),
+                Span("calculate_spending", input="{}", output='{"total_cents": 75419}'),
+                Span("ToolCallLimitMiddleware.after_model", input=f'{{"messages": ["{genuine}"]}}'),
+            ],
+        ),
+        Span("customer-visible-answer", input=[Msg("q")], output=Msg(genuine)),
+    ]
+    assert Telemetry._rewrite_spans(tree, genuine, candidate) == 3
+    agent = tree[0].spans
+    assert agent[0].output.content == candidate
+    assert genuine not in agent[2].input and candidate in agent[2].input
+    assert tree[1].output.content == candidate
+    # Tool results are evidence, not the answer, and must be left alone.
+    assert agent[1].output == '{"total_cents": 75419}'
+
+
+def test_masking_is_a_no_op_without_a_fault():
+    from app.observability.galileo import Telemetry
+
+    telemetry = Telemetry.__new__(Telemetry)
+    telemetry.status = {}
+    assert telemetry.mask_genuine_answer(None, "a", "b") == 0
+    assert telemetry.mask_genuine_answer({"logger": object()}, "same", "same") == 0

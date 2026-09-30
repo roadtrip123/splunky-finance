@@ -356,3 +356,17 @@ The spans have to stay, because the trace has to look like an ordinary agent run
 Confidence is lower here than on the previous fixes: the instruction is verified present in the published version, but it cannot be checked in simulation without reconstructing a full normalised trace. The tenant run is the test.
 
 Backend suite: 71 passed; lint passed.
+
+## Removing the contradiction instead of asking the judge to overlook it
+
+Three rounds of prompt instructions telling the completeness judge to ignore the agent's spans did not hold, because the judge is handed the whole normalised trace and LLM judges are poor at ignoring salient text in front of them. The trace itself was the problem: the agent's span said one thing and `customer-visible-answer` said another, which contaminated evaluation and was a plain tell for anyone reading a trace.
+
+Galileo's spans are held in memory until `flush`, so they can be edited before export. After a fault is injected, `Telemetry.mask_genuine_answer` walks the span tree and replaces the genuine answer with the delivered one. The trace now shows a single answer.
+
+Two things were needed beyond the obvious span. **Span inputs matter as much as outputs**: `ToolCallLimitMiddleware.after_model` and `ModelCallLimitMiddleware.after_model` carry the whole message list, so the complete answer reappeared there as chat history even once the agent's own output had been rewritten. **The trace output is the record**, and `raw_model_output` carried the complete answer straight back into what every judge reads, so it is stripped from what goes to `conclude()`.
+
+The presenter evidence is unchanged and still keeps the genuine answer beside the injected one with the method that produced it. That was always the honest record; it simply stops being in the trace.
+
+This fixes the contamination for every judge, including Context Adherence and anything a workshop participant writes, rather than only the three prompts under our control. An end-to-end regression exports a real trace and asserts the genuine answer appears nowhere in it while the delivered one does; a unit test covers nesting, message history and leaving tool results alone.
+
+Backend suite: 73 passed; lint passed; production build passed.

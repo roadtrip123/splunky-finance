@@ -269,6 +269,9 @@ class ChatService:
                     # Only the model-call span is logged. A workflow span pairing the genuine
                     # answer with the injected one used to sit here and gave the injection away
                     # more plainly than any name; the presenter evidence keeps that comparison.
+                    # Before any span carrying the genuine answer is exported: the trace must
+                    # show one answer, the one the customer received.
+                    self.telemetry.mask_genuine_answer(turn, raw, candidate)
                     self.telemetry.fault_span(
                         turn, scenario, message, candidate, evidence, fault_usage
                     )
