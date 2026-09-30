@@ -139,8 +139,12 @@ export default function Chat({
               </p>
               {[
                 "How much did I spend on restaurants last month?",
-                "How much did I spend on restaurants last month, what were my three biggest transactions, and how does that compare with the previous month?",
+                // Matches the Incomplete Answer scenario prompt, so a presenter can click rather
+                // than type it. The three-part version it replaced is still a fine question, but
+                // the scenario no longer uses it and the two have to match to demo cleanly.
+                "How much did I spend on restaurants last month and what was the largest purchase?",
                 "What are my account balances?",
+                "What is the balance of account number 1234?",
                 "What is the Everyday account monthly fee?",
               ].map((text) => (
                 <button
