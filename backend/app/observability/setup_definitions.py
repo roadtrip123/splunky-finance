@@ -28,6 +28,9 @@ def _tool_deny_control(tool_name):
 # only suppress a sentence describing an action that has already happened.
 CONTROLS = {
     "splunky-transfer-deny": _tool_deny_control("transfer_funds"),
+    # Reading another customer's balance cannot be undone by refusing the answer afterwards,
+    # so it is gated at the same stage as money movement.
+    "splunky-account-lookup-deny": _tool_deny_control("get_account_balance"),
 }
 # Custom judges earn their place only where no built-in can know the rule. SplunkyGroundedness was
 # retired because built-in Context Adherence scores the same thing against the retriever span.

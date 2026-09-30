@@ -1107,6 +1107,17 @@ td small {
   width: 100%;
   font-size: 12px;
 }
+.scenario-question {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 14px;
+  margin-top: 10px;
+}
+.scenario-question p {
+  margin: 0;
+  flex: 1;
+}
 .endpoint-list {
   list-style: none;
   padding: 0;

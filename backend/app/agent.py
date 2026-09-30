@@ -30,12 +30,17 @@ class Conversation:
     updated: float = field(default_factory=time.time)
 
 
-class TransferGuard(AgentMiddleware):
-    """Block a money movement before it happens.
+# Tools whose effects cannot be undone by refusing the answer afterwards: money that has moved,
+# and another customer's balance that has already been read.
+GATED_TOOLS = ("transfer_funds", "get_account_balance")
 
-    The answer gate cannot protect an action: by the time a candidate answer exists the transfer has
-    already executed and the balance has already changed. This wraps tool execution, so a denial
-    means the tool is never called. Only `transfer_funds` is gated; the read-only tools run freely.
+
+class ActionGuard(AgentMiddleware):
+    """Block a gated tool before it runs.
+
+    The answer gate cannot protect an action: by the time a candidate answer exists the transfer
+    has executed and the balance has been disclosed. This wraps tool execution, so a denial means
+    the tool is never called. The read-only tools scoped to the authenticated customer run freely.
     """
 
     def __init__(self, protection, turn, enabled, decisions):
@@ -43,10 +48,11 @@ class TransferGuard(AgentMiddleware):
         self.protection, self.turn, self.enabled, self.decisions = protection, turn, enabled, decisions
 
     async def awrap_tool_call(self, request, handler):
-        if request.tool_call["name"] != "transfer_funds":
+        name = request.tool_call["name"]
+        if name not in GATED_TOOLS:
             return await handler(request)
         allowed, decision = await self.protection.check_action(
-            "transfer_funds",
+            name,
             request.tool_call.get("args"),
             self.turn["logger"] if self.turn else None,
             self.enabled,
@@ -57,7 +63,7 @@ class TransferGuard(AgentMiddleware):
         return ToolMessage(
             content=json.dumps({"error": "blocked_by_control", "reason": decision.get("reason")}),
             tool_call_id=request.tool_call["id"],
-            name="transfer_funds",
+            name=name,
             status="error",
         )
 
@@ -193,7 +199,7 @@ class ChatService:
                     tools=tools,
                     system_prompt=system,
                     middleware=[
-                        TransferGuard(self.protection, turn, enabled, action_decisions),
+                        ActionGuard(self.protection, turn, enabled, action_decisions),
                         ModelCallLimitMiddleware(
                             run_limit=self.settings.llm_max_model_calls, exit_behavior="error"
                         ),

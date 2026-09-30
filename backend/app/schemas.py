@@ -50,6 +50,10 @@ class Dataset(StrictModel):
     manifest: Manifest
     customer: dict[str, str]
     accounts: list[Account]
+    # Accounts belonging to other fictional customers. Deliberately reachable by account number,
+    # so the guardrail has a real cross-customer exposure to prevent rather than a staged one.
+    # Kept out of `accounts` so the authenticated customer's ledger still reconciles exactly.
+    other_accounts: list[Account] = Field(default_factory=list)
     transactions: list[Transaction]
     expected_results: dict = Field(default_factory=dict)
 

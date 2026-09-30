@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { api, mutate } from "@/lib/api";
 
 type Run = { id: string; scenario: string; protection: boolean; revision: number };
-type Scenario = { prompt: string; protection_applicable: boolean };
+type Scenario = { prompt: string; prompts?: string[]; protection_applicable: boolean };
 type Status = { banking_connection: { state: string; session: string | null }; run: Run | null; scenarios: Record<string, Scenario>; protection_status: string; demo_mode: "presenter" | "workshop"; galileo: { enabled: boolean; connection: string } };
 type Answer = { answer: string; conversation_id: string; scenario: string; protection_enabled: boolean; protection_decision: { decision?: string }; };
 type Entry = { question: string; result: Answer };
@@ -12,7 +12,7 @@ const descriptions: Record<string, [string, string]> = {
   incomplete_answer: ["Incomplete Answer", "Deliberately omits important details from the answer to your question."],
   incorrect_total: ["Incorrect Total", "Introduces a wrong amount or numerical claim related to your question."],
   wrong_customer: ["Wrong Customer", "Answers as if you were a different customer, citing an account you do not own."],
-  money_transfer: ["Guardrail Money Transfer", "The agent tries to move real money. The guardrail evaluates the transfer before the tool runs, so a block means no balance changes."],
+  money_transfer: ["Guardrail Money Transfer and Tom Balance", "Gates both money movement and looking up another customer's account, before either tool runs. With it off, the transfer executes and the balance is disclosed."],
 };
 const label = (key: string) => descriptions[key]?.[0] || key;
 function decision(result: Answer) {
@@ -123,8 +123,13 @@ export default function DemoWorkspace({ onEvidence }: { onEvidence: () => Promis
       )}
       <h3>Demo chat</h3>
       <p>No customer login or session linking is needed.</p>
-      <div className="prompt-box"><strong>Example question — or ask your own</strong><p>{scenario?.prompt}</p>
-        <button className="button small" disabled={busy} onClick={() => send(scenario!.prompt)}>Run example question</button>
+      <div className="prompt-box"><strong>Questions for this scenario — or ask your own</strong>
+        {(scenario?.prompts?.length ? scenario.prompts : [scenario?.prompt ?? ""]).map((q, i) => (
+          <div key={i} className="scenario-question">
+            <p>{q}</p>
+            <button className="button small" disabled={busy} onClick={() => send(q)}>Run</button>
+          </div>
+        ))}
       </div>
       <div className="demo-transcript" aria-live="polite">
         {entries.map((entry, i) => <article key={i} className="demo-response">

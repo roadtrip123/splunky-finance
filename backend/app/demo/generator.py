@@ -133,6 +133,17 @@ def generate(seed: int, reference: date, timezone: str = "Australia/Brisbane", v
                 credit_limit_cents=1000000 if kind == "credit_card" else None,
             )
         )
+    other = [
+        Account(
+            id="tom-everyday",
+            customer_id="syn-tom",
+            name="Tom Whitfield Everyday",
+            type="everyday",
+            masked_number="1234",
+            opening_balance_cents=312450,
+            posted_balance_cents=312450,
+        )
+    ]
     rows.sort(key=lambda t: (t.posted_date, t.id))
     ds = Dataset(
         manifest=Manifest(
@@ -150,6 +161,7 @@ def generate(seed: int, reference: date, timezone: str = "Australia/Brisbane", v
             "data_notice": "Fictional demonstration customer",
         },
         accounts=accounts,
+        other_accounts=other,
         transactions=rows,
     )
     current_start, current_end, prev_start, prev_end = previous_months(reference)

@@ -262,3 +262,17 @@ An earlier probe with a small `max_tokens` also returned empty `content` with th
 The supplied config gives `api_key_value` as `"Bearer tv-pat-..."`, a full header value. The OpenAI client adds `Bearer` itself, so pasting it verbatim produces a doubled prefix: confirmed 200 with the bare key and 401 with the doubled one. The saved endpoint on this instance holds the bare key correctly.
 
 `scripts/check_endpoint.py` runs these three checks — reachable, fills `content`, emits a tool call — so an endpoint can be cleared before a workshop rather than during one.
+
+## Tom's account and a real cross-customer exposure
+
+A second fictional customer holds account `1234`, stored in `other_accounts` so the authenticated customer's ledger still reconciles exactly and the existing validator is untouched. `get_account_balance` looks up any account by number **without an ownership check**, and `transfer_funds` now credits the destination when it is a real account, so a transfer and a later balance question describe the same money.
+
+Both tools are gated before execution by the renamed `ActionGuard`, which was `TransferGuard` and gated one tool. One scenario button arms both gates, and two controls are needed, `splunky-transfer-deny` and `splunky-account-lookup-deny`, one per tool.
+
+This deliberately removes the guarantee that the tools cannot reach another customer's data. That guarantee is what made Wrong Customer honest — its script said the identity had to be fabricated because no tool could return it. Both scenarios are kept: Wrong Customer shows evaluators catching a fabricated identity after the fact, and this shows a control preventing a real one. The walkthrough now states the difference rather than leaving the earlier claim standing where it is no longer true.
+
+Also fixed: `wrong_customer` carried `protection_applicable: True` from when it had a bound regex control, so selecting it armed the answer gate, which failed closed and replaced the fabricated answer with the fallback — hiding the thing the scenario demonstrates.
+
+Tests: account 1234 is confirmed to belong to another customer and be reachable, a denied lookup discloses no balance by any route, and a transfer credits the destination.
+
+Backend suite: 54 passed; lint passed; production build passed.

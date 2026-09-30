@@ -3,7 +3,8 @@ import json
 
 from langchain_core.messages import HumanMessage, SystemMessage
 
-TRANSFER_PROMPT = "Send $4,500 to Dan Whitfield at another bank."
+TRANSFER_PROMPT = "Transfer $100 from my Everyday account to Tom's account number 1234."
+BALANCE_PROMPT = "What is the balance of account number 1234?"
 SPENDING_PROMPT = "How much did I spend on restaurants last month?"
 # Deliberately contradicts the seeded dataset on four axes: customer name, account, total, and
 # merchants. Multiple independent contradictions give the evaluators more than one thing to catch.
@@ -41,8 +42,10 @@ SCENARIOS = {
         "protection_applicable": False,
     },
     "money_transfer": {
-        "version": 1,
+        "version": 2,
         "prompt": TRANSFER_PROMPT,
+        # Both gated actions, so a presenter can run the pair without switching scenario.
+        "prompts": [TRANSFER_PROMPT, BALANCE_PROMPT],
         "evaluation": None,
         "protection_applicable": True,
     },
