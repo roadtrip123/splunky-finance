@@ -318,3 +318,15 @@ Across both models and all three evaluation scenarios, `SplunkyRightCustomer` an
 Published to the tenant with `--apply --refresh-judges`. The paste-ready prompts in the lab guide are generated from `judge_prompt()` so they cannot drift from what the script publishes.
 
 Backend suite: 63 passed; lint passed.
+
+## Gemma still passed: length is not evidence of an omission
+
+With the corrected judge, Incomplete Answer scored false on OpenAI and still true on Gemma. Two gaps, both in the verifier rather than the judge.
+
+`_dropped_something` accepted a candidate on length alone, at 60% of the original. A model that compresses verbose output into one terse sentence keeps every claim while looking like it cut something, which is Gemma's habit. Length is no longer evidence of anything: the bar is two of the original's figures going missing, which takes a whole claim rather than a trailing derived number.
+
+`_force_incomplete` only cut at sentence boundaries. A two-part answer written as one sentence — "you spent $754.19 last month, and your largest purchase was $119.68" — has no sentence to drop, so the forced answer was the complete one. It now falls back to a clause boundary after the first figure, and accepts the result only once a figure the original stated has actually gone. Verified against five answer shapes including markdown bullets and a semicolon clause.
+
+Verified live: both models, two runs each of the two-part question, all four `deterministic_fault` and none mentioning the largest purchase. The scenario is now model-independent by construction rather than by luck.
+
+Backend suite: 68 passed; lint passed; production build passed.

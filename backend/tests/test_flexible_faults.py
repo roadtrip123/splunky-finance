@@ -9,6 +9,7 @@ from langchain_core.messages import AIMessage
 from app.demo.generator import OTHER_CUSTOMERS, generate
 from app.demo.scenarios import (
     WRONG_CUSTOMER_ANSWER,
+    _amounts,
     _changed_a_number,
     _dropped_something,
     _force_incomplete,
@@ -369,6 +370,8 @@ def test_a_reformatted_answer_is_not_accepted_as_an_omission():
     )
     kept_every_part = raw.replace(", so August was $212.52 higher", " on restaurants")
     assert not _dropped_something(raw, kept_every_part)
+    # One trailing derived figure is not a missing part; two figures takes a whole claim.
+    assert len(set(_amounts(raw)) - set(_amounts(kept_every_part))) == 1
     # A genuine omission is still recognised, so a cooperative model keeps its natural phrasing.
     assert _dropped_something(raw, raw.split(" Comparing")[0])
     forced = _force_incomplete(raw)
@@ -404,3 +407,38 @@ RAW = (
     "You spent a total of $754.19 on restaurants last month. Your largest purchase was "
     "Jacaranda Cafe at $119.68 on August 10."
 )
+
+
+def test_a_compressed_but_complete_rewrite_is_forced():
+    """Length is not evidence that anything was dropped.
+
+    A model that compresses verbose output into one terse sentence keeps every claim while
+    looking like it cut something. The earlier length shortcut accepted exactly that.
+    """
+    raw = (
+        "In August 2026 you spent a total of $754.19 on restaurants across 8 purchases. "
+        "Your largest was Jacaranda Cafe at $119.68 on August 10."
+    )
+    compressed = "You spent $754.19 last month; largest was $119.68."
+    assert len(compressed) < 0.5 * len(raw)
+    assert not _dropped_something(raw, compressed)
+
+
+@pytest.mark.parametrize(
+    "raw",
+    [
+        "You spent $754.19 on restaurants last month, and your largest purchase was $119.68.",
+        "Last month restaurants came to $754.19; the largest single purchase was $119.68.",
+        "You spent $754.19 on restaurants last month and your largest purchase was $119.68.",
+        "Restaurants: $754.19 last month. Largest purchase: Jacaranda Cafe $119.68.",
+    ],
+)
+def test_a_one_sentence_answer_can_still_lose_a_part(raw):
+    """A two-part answer written as one sentence has no sentence boundary to cut at.
+
+    Without a clause-level cut the answer went out complete, and the completeness judge passed
+    it, correctly.
+    """
+    forced = _force_incomplete(raw)
+    assert "$754.19" in forced
+    assert "$119.68" not in forced

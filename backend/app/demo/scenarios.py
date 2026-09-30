@@ -121,13 +121,17 @@ def _dropped_something(raw, candidate):
     August was $212.52 higher", which still answers all three parts and which the completeness
     judge is right to pass.
 
-    So the bar is a whole claim going missing, not a single figure. The thresholds deliberately
-    bias towards the deterministic path: forcing an omission that the model had already made is
-    harmless, while shipping a complete answer under a label promising a fault is the failure
-    this exists to prevent.
+    So the bar is two of the original's figures going missing, which takes a whole claim rather
+    than a trailing derived number. A shorter-but-complete rewrite used to pass on length alone:
+    a model that compresses verbose output into one terse sentence keeps every claim while
+    looking like it cut something, so length is no longer evidence of anything.
+
+    This deliberately biases towards the deterministic path. Forcing an omission the model had
+    already made is harmless; shipping a complete answer under a label promising a fault is the
+    failure this exists to prevent.
     """
     lost = set(_amounts(raw)) - set(_amounts(candidate))
-    return len(lost) >= 2 or len(candidate.strip()) <= 0.6 * len(raw.strip())
+    return len(lost) >= 2
 
 
 def _force_incomplete(raw):
@@ -136,12 +140,31 @@ def _force_incomplete(raw):
     The model-written omission reads better, so it is always tried first. This is the guarantee
     behind it: the scenario must fail the completeness check on any model, including one that
     ignores the instruction entirely.
+
+    Cutting at a sentence boundary is not enough on its own. A model that answers a two-part
+    question in one sentence -- "you spent $754.19 last month, and your largest purchase was
+    $119.68" -- has no sentence to drop, and the answer went out complete. So a clause boundary
+    after the first figure is the fallback, and the result is accepted only once it has actually
+    lost a figure the original stated.
     """
-    pieces = [s for s in SENTENCE_END.split(raw.strip()) if s.strip()]
-    if len(pieces) < 2:
-        return raw.strip()
-    kept = next((i for i, s in enumerate(pieces) if _amounts(s)), 0)
-    return " ".join(pieces[: kept + 1]).strip()
+    text = raw.strip()
+    whole = set(_amounts(text))
+    pieces = [s for s in SENTENCE_END.split(text) if s.strip()]
+    if len(pieces) >= 2:
+        kept = next((i for i, s in enumerate(pieces) if _amounts(s)), 0)
+        clipped = " ".join(pieces[: kept + 1]).strip()
+        if set(_amounts(clipped)) != whole:
+            return clipped
+    match = MONEY.search(text)
+    if match:
+        for separator in (", and ", "; ", " and ", ", ", " -- "):
+            cut = text.find(separator, match.end())
+            if cut == -1:
+                continue
+            clipped = text[:cut].rstrip(" ,;:-") + "."
+            if set(_amounts(clipped)) != whole:
+                return clipped
+    return text
 
 
 def _changed_a_number(raw, candidate):
