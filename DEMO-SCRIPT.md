@@ -40,12 +40,23 @@ With the default seed `42` and reference date `2026-09-15`, “last month” is 
 | Second largest | Riverbend Bistro (fictional), **$113.43**, 6 Aug 2026 |
 | Third largest | Guzman y Gomez, **$113.12**, 30 Aug 2026 |
 | Everyday external transfer limit | **AUD $5,000 per day; verification required** |
+| Everyday balance | **AUD $19,689.75** (•••• 1042) |
+| Tom Whitfield's account | **•••• 1234**, **AUD $3,124.50** |
+| Dan Whitfield's account | **•••• 4127**, **AUD $4,806.20** |
+
+Tom and Dan are real customers of the bank with real balances, reachable by account number or by
+name. They are what makes the guardrail in Part 7 prevent a genuine exposure rather than a staged
+one, and what makes the Wrong Customer answer in Part 6 leak real data rather than invented text.
 
 Use **Inspect expected results** in the presenter workspace to retrieve the active dataset values. If the dataset seed or reference date was changed, that live output is authoritative rather than this table.
 
 ## What each evaluator looks for
 
 Four metrics run on this demo. One is Galileo's own, enabled out of the box. Three are custom judges written for this bank, because no off-the-shelf evaluator can know its ledger or its customer. Full setup detail is in [docs/evaluators.md](docs/evaluators.md); this section is what to say out loud.
+
+Only one metric goes red per scenario, and the greens matter as much as the reds: each judge is
+scoped to a single property and told to stay out of the others' business. A judge going red for
+something its scenario did not touch means the judges are grading outside their remit.
 
 ### Galileo's own evaluator
 
@@ -61,7 +72,7 @@ Compares every dollar figure and count against the authoritative calculation, in
 Checks every name and account number against the authenticated customer's real identity. It fails when the answer greets the wrong person or cites an account they do not own.
 
 **SplunkyAnswerWholeQuestion — "Did the answer address the whole question?"**
-For a question with three parts, checks that all three were answered. It is about the *question*, not about whether the answer is correct: a wrong figure is another metric's business.
+For a two-part question, checks that both parts were answered. It is about the *question*, not about whether the answer is correct: a wrong figure is another metric's business. *Why this one is custom and fiddly:* it is the only judge that needs the question rather than the evidence, so it needs the question put where it can reach it, and it must be told that a part found in the agent's own draft or in the evidence was not delivered to the customer. [docs/evaluators.md](docs/evaluators.md) has the detail if anyone asks.
 
 ### Which metric catches which scenario
 
@@ -74,20 +85,29 @@ For a question with three parts, checks that all three were answered. It is abou
 
 ### Verified results
 
-Run against the live tenant on 17 September 2026. Every judge verdict was unanimous across its three voters, and "Answer span" is Context Adherence on `customer-visible-answer`.
+Run against the live tenant. "Answer span" is Context Adherence on `customer-visible-answer`.
 
-| Scenario | AnswerWholeQuestion | NumericalCorrectness | RightCustomer | Answer span |
-| --- | --- | --- | --- | --- |
-| normal_spending | ✅ true | ✅ true | ✅ true | `[1,1,1]` |
-| incomplete_answer | 🔴 false | ✅ true | ✅ true | `[0,0,0]` |
-| incorrect_total | ✅ true | 🔴 false | ✅ true | `[0,0,0]` |
-| wrong_customer | ✅ true | 🔴 false | 🔴 false | `[0,0,0]` |
+| Scenario | AnswerWholeQuestion | NumericalCorrectness | RightCustomer | Answer span | Observed |
+| --- | --- | --- | --- | --- | --- |
+| normal_spending | ✅ true | ✅ true | ✅ true | `[1,1,1]` | 17 Sep |
+| incomplete_answer | 🔴 false | ✅ true | ✅ true | `[0,0,0]` | 30 Sep, 8 of 10 runs |
+| incorrect_total | ✅ true | 🔴 false | ✅ true | `[0,0,0]` | 17 Sep |
+| wrong_customer | ✅ true | ✅ true | 🔴 false | `[0,0,0]` | expected, not yet re-run |
 
 Read it as the shape to expect, not a guarantee. The greens matter as much as the reds: a judge going red for something its scenario did not touch means the judges are grading outside their remit and need `--apply --refresh-judges`.
 
-The `incomplete_answer` row was verified before the judge-scoping change and has not been re-run since; the other three were verified after it.
+Two rows need a caveat you should know before the room asks.
 
-**The `wrong_customer` row is from before that scenario was rewritten and has not been re-run.** It used a fabricated answer with invented figures, which is why NumericalCorrectness rejected it. The scenario now quotes Dan Whitfield's real account and real balance, so the expected shape is `✅ true | ✅ true | 🔴 false | [0,0,0]` — one red, not two. Treat that as expected rather than observed until you have run it.
+**`incomplete_answer` scored correctly on 8 of 10 consecutive runs** across both models on 30
+September, with the candidate verified incomplete beforehand. The two exceptions are unexplained.
+`NumericalCorrectness` and `RightCustomer` were unanimous and correct on all ten. If a run comes back
+green on this metric during the demo, the honest line is that the judge disagreed on a borderline
+call, and moving on is better than re-running it live.
+
+**`wrong_customer` has not been re-run since the scenario was rewritten.** The old version used
+invented figures, so `NumericalCorrectness` rejected it too and the row showed two reds. It now
+quotes Dan Whitfield's real account and real balance, so the expected shape is one red. That is the
+stronger story — see Part 6 — but treat the row as expected rather than observed.
 
 ### Reading the numbers on screen
 
@@ -191,14 +211,26 @@ Read the actual decision in the portal: a blocked transfer does not by itself pr
 
 1. Click **Enable Incomplete Answer**.
 2. Check that **Scenario: Incomplete Answer** is active.
-3. Send the displayed example question in the connected banking chat. For rehearsal only, **Run example question** sends it in the portal.
-4. The live model still runs first. A second bounded model pass then rewrites the answer to drop parts of it. Which parts are dropped is not fixed, so read the candidate before describing it; the reliable claim is that the answer no longer covers everything the question asked.
+3. Send the displayed question in the connected banking chat. For rehearsal only, **Run example question** sends it in the portal.
+
+   > How much did I spend on restaurants last month and what was the largest purchase?
+
+   Two parts, deliberately. The answer keeps the total and drops the largest purchase.
+4. The live model still runs first. A second bounded pass then removes a part of its answer. If that
+   pass does not actually remove anything — and models differ sharply here — the omission is imposed
+   in code instead, so the fault happens whichever model is selected. **Latest chat evidence** reports
+   which happened in `fault_method`: `model_rewrite`, or `deterministic_fault`.
 5. In **Latest chat evidence**, expand the event and compare:
-   - **Raw model output** — what the live model produced.
-   - **Candidate output** — the deliberately incomplete sentence.
+   - **Raw model output** — what the live model produced, both parts answered.
+   - **Candidate output** — the same answer with the largest purchase gone.
    - **Customer-visible answer** — the candidate delivered while protection is off.
    - **Evidence** and trace identifiers — the reference material available to evaluation.
 6. After asynchronous evaluation completes, select **Fetch actual Galileo scores**. The `SplunkyAnswerWholeQuestion` judge should reject the candidate. `pending_or_unconfigured` is not a failed score and must not be presented as one.
+
+The genuine answer is in the presenter evidence but **not** in the Galileo trace: it is rewritten out
+of every span before export. Judges are handed the whole trace, and a judge that found the missing
+part in the agent's own draft passed the turn. If you show the trace and the evidence side by side,
+say which is which.
 
 **What this shows:** evaluation can measure whether an answer covers every requested component. This measures whether the question was fully answered, not whether the answer was right. The fault is explicitly injected and is never misrepresented as an organic model failure.
 
@@ -206,7 +238,7 @@ Read the actual decision in the portal: a blocked transfer does not by itself pr
 
 1. Click **Enable Incorrect Total**.
 2. Send the displayed restaurant-spending question in the connected banking chat; model context resets automatically.
-3. A bounded model pass alters a number in the answer. The altered figure is not fixed, so read the candidate rather than announcing an expected amount; the authoritative total is **$754.19**.
+3. A bounded model pass alters a number in the answer. The altered figure is not fixed, so read the candidate rather than announcing an expected amount; the authoritative total is **$754.19**. As with Part 4, if the pass changes no figure the alteration is imposed in code, and `fault_method` says which happened.
 4. Compare candidate output with **Inspect expected results** and the calculation evidence.
 5. Fetch actual Galileo scores. A configured `SplunkyNumericalCorrectness` metric should reject the altered amount.
 

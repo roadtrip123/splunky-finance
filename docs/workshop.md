@@ -89,8 +89,8 @@ Each is handed one URL, an account number and two passwords. In their own instan
 1. Sign in to banking, and to `/demo-admin` in another tab of the same browser profile — linking is automatic within one profile
 2. Create their own Galileo API key, project and log stream in the console — this comes first, because the app cannot connect to a project that does not exist
 3. Open the **Setup** tab, choose a model endpoint and save it, then paste their Galileo details and press **Save and connect**
-4. Build the evaluators themselves in the Galileo console: enable Context Adherence and create the three custom judges
-5. Build and bind the guardrail control themselves
+4. Build the evaluators themselves in the Galileo console: enable Context Adherence and create the three custom judges, each boolean, trace-level, `gpt-4.1-mini`, three voters
+5. Build and bind the two guardrail controls themselves — one per gated tool, both `pre`-stage, both deny-lists rather than match-everything
 6. Work through the scenarios and read their own traces
 
 Steps 4 and 5 are the lab, so **Set up my project** — which would do both for them — is hidden in workshop mode. [docs/workshop-lab.md](workshop-lab.md) is the participant guide and carries the judge prompts and the control definition ready to paste.
@@ -126,5 +126,10 @@ Pass the key without any `Bearer ` prefix; the client adds it. A provider config
 **One LLM endpoint for fifty people** is the most likely thing to spoil the session — well ahead of anything about instance sizing. Check the endpoint's rate limits against fifty concurrent turns of roughly 2,500 input tokens each, and confirm it handles tool calling properly: this agent depends entirely on well-formed tool calls, and an endpoint that is chat-compatible but weak on tools fails every scenario.
 
 **Evaluation cost** runs about $0.035 per turn across the four enabled metrics. Fifty participants at eight turns each is roughly $14.
+
+**The completeness judge is the flakiest part of the lab.** It scored correctly on 8 of 10 runs in
+testing, with the faulty answer verified faulty beforehand. Expect a few participants to see a green
+where they expect red, and tell them to re-run rather than debug their prompt. The other two judges
+were unanimous throughout. [docs/evaluators.md](evaluators.md) has the detail if someone digs.
 
 **Resetting the dataset.** Participants use **Reset balance** on the DATASET card, which reuses the current seed and reference date so the figures in the lab sheet keep matching. The fuller reset control lower down allows changing the seed, which moves every number they have been given.

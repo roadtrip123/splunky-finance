@@ -1,15 +1,66 @@
-# Evaluator setup
+# Evaluators and guardrails
 
-Which metrics to enable in the Galileo tenant, why each one is here, and what the demo shows with it.
+Which metrics to enable in the Galileo tenant, why each one is here, how they are defined in this
+repository, and what the application does so they can score anything at all.
 
-Apply them with the setup script from `backend/`:
+## Where they are defined
+
+Everything published to a tenant comes from one file, `backend/app/observability/setup_definitions.py`:
+
+| Object | What it holds |
+| --- | --- |
+| `JUDGES` | The description of each custom judge: one sentence of rubric per metric |
+| `judge_prompt(name)` | Builds the full published prompt for one judge from its description plus the scoping rules that suit it |
+| `BUILTIN_METRICS` | The Galileo-native evaluators to enable by slug |
+| `CONTROLS` | The Agent Control guardrails, one entry per gated tool |
+| `_foreign_account_pattern()` | The guardrail's deny-list, generated from the dataset so it cannot drift |
+| `JUDGE_MODEL`, `JUDGE_COUNT` | `gpt-4.1-mini`, three voters |
+
+It lives in `backend/app/` rather than `scripts/` because the container image copies only
+`backend/app` and `data/`: a workshop participant running setup from the portal has no `scripts/`.
+
+## Applying them
+
+From `backend/`:
 
 ```bash
-PYTHONPATH=. .venv/bin/python ../scripts/configure_galileo.py          # validate control schemas only
-PYTHONPATH=. .venv/bin/python ../scripts/configure_galileo.py --apply  # create judges, enable metrics, bind controls
+PYTHONPATH=. .venv/bin/python ../scripts/configure_galileo.py                    # validate schemas only
+PYTHONPATH=. .venv/bin/python ../scripts/configure_galileo.py --apply            # create, enable, bind
+PYTHONPATH=. .venv/bin/python ../scripts/configure_galileo.py --apply --refresh-judges
 ```
 
+`--apply` creates any missing judge, enables the whole metric set on the log stream, and creates and
+binds the controls. It also pushes the current control definition over whatever is already there, on
+the original **and on every bound clone** — the clone is what the log stream evaluates, so refreshing
+only the original leaves the old rule in force.
+
+`--refresh-judges` publishes a new **version** of each judge and makes it the default. Editing a
+prompt without this changes nothing in the tenant. Versioning rather than delete-and-recreate,
+because deletion is refused for anyone but a metric's original creator and versioning keeps the
+scoring history.
+
+The same definitions back the portal's **Set up my project** button, which is hidden in workshop
+mode so participants build their own.
+
 Then confirm in the tenant console that every metric is enabled on the log stream at **100% sampling**, and that both controls are bound. The script requests remote setup; it does not prove the tenant accepted it. Tenant permissions and model entitlements differ between accounts.
+
+## What the application does so evaluation works
+
+Four deliberate choices in the logging, each one the result of a metric scoring wrongly without it:
+
+- **A retriever span.** Policy lookup was a plain tool, so the RAG evaluators had no input and
+  Completeness scored nothing. `PolicyRetriever` emits the retrieved chunks as a retriever span.
+- **Evidence on the answer span.** `customer-visible-answer` logged with the question alone reported
+  every claim unsupported, correct answers included. It now carries the turn's calculations, policies,
+  customer and accounts as context.
+- **The question in the trace output.** The record carries a `question` field. The trace input has it
+  too, but a trace-level custom judge is not reliably given the input, and the one judge that needs
+  the question rather than the evidence was inferring an "implied question" from the answer.
+- **One answer in the trace.** After a fault is injected, `Telemetry.mask_genuine_answer` rewrites the
+  agent's own answer out of every span — outputs *and* inputs, since the middleware spans carry the
+  whole message list — and `raw_model_output` is stripped from the record before it becomes the trace
+  output. A judge is handed the whole normalised trace, so a fuller draft left anywhere in it gets
+  read as part of the answer. The presenter evidence still keeps both answers and the fault method.
 
 ## Built-in evaluators to enable
 
@@ -29,7 +80,26 @@ Custom judges are worth their cost only where no built-in can know the rule. Eac
 | --- | --- |
 | **SplunkyNumericalCorrectness** | Built-in Correctness has no reference data. It cannot know that $854.19 is wrong and $754.19 is right; both are plausible. This judge compares against `evidence.calculations` in integer AUD cents. |
 | **SplunkyRightCustomer** | Checks every name and masked account number in the candidate against `evidence.customer` and `evidence.accounts`. Customer identity is seeded into evidence server-side, so this holds even when no profile tool is called. |
-| **SplunkyAnswerWholeQuestion** | Whether the answer covered every part the question asked. Derives the required parts from the input rather than assuming a fixed list. |
+| **SplunkyAnswerWholeQuestion** | Whether the answer covered every part the question asked. Derives the required parts from the `question` field rather than assuming a fixed list. |
+
+All three are boolean, trace-level, on `gpt-4.1-mini`, with **three voters**. On a single judge a
+borderline call flips the verdict between runs.
+
+Each published prompt is its description plus scoping rules, assembled by `judge_prompt()`. The
+rules are **not** the same for every judge, and that matters more than it looks:
+
+| Rule | AnswerWholeQuestion | The other two |
+| --- | --- | --- |
+| An absent claim | **is** the failure | is not a failure |
+| "an omitted part" in the list of other metrics' concerns | excluded | included |
+| Other spans in the trace | ignore them; only `candidate_output` counts | — |
+| Evidence and retrieved context | shows what was available, not what was said | — |
+
+A single shared suffix carrying *"the absence of a claim is not a failure"* and an exclusion list
+containing *"an omitted part"* is right for the other two and precisely wrong for the completeness
+judge, whose whole job is to fail an omission. With the shared wording it stayed green on a
+genuinely incomplete answer on every model tested. A regression asserts it is never told to ignore
+omissions and that the other two keep the rule.
 
 ### Renamed
 
@@ -78,7 +148,7 @@ Evaluation cost was measured per turn against live traces. The set was cut from 
 
 Dropping `context_adherence` as well would reach about $0.013 a turn, but every remaining metric would then be one written in-house, which weakens a demonstration of Galileo's own evaluation.
 
-A further lever, not yet taken: the custom judges each consume around 9,000 tokens because the trace output carries the whole record, including every account and top-purchase row. Trimming that to what the judges actually read would cut tokens again without dropping a metric.
+`raw_model_output` has since been dropped from the trace output, which trims the payload as a side effect of keeping the genuine answer out of the trace. A further lever, not yet taken: the record still carries every account and top-purchase row, and trimming that to what the judges actually read would cut tokens again without dropping a metric.
 
 ## Deliberately not enabled
 
@@ -103,18 +173,106 @@ A further lever, not yet taken: the custom judges each consume around 9,000 toke
 | Wrong Customer | `SplunkyRightCustomer`, plus Context Adherence |
 | Guardrail Cross-Customer Access | No evaluator. The pre-execution Agent Control decision is the result |
 
-## Agent Control
+## Agent Control: how the guardrails are built
 
-Two server-side regex deny controls, both scoped to the `customer-visible-answer` LLM span at the `post` stage:
+Evaluators are detective controls — they tell you afterwards, which is fine for a wrong number and
+useless for money that has left or a balance that has been read. The guardrails are preventive, and
+there are two, one per action that cannot be undone by refusing the answer afterwards:
 
-- `splunky-seeded-policy-deny` — matches the seeded unlimited-transfer-limit claim.
-- `splunky-wrong-customer-deny` — matches the injected wrong-customer identity, anchored on ASCII so it does not depend on the masked-number bullet characters.
+| Control | Gated tool | Prevents |
+| --- | --- | --- |
+| `splunky-transfer-deny` | `transfer_funds` | Moving money to another customer |
+| `splunky-account-lookup-deny` | `get_account_balance` | Reading another customer's balance |
 
-A regex rejects a controlled contradiction known before the demo. It is not a general semantic validator, and it should not be described as one. Until the `customer-visible-answer` span existed, no control scoped to that step name could fire at all; verify the binding produces a real decision before relying on it live.
+### The definition
+
+Both are built by `_tool_deny_control(tool_name)` and differ only in the tool they name:
+
+```json
+{
+  "condition": {
+    "selector": { "path": "input" },
+    "evaluator": { "name": "regex", "config": { "pattern": "(?i)\\b(Tom\\s+Whitfield|Dan\\s+Whitfield|4127|1234|Tom|Dan)\\b" } }
+  },
+  "execution": "server",
+  "scope": { "step_types": ["tool"], "step_names": ["transfer_funds"], "stages": ["pre"] },
+  "action": { "decision": "deny" },
+  "enabled": true
+}
+```
+
+Three parts matter.
+
+**`"stages": ["pre"]` is the whole point.** At `post` the tool has already run: the money has moved
+and the balance has been read, and all a control can block is the sentence describing it. At `pre`
+the step carries no output yet, so the condition matches the call itself.
+
+**The pattern is a deny-list, not `(?i).+`.** Matching everything also refuses the customer's own
+balance checks and their own transfers, which makes the guardrail a feature switch rather than a
+guardrail — and a guardrail that breaks the product is not one anybody ships. `_foreign_account_pattern()`
+generates it from `OTHER_CUSTOMERS` in the dataset generator, so the tenant definition cannot drift
+from the accounts that actually exist. Longest names first, so `Tom Whitfield` is preferred over `Tom`
+in the reported match.
+
+**`"execution": "server"`** means Galileo evaluates it, not the application. The app asks and obeys;
+it does not decide.
+
+### How they reach the tenant
+
+`configure_galileo.py --apply` creates each control if missing, pushes the current definition with
+`set_control_data`, then calls `clone_and_bind_control` to attach it to the log stream. That call
+*clones* as well as binds, so it runs only when no clone exists — calling it repeatedly leaves spare
+copies behind, and a duplicate clone is what previously made the runtime return `unavailable`. Every
+existing clone gets the refreshed definition too, because the clone is what actually evaluates.
+
+### How the application obeys them
+
+`ActionGuard`, an `AgentMiddleware` in `backend/app/agent.py`, wraps tool execution:
+
+```python
+GATED_TOOLS = ("transfer_funds", "get_account_balance")
+
+async def awrap_tool_call(self, request, handler):
+    if request.tool_call["name"] not in GATED_TOOLS:
+        return await handler(request)
+    allowed, decision = await self.protection.check_action(...)
+    if allowed:
+        return await handler(request)
+    return ToolMessage(..., status="error")
+```
+
+A denial short-circuits before `handler` runs, so the tool is never invoked and no `transfer_funds`
+span appears in the trace. `Protection.check_action` posts a `pre`-stage `EvaluationRequest` and
+**fails closed**: anything that is not a genuine decision carrying evaluated controls blocks the
+action. The customer sees `"That request is not available from My Bank Agent."`
+
+### Telling a real deny from a fail-closed block
+
+They look identical in the chat. `action_decisions` in the presenter evidence tells them apart:
+
+| | Meaning |
+| --- | --- |
+| `decision: "deny"`, `verified: true` | A control evaluated and denied it. This is the goal. |
+| `decision: "unavailable"`, `verified: false` | No verdict came back; the app blocked by failing closed |
+
+An `unavailable` carries a `diagnosis.cause`, because four very different problems used to collapse
+into one message:
+
+| `cause` | What to fix |
+| --- | --- |
+| `no_control_selected` | The request arrived but nothing matched. Check the binding and the scope. |
+| `control_errored` | A control ran and failed. `errors` has the detail. |
+| `request_failed` | The call never completed. Check the Agent Control URL and key. |
+| `not_configured` | No Agent Control URL saved in the app. |
+
+A regex rejects a controlled condition known before the demo. It is not a general semantic validator
+and should not be described as one. **Verify the binding produces a `verified: true` decision before
+relying on it live** — a block alone does not prove a control ran.
 
 ## Known limits
 
 - Built-in span-level evaluators score **every** LLM span, the injected answer included. Read the score on `customer-visible-answer` and expect questions about the others.
 - **Fetch actual Galileo scores** reads trace-level metrics. Span-level built-in values may not appear there; read them in the console until this is confirmed against a live tenant.
 - `pending_or_unconfigured` means no value was retrieved yet. It is not a failed score and must not be presented as one.
-- No built-in evaluator here has been confirmed to return an actual value from a live tenant. Enable them and verify one real score before presenting them.
+- Context Adherence has been confirmed returning real values from the live tenant. The other built-ins listed under **Deliberately not enabled** have not, so verify one real score before presenting any of them.
+- `SplunkyAnswerWholeQuestion` scored correctly on 8 of 10 live runs after the trace-masking fix, with the candidate verified incomplete beforehand. The remaining two are unexplained. Two candidate causes point opposite ways: an `unverified_rewrite` shipping a complete answer, or judge variance. The `fault_method` field on a `true` trace distinguishes them. The other two judges have been unanimous throughout.

@@ -6,7 +6,7 @@ Fictional Australian banking demonstration: a responsive Next.js website, determ
 
 Production frontend build and desktop/mobile browser journeys passed. Backend tests cover ledger integrity, date arithmetic, session isolation, CSRF, controlled faults, and the pre-execution transfer gate including that a blocked transfer leaves balances untouched. Browser tests use an explicit offline model that invokes real banking tools; they do not validate paid model APIs or fabricate Galileo scores.
 
-One live OpenAI tool-backed turn and its Galileo model/tool span export have been verified. Anthropic/Ollama calls, Galileo judges, and tenant-bound Agent Control remain unverified. Docker image builds require access to the server's Docker daemon; the current user does not yet have that access.
+One live OpenAI tool-backed turn and its Galileo model/tool span export have been verified, as have the custom judges and Context Adherence against the live tenant. Ollama has been verified end to end for chat and fault injection. Anthropic is unverified. Tenant-bound Agent Control blocks the action, but a `verified: true` deny from a bound control has not yet been observed — the app fails closed, which looks identical from the chat and is distinguishable only in `action_decisions`. Docker image builds require access to the server's Docker daemon; the current user does not yet have that access.
 
 ## Install on Ubuntu
 
@@ -112,7 +112,11 @@ PYTHONPATH=. .venv/bin/python ../scripts/configure_galileo.py
 PYTHONPATH=. .venv/bin/python ../scripts/configure_galileo.py --apply
 ```
 
-The default invocation validates the control schemas without remote changes. Apply creates/enables the custom boolean judges, enables the built-in evaluators, and requests two bound server regex controls. [docs/evaluators.md](docs/evaluators.md) lists every metric, why it is enabled, and which ones are deliberately left off. Verify binding and 100% metric sampling in the tenant console. The regex demonstrates rejection of a controlled contradiction; it is not a general semantic policy validator. Custom judges inspect the candidate and deterministic evidence. Tenant permissions and model entitlements may differ, so remote setup is not claimed as tested.
+The default invocation validates the control schemas without remote changes. `--apply` creates the custom boolean judges, enables the built-in evaluators, and creates and binds two server-side regex controls, one per gated tool, at the `pre` stage. `--apply --refresh-judges` publishes a new version of each judge; editing a prompt without it changes nothing in the tenant.
+
+Everything published comes from one file, `backend/app/observability/setup_definitions.py`: the judge rubrics, the prompt builder, the built-in metric slugs, and the control definitions. The guardrail's deny-list is generated from the dataset, so it cannot drift from the accounts that exist.
+
+[docs/evaluators.md](docs/evaluators.md) is the reference: every metric and why it is enabled, which are deliberately left off, how the guardrails are built and how the application obeys them, and the four logging choices without which none of it scores correctly. Verify binding and 100% metric sampling in the tenant console. The regex rejects a controlled condition known before the demo; it is not a general semantic policy validator. Tenant permissions and model entitlements differ between accounts.
 
 Presenter evidence shows real IDs, raw model output, injected candidate, delivered answer, candidate hash, control decisions, usage when supplied, and export status. Scores remain unavailable until retrieved from Galileo. Use “Fetch actual Galileo scores” after asynchronous evaluation completes. No fabricated scores, costs, trace links, or successful controls are displayed.
 

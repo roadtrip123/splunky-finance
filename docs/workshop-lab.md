@@ -132,6 +132,21 @@ rather than failing it.
 
 **Enable all three on your log stream**, then confirm four metrics are enabled at **100% sampling**. A lower rate means some turns simply are not scored, which looks identical to a broken metric.
 
+### Why the app makes this possible
+
+Nothing you build here would score correctly against a naive trace. Four things in the application
+exist so these judges can work, and they are worth knowing because they are the transferable lesson:
+
+| The app does this | Because without it |
+| --- | --- |
+| Logs policy lookup as a **retriever span** | The RAG evaluators have no input at all |
+| Puts the turn's **evidence on the answer span** | Every claim scores unsupported, correct answers included |
+| Puts the **question in the trace output** | The completeness judge invents an "implied question" from the answer and passes it |
+| **Rewrites the agent's own answer** out of every span when a fault is injected | Judges read the whole trace, find the missing part in the agent's draft, and pass the turn |
+
+That last one is the least obvious and caused the most trouble: a trace-level judge sees every span,
+inputs included, so the complete draft has to be gone from all of them — not just the obvious one.
+
 ### Why the prompts are written this way
 
 Three instructions exist because of failures we hit building this:
@@ -150,6 +165,9 @@ On the **Demo** tab, run each scenario and send its question. Expect:
 | Incomplete Answer | AnswerWholeQuestion |
 | Incorrect Total | NumericalCorrectness |
 | Wrong Customer | RightCustomer only |
+
+Incomplete Answer is the least reliable of the three — it scored correctly on 8 of 10 runs in
+testing. If yours comes back green once, re-run it before assuming your prompt is wrong.
 
 Wrong Customer is the interesting one. Its answer greets you as Dan Whitfield and quotes Dan's balance — and Dan is a real customer, so the figure is real too. NumericalCorrectness has nothing to object to, AnswerWholeQuestion has nothing to object to, and only the identity check catches a serious breach. That is the argument for having more than one evaluator, each aimed at one property.
 
@@ -174,7 +192,7 @@ Create the first as:
     "selector": { "path": "input" },
     "evaluator": {
       "name": "regex",
-      "config": { "pattern": "(?i)\\b(Dan\\s+Whitfield|Tom\\s+Whitfield|4127|1234|Tom|Dan)\\b" }
+      "config": { "pattern": "(?i)\\b(Tom\\s+Whitfield|Dan\\s+Whitfield|4127|1234|Tom|Dan)\\b" }
     }
   },
   "execution": "server",

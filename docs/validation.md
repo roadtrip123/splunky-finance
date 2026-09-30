@@ -382,3 +382,15 @@ So the judge is now told that evidence and retrieved context show what was avail
 If runs remain intermittent after this, the cause is judge variance rather than anything readable in the trace, and the lever is `JUDGE_COUNT`: three voters make a borderline call a 2–1. Raising it to five costs about two thirds more for this metric.
 
 Backend suite: 74 passed; lint passed.
+
+## Documentation pass
+
+`docs/evaluators.md` was the stalest file in the repository: its Agent Control section still described two `post`-stage regex controls on `customer-visible-answer` (`splunky-seeded-policy-deny`, `splunky-wrong-customer-deny`) that no longer exist. It now documents the two `pre`-stage tool controls, why `pre` is the whole point, why the condition is a deny-list rather than `(?i).+`, how `--apply` reaches the tenant including the clone-refresh, how `ActionGuard` obeys a denial before the tool runs, and how to tell a real deny from a fail-closed block.
+
+Added to the same file: where every definition lives, how to apply and re-version them, and the four logging choices the evaluators depend on — retriever span, evidence on the answer span, the `question` field, and masking the genuine answer out of every span.
+
+`DEMO-SCRIPT.md` gained Tom's and Dan's balances in the reference table, the two-part Incomplete Answer question, the `fault_method` values a presenter will see, and a note that the genuine answer is in the presenter evidence but deliberately not in the trace. The verified-results table now carries an observation date per row and states plainly that Incomplete Answer scored 8 of 10.
+
+`docs/workshop-lab.md` gained a table of what the app does so the participants' judges can score anything, and a warning that the completeness judge is the flakiest part of the lab. `docs/workshop.md` and `README.md` were corrected to match.
+
+Backend suite: 74 passed.
