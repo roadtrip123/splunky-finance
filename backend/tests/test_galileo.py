@@ -576,3 +576,16 @@ def test_masking_is_a_no_op_without_a_fault():
     telemetry.status = {}
     assert telemetry.mask_genuine_answer(None, "a", "b") == 0
     assert telemetry.mask_genuine_answer({"logger": object()}, "same", "same") == 0
+
+
+def test_the_completeness_judge_does_not_count_evidence_as_an_answer():
+    """The evidence carries the figures the answer was meant to quote.
+
+    It cannot be removed -- Context Adherence scores against it, and without it every claim on
+    the span scored unsupported -- so the omitted part sits in context looking answered.
+    """
+    from app.observability.setup_definitions import judge_prompt
+
+    whole = judge_prompt("SplunkyAnswerWholeQuestion")
+    assert "not what it said" in whole
+    assert "does not count as an answered part" in whole

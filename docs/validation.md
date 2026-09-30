@@ -370,3 +370,15 @@ The presenter evidence is unchanged and still keeps the genuine answer beside th
 This fixes the contamination for every judge, including Context Adherence and anything a workshop participant writes, rather than only the three prompts under our control. An end-to-end regression exports a real trace and asserts the genuine answer appears nowhere in it while the delivered one does; a unit test covers nesting, message history and leaving tool results alone.
 
 Backend suite: 73 passed; lint passed; production build passed.
+
+## Residual: evidence read as an answer
+
+With the genuine answer out of the trace, 8 of 10 runs scored correctly. The two that did not were indistinguishable from the ones that did: same question, same model, same record shape, opposite verdict.
+
+What remains available to the judge is the evidence. `answer_context` puts the turn's calculations on the answer span, and those calculations carry `top_purchases` — so Jacaranda Cafe at $119.68, the very part the answer omits, sits in the span's context looking answered. The evidence cannot be removed: Context Adherence scores against it, and logging the span without it made every claim score unsupported, correct answers included.
+
+So the judge is now told that evidence and retrieved context show what was available to the agent, not what it said, and that a figure present only in evidence was not communicated and does not count as an answered part. Published as version 4.
+
+If runs remain intermittent after this, the cause is judge variance rather than anything readable in the trace, and the lever is `JUDGE_COUNT`: three voters make a borderline call a 2–1. Raising it to five costs about two thirds more for this metric.
+
+Backend suite: 74 passed; lint passed.

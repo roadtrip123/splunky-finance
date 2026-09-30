@@ -107,6 +107,12 @@ _ABSENCE = {
         " draft than the customer received. Ignore every span. Judge only the trace-level"
         " candidate_output. If part of the question is answered somewhere in a span but not in"
         " candidate_output, it was never delivered and the answer is incomplete: return false."
+        # The evidence has to stay on the span -- Context Adherence scores against it, and
+        # without it every claim scored unsupported. But it holds the figures the answer was
+        # meant to quote, so the omitted part is sitting in context looking answered.
+        " The evidence and retrieved context show what was available to the agent, not what it"
+        " said. A figure or fact present only in evidence was not communicated to the customer"
+        " and does not count as an answered part."
     )
 }
 _DEFAULT_ABSENCE = (
