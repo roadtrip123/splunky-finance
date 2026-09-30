@@ -292,3 +292,17 @@ Wrong Customer now answers *"How much is in my account?"* with Dan's **real** ac
 Tests: resolution by number and by name including the surname collision, ledger reconciliation after an internal transfer, the deny-list matching only foreign accounts, and the injected answer quoting Dan's real figures.
 
 Backend suite: 59 passed; lint passed; production build passed. The guardrail's allowed paths are verified by unit test and by the live control definitions, not yet by a live armed run.
+
+## Making the fault happen on every model
+
+`SplunkyAnswerWholeQuestion` returned true on an Incomplete Answer turn. The judge was right. `inject()` only rejected a candidate identical to the original, and distinct text is not the same as a faulty answer: on the multi-part restaurants question gpt-4o-mini reliably dropped only the trailing "so August was $212.52 higher", leaving an answer that addresses every part and whose figures all reconcile with the ledger. Gemma, on the same question, omitted the transactions and the comparison as instructed and scored false. Two models, same judge, opposite verdicts, both correct.
+
+An earlier hypothesis — that the judge was reading `raw_model_output` out of the trace output JSON — is disproven by that gemma result: the genuine answer is in the payload for both runs, and only one came back true.
+
+`inject()` now verifies the fault is present and imposes it in code when it is not. For Incomplete Answer the bar is a whole claim going missing rather than a single figure, because losing one trailing amount was exactly the case that slipped through; the thresholds bias towards the deterministic path, since forcing an omission the model had already made is harmless while shipping a complete answer under a label promising a fault is the failure being prevented. For Incorrect Total the candidate must state a money amount the original did not. `fault_method` now reports what actually produced the candidate: `model_rewrite`, `deterministic_fault`, or `unverified_rewrite` for a single-claim answer with no part that could be removed.
+
+That last case delivers the model's candidate rather than raising. The previous code path would have turned an unforceable answer into a 503, and a broken turn in front of an audience is worse than a weak fault.
+
+Verified live against gpt-4o-mini: three runs of the two-part question, three genuinely incomplete candidates, and the reproduced "kept every part" candidate is now rejected by the verifier and forced. The Incomplete Answer scenario prompt is now the two-part restaurants question.
+
+Backend suite: 62 passed; lint passed; production build passed.

@@ -1,5 +1,6 @@
 import asyncio
 import json
+import re
 
 from langchain_core.messages import HumanMessage, SystemMessage
 
@@ -33,7 +34,7 @@ SCENARIOS = {
     },
     "incomplete_answer": {
         "version": 2,
-        "prompt": "How much did I spend on restaurants last month, what were my three biggest transactions, and how does that compare with the previous month?",
+        "prompt": "How much did I spend on restaurants last month and what was the largest purchase?",
         "evaluation": "SplunkyAnswerWholeQuestion",
         "protection_applicable": False,
     },
@@ -95,12 +96,86 @@ FAULT_INSTRUCTIONS = {
 }
 
 
+MONEY = re.compile(r"\$\s?\d[\d,]*(?:\.\d+)?")
+SENTENCE_END = re.compile(r"(?<=[.!?])\s+|\n+")
+
+
+def _amounts(text):
+    """Every money amount in the text, normalised so formatting differences do not count."""
+    return [m.group(0).replace(" ", "").replace(",", "") for m in MONEY.finditer(text)]
+
+
+def _money_like(sample, value):
+    """Render `value` the way `sample` was written, so a swapped figure does not stand out."""
+    grouped = "," in sample
+    decimals = len(sample.partition(".")[2]) if "." in sample else 0
+    body = f"{value:,.{decimals}f}" if grouped else f"{value:.{decimals}f}"
+    return "$" + body
+
+
+def _dropped_something(raw, candidate):
+    """True when the candidate genuinely leaves a part of the question unanswered.
+
+    A model asked to omit a part often reformats instead and keeps every claim, and the weaker
+    version of this test let that through: gpt-4o-mini reliably dropped only the trailing "so
+    August was $212.52 higher", which still answers all three parts and which the completeness
+    judge is right to pass.
+
+    So the bar is a whole claim going missing, not a single figure. The thresholds deliberately
+    bias towards the deterministic path: forcing an omission that the model had already made is
+    harmless, while shipping a complete answer under a label promising a fault is the failure
+    this exists to prevent.
+    """
+    lost = set(_amounts(raw)) - set(_amounts(candidate))
+    return len(lost) >= 2 or len(candidate.strip()) <= 0.6 * len(raw.strip())
+
+
+def _force_incomplete(raw):
+    """Deterministically cut the answer back to its first claim.
+
+    The model-written omission reads better, so it is always tried first. This is the guarantee
+    behind it: the scenario must fail the completeness check on any model, including one that
+    ignores the instruction entirely.
+    """
+    pieces = [s for s in SENTENCE_END.split(raw.strip()) if s.strip()]
+    if len(pieces) < 2:
+        return raw.strip()
+    kept = next((i for i, s in enumerate(pieces) if _amounts(s)), 0)
+    return " ".join(pieces[: kept + 1]).strip()
+
+
+def _changed_a_number(raw, candidate):
+    """True when the candidate states a money amount the original did not."""
+    return bool(set(_amounts(candidate)) - set(_amounts(raw)))
+
+
+def _force_wrong_number(raw):
+    """Deterministically alter the first money amount, keeping its units and formatting."""
+    match = MONEY.search(raw)
+    if not match:
+        return raw.strip()
+    original = match.group(0)
+    try:
+        value = float(original.replace("$", "").replace(",", "").strip())
+    except ValueError:
+        return raw.strip()
+    # A large enough shift that no rounding story explains it, and never zero.
+    altered = _money_like(original.replace("$", "").strip(), round(value * 1.37 + 11.29, 2))
+    return raw.strip().replace(original, altered)
+
+
+VERIFIERS = {
+    "incomplete_answer": (_dropped_something, _force_incomplete),
+    "incorrect_total": (_changed_a_number, _force_wrong_number),
+}
+
+
 async def inject(scenario, question, raw, evidence, model, timeout, config):
     """Explicit bounded fault-writing pass over this turn, with no tools or data mutation."""
     if scenario == "wrong_customer":
         # Fixed text rather than a model rewrite: a model asked to impersonate a cross-customer
         # exposure may refuse, and the bound output control needs a string known before the demo.
-        return WRONG_CUSTOMER_ANSWER, None
+        return WRONG_CUSTOMER_ANSWER, None, "fixed_template"
     instruction = FAULT_INSTRUCTIONS[scenario]
     system = (
         "CONTROLLED_DEMO_FAULT: " + scenario + "\n"
@@ -124,4 +199,19 @@ async def inject(scenario, question, raw, evidence, model, timeout, config):
     candidate = candidate.strip()[:12000]
     if not candidate or candidate == raw.strip() or getattr(response, "tool_calls", None):
         raise ValueError("Fault writer did not produce a distinct answer")
-    return candidate, getattr(response, "usage_metadata", None)
+    # Distinct text is not the same as a faulty answer. Models differ sharply here: one reliably
+    # omits the part it was told to omit, another reformats and keeps every claim, and the
+    # scenario then ships a complete, correct answer under a label promising a fault. Verify the
+    # fault is actually present, and impose it deterministically when it is not, so the demo
+    # behaves the same on every model.
+    verify, force = VERIFIERS[scenario]
+    if verify(raw, candidate):
+        return candidate, getattr(response, "usage_metadata", None), "model_rewrite"
+    forced = force(raw)
+    if forced.strip() and forced.strip() != raw.strip():
+        return forced, getattr(response, "usage_metadata", None), "deterministic_fault"
+    # Nothing in the genuine answer could be altered: a single short claim has no part to omit.
+    # Deliver the model's candidate rather than failing the turn. A weak fault is a disappointing
+    # demo; a 503 in front of an audience is a broken one. The evidence records that the fault
+    # could not be verified, so the presenter is not told a fault was injected when none was.
+    return candidate, getattr(response, "usage_metadata", None), "unverified_rewrite"

@@ -7,7 +7,14 @@ from conftest import login
 from langchain_core.messages import AIMessage
 
 from app.demo.generator import OTHER_CUSTOMERS, generate
-from app.demo.scenarios import WRONG_CUSTOMER_ANSWER, inject
+from app.demo.scenarios import (
+    WRONG_CUSTOMER_ANSWER,
+    _changed_a_number,
+    _dropped_something,
+    _force_incomplete,
+    _force_wrong_number,
+    inject,
+)
 from app.observability.setup_definitions import _foreign_account_pattern
 from app.schemas import Dataset
 from app.tools import Banking, build_tools
@@ -43,7 +50,10 @@ def test_faults_accept_different_questions_and_preserve_evidence(client, scenari
     assert response.status_code == 200, response.text
     event = client.app.state.chat.events[-1]
     assert event["candidate_output"] != event["raw_model_output"]
-    assert event["fault_method"] == "model_rewrite"
+    # Which path produced the fault depends on whether the model cooperated, and the stub answers
+    # here are too short to force an omission from. That the candidate differs at all is what this
+    # test is about; the guarantee itself is covered by its own tests below.
+    assert event["fault_method"] in ("model_rewrite", "deterministic_fault", "unverified_rewrite")
     assert event["scenario"] == scenario
     if "restaurant" not in question.lower():
         assert not event["evidence"].get("calculations")
@@ -173,13 +183,13 @@ def test_wrong_customer_uses_a_fixed_candidate_and_contradicts_the_dataset(clien
     live model asked to impersonate a cross-customer exposure may refuse."""
     from app.demo.scenarios import WRONG_CUSTOMER_ANSWER
 
-    candidate, usage = asyncio.run(
+    candidate, usage, method = asyncio.run(
         inject("wrong_customer", "How much did I spend on restaurants last month?", "raw", {}, None, 1, {})
     )
     assert candidate == WRONG_CUSTOMER_ANSWER
-    assert usage is None
+    assert usage is None and method == "fixed_template"
     # No model call is made, so the text is identical on every run.
-    again, _ = asyncio.run(inject("wrong_customer", "anything else", "other raw", {}, None, 1, {}))
+    again, _, _ = asyncio.run(inject("wrong_customer", "anything else", "other raw", {}, None, 1, {}))
     assert again == candidate
 
     headers = login(client, True)
@@ -342,3 +352,55 @@ def test_wrong_customer_answer_quotes_dans_real_account():
     generated = generate(42, date(2026, 9, 15))
     account = next(a for a in generated.other_accounts if a.owner_name == "Dan Whitfield")
     assert account.posted_balance_cents == dan["balance_cents"]
+
+
+def test_a_reformatted_answer_is_not_accepted_as_an_omission():
+    """The fault must be present whichever model writes it.
+
+    gpt-4o-mini reliably dropped only the trailing delta, leaving an answer that addresses every
+    part of the question. The completeness judge passed it, correctly, and the scenario shipped a
+    complete answer under a label promising a fault.
+    """
+    raw = (
+        "In August 2026, you spent a total of $754.19 on restaurants. Your three biggest "
+        "transactions were Jacaranda Cafe $119.68 on August 10, Riverbend Bistro $113.43 on "
+        "August 6 and Guzman y Gomez $113.12 on August 30. Comparing this with July 2026, you "
+        "spent $541.67, so August was $212.52 higher."
+    )
+    kept_every_part = raw.replace(", so August was $212.52 higher", " on restaurants")
+    assert not _dropped_something(raw, kept_every_part)
+    # A genuine omission is still recognised, so a cooperative model keeps its natural phrasing.
+    assert _dropped_something(raw, raw.split(" Comparing")[0])
+    forced = _force_incomplete(raw)
+    assert "$754.19" in forced
+    assert "Jacaranda" not in forced and "July" not in forced
+
+
+def test_a_wrong_number_is_imposed_when_the_model_changes_nothing():
+    raw = "You spent a total of $754.19 on restaurants across 8 purchases."
+    assert not _changed_a_number(raw, raw)
+    forced = _force_wrong_number(raw)
+    assert "$754.19" not in forced
+    assert _changed_a_number(raw, forced)
+
+
+@pytest.mark.asyncio
+async def test_inject_forces_the_fault_when_the_model_will_not(monkeypatch):
+    """End to end: a model that returns the answer unchanged still yields a faulty candidate."""
+
+    class UncooperativeModel:
+        async def ainvoke(self, messages, config):
+            # Distinct enough to pass the old check, but says everything the original said.
+            return AIMessage(content=RAW.replace("You spent", "You have spent"))
+
+    candidate, _, method = await inject(
+        "incomplete_answer", "total and largest?", RAW, {}, UncooperativeModel(), 5, {}
+    )
+    assert method == "deterministic_fault"
+    assert "Jacaranda" not in candidate
+
+
+RAW = (
+    "You spent a total of $754.19 on restaurants last month. Your largest purchase was "
+    "Jacaranda Cafe at $119.68 on August 10."
+)

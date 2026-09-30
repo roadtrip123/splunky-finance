@@ -328,7 +328,7 @@ Unlike every other scenario, this one changes the data. **Reset balance** on the
 | --- | --- |
 | Raw model output | Genuine selected-provider output before controlled injection |
 | Candidate output | Text presented to evaluation/protection; may be deliberately injected |
-| Fault method | `model_rewrite` for a second model pass, `fixed_template` for constant injected text, empty when no fault is active |
+| Fault method | `model_rewrite` when the second model pass produced the fault, `deterministic_fault` when it did not and the fault was imposed in code, `unverified_rewrite` when neither was possible, `fixed_template` for constant injected text, empty when no fault is active |
 | Customer-visible answer | Delivered candidate or safe fallback after the gate |
 | Candidate hash | SHA-256 identity of the candidate presented to evaluation |
 | Trace ID | Actual Galileo trace identifier, or unavailable |
@@ -372,6 +372,8 @@ Use these exact distinctions:
 - **Unavailable/fallback** — protection was enabled but no verified control decision was available.
 - **Simulation/injection** — the presenter workflow deliberately altered a candidate after the genuine model call.
 - **Fixed template** — the candidate is constant text, not a model rewrite. Only Wrong Customer uses this.
+- **Deterministic fault** — the model was asked to introduce the fault and did not, so the fault was imposed in code instead. Models differ sharply here: one reliably omits the part it was told to omit, another reformats and keeps every claim. Without this the scenario could ship a complete, correct answer under a label promising a fault, and a green metric would look like a broken evaluator when it was simply right. Expect to see it on some models and not others; the customer-visible answer is faulty either way.
+- **Unverified rewrite** — a short single-claim answer with no part that could be removed. The model's candidate is delivered as-is and the evidence says the fault was not verified, rather than failing the turn in front of an audience.
 
 ## Troubleshooting during the demo
 

@@ -248,8 +248,9 @@ class ChatService:
                 candidate = raw
                 # money_transfer injects nothing: the agent genuinely attempts the action, and
                 # the gate decides whether it happens.
-                if FAULT_METHODS.get(scenario):
-                    candidate, fault_usage = await inject(
+                fault_method = FAULT_METHODS.get(scenario)
+                if fault_method:
+                    candidate, fault_usage, fault_method = await inject(
                         scenario,
                         message,
                         raw,
@@ -285,7 +286,9 @@ class ChatService:
                 citations = list({doc["citation"]: doc for doc in evidence.get("policies", [])}.values())
                 record = {
                     **metadata,
-                    "fault_method": FAULT_METHODS.get(scenario),
+                    # What actually produced the candidate, not what was planned: a model that
+                    # ignored the instruction is reported as `deterministic_fault`.
+                    "fault_method": fault_method,
                     "raw_model_output": raw,
                     "candidate_output": candidate,
                     "final_output": final,
