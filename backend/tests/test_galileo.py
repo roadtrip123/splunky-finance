@@ -455,3 +455,26 @@ def test_a_turn_uses_the_endpoint_resolved_when_it_started(client):
     assert event["model"] == "model-a"
     assert event["endpoint"] == "A"
 
+
+
+def test_the_completeness_judge_is_not_told_to_ignore_omissions():
+    """The shared suffix once told this judge to pass the exact fault it exists to catch.
+
+    "the absence of a claim is not a failure" and an exclusion list containing "an omitted part"
+    are right for the other two judges and precisely wrong for this one. With them in place it
+    stayed green on a genuinely incomplete answer on every model tested.
+    """
+    from app.observability.setup_definitions import JUDGES, judge_prompt
+
+    whole = judge_prompt("SplunkyAnswerWholeQuestion")
+    assert "the absence of a claim is not a failure" not in whole
+    assert "An omission is a failure here" in whole
+    assert "an omitted part" not in whole.partition("does not measure:")[2]
+    # The other judges keep it: for them an absent claim really is out of scope.
+    for name in ("SplunkyNumericalCorrectness", "SplunkyRightCustomer"):
+        assert "the absence of a claim is not a failure" in judge_prompt(name)
+    assert "an omitted part" in judge_prompt("SplunkyNumericalCorrectness")
+    # Every judge keeps its own description and the single-property scoping.
+    for name in JUDGES:
+        assert JUDGES[name] in judge_prompt(name)
+        assert "Judge only the single property described above" in judge_prompt(name)

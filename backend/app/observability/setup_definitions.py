@@ -87,15 +87,41 @@ JUDGES = {
         "and must not make this metric fail. Evaluate candidate_output, not final_output."
     ),
 }
-JUDGE_PROMPT_SUFFIX = (
-    " The trace output is JSON containing candidate_output and evidence. Judge only what"
-    " candidate_output actually claims: the absence of a claim is not a failure."
-    " Judge only the single property described above. An answer can be wrong in ways this metric"
-    " does not measure: a wrong amount, an omitted part, an invented rule, a misnamed customer."
-    " Each of those is measured by a different metric. When the property you are judging is"
-    " correct, return true even if the answer is obviously wrong for some other reason, and say so"
-    " in your reasoning rather than failing it."
+# The suffix used to be one shared string, and two of its clauses told
+# SplunkyAnswerWholeQuestion to pass the exact fault it exists to catch: "the absence of a claim
+# is not a failure", and a list of other metrics' concerns that included "an omitted part". Both
+# are right for the other two judges and precisely wrong for this one, which is why it stayed
+# green on a genuinely incomplete answer on every model while the other two scored correctly.
+# Each judge now gets the absence rule and the exclusion list that suit it.
+_ABSENCE = {
+    "SplunkyAnswerWholeQuestion": (
+        " A part of the question that candidate_output does not address is exactly what this"
+        " metric measures. An omission is a failure here, whatever other metrics make of it."
+    )
+}
+_DEFAULT_ABSENCE = (
+    " Judge only what candidate_output actually claims: the absence of a claim is not a failure."
 )
+_OTHER_FAULTS = {
+    "SplunkyAnswerWholeQuestion": "a wrong amount, an invented rule, a misnamed customer",
+    "SplunkyNumericalCorrectness": "an omitted part, an invented rule, a misnamed customer",
+    "SplunkyRightCustomer": "a wrong amount, an omitted part, an invented rule",
+}
+
+
+def judge_prompt(name):
+    """The full instructions published for one judge, scoped to its own property."""
+    others = _OTHER_FAULTS.get(name, "a wrong amount, an invented rule, a misnamed customer")
+    return (
+        JUDGES[name]
+        + " The trace output is JSON containing candidate_output and evidence."
+        + _ABSENCE.get(name, _DEFAULT_ABSENCE)
+        + " Judge only the single property described above. An answer can be wrong in ways this"
+        + f" metric does not measure: {others}."
+        + " Each of those is measured by a different metric. When the property you are judging is"
+        + " correct, return true even if the answer is obviously wrong for some other reason, and"
+        + " say so in your reasoning rather than failing it."
+    )
 JUDGE_MODEL = "gpt-4.1-mini"
 # Three judges vote. On one judge a borderline call flips the whole verdict between runs:
 # SplunkyAnswerWholeQuestion returned true and then false on the same scenario and question, with

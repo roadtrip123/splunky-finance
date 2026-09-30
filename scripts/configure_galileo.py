@@ -10,8 +10,8 @@ from app.observability.setup_definitions import (
     CONTROLS,
     JUDGE_COUNT,
     JUDGE_MODEL,
-    JUDGE_PROMPT_SUFFIX,
     JUDGES,
+    judge_prompt,
 )
 
 
@@ -71,7 +71,7 @@ async def main():
                 scorer_id=str(existing[0].id),
                 client=GalileoPythonConfig.get().api_client,
                 body=CreateLLMScorerVersionRequest(
-                    user_prompt=instructions + JUDGE_PROMPT_SUFFIX,
+                    user_prompt=judge_prompt(name),
                     model_name=JUDGE_MODEL,
                     num_judges=JUDGE_COUNT,
                     output_type=OutputTypeEnum.BOOLEAN,
@@ -83,7 +83,7 @@ async def main():
             print(f"{name}: created")
             create_custom_llm_metric(
                 name=name,
-                user_prompt=instructions + JUDGE_PROMPT_SUFFIX,
+                user_prompt=judge_prompt(name),
                 node_level=StepType.trace,
                 output_type=OutputTypeEnum.BOOLEAN,
                 model_name=JUDGE_MODEL,

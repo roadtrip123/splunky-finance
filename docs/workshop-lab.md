@@ -80,12 +80,13 @@ parts from the input itself; do not assume a fixed list. Return false only when 
 question is left unanswered. An answer that addresses every part is covered even when its
 content is incorrect: whether a stated figure is right, and whether it describes the right
 customer, are not this metric's concern. Evaluate candidate_output, not final_output. The trace
-output is JSON containing candidate_output and evidence. Judge only what candidate_output
-actually claims: the absence of a claim is not a failure. Judge only the single property
-described above. An answer can be wrong in ways this metric does not measure: a wrong amount, an
-omitted part, an invented rule, a misnamed customer. Each of those is measured by a different
-metric. When the property you are judging is correct, return true even if the answer is
-obviously wrong for some other reason, and say so in your reasoning rather than failing it.
+output is JSON containing candidate_output and evidence. A part of the question that
+candidate_output does not address is exactly what this metric measures. An omission is a failure
+here, whatever other metrics make of it. Judge only the single property described above. An
+answer can be wrong in ways this metric does not measure: a wrong amount, an invented rule, a
+misnamed customer. Each of those is measured by a different metric. When the property you are
+judging is correct, return true even if the answer is obviously wrong for some other reason, and
+say so in your reasoning rather than failing it.
 ```
 
 **`SplunkyNumericalCorrectness-<initials>`** — do the numbers match the ledger?
@@ -98,10 +99,10 @@ and no count, return true: there is nothing to contradict, and an answer that om
 a different fault measured by another metric. Evaluate candidate_output, not final_output. The
 trace output is JSON containing candidate_output and evidence. Judge only what candidate_output
 actually claims: the absence of a claim is not a failure. Judge only the single property
-described above. An answer can be wrong in ways this metric does not measure: a wrong amount, an
-omitted part, an invented rule, a misnamed customer. Each of those is measured by a different
-metric. When the property you are judging is correct, return true even if the answer is
-obviously wrong for some other reason, and say so in your reasoning rather than failing it.
+described above. An answer can be wrong in ways this metric does not measure: an omitted part,
+an invented rule, a misnamed customer. Each of those is measured by a different metric. When the
+property you are judging is correct, return true even if the answer is obviously wrong for some
+other reason, and say so in your reasoning rather than failing it.
 ```
 
 **`SplunkyRightCustomer-<initials>`** — is this even the right customer?
@@ -115,20 +116,21 @@ misstated. A wrong amount, count or date is not an identity error and must not m
 fail. Evaluate candidate_output, not final_output. The trace output is JSON containing
 candidate_output and evidence. Judge only what candidate_output actually claims: the absence of
 a claim is not a failure. Judge only the single property described above. An answer can be wrong
-in ways this metric does not measure: a wrong amount, an omitted part, an invented rule, a
-misnamed customer. Each of those is measured by a different metric. When the property you are
-judging is correct, return true even if the answer is obviously wrong for some other reason,
-and say so in your reasoning rather than failing it.
+in ways this metric does not measure: a wrong amount, an omitted part, an invented rule. Each of
+those is measured by a different metric. When the property you are judging is correct, return
+true even if the answer is obviously wrong for some other reason, and say so in your reasoning
+rather than failing it.
 ```
 
 **Enable all three on your log stream**, then confirm four metrics are enabled at **100% sampling**. A lower rate means some turns simply are not scored, which looks identical to a broken metric.
 
 ### Why the prompts are written this way
 
-Two instructions in each judge exist because of failures we hit building this:
+Three instructions exist because of failures we hit building this:
 
 - *"The absence of a claim is not a failure."* Without it, an answer with its total removed was reported as having a **wrong** total.
 - *"Judge only the single property described above."* Without it, a judge would establish its own subject was fine and then fail the answer anyway because it noticed a different defect.
+- **The first rule is inverted for `SplunkyAnswerWholeQuestion`**, and its exclusion list leaves out "an omitted part". Applying the shared wording to all three told the completeness judge to pass the one fault it exists to catch, and it stayed green on a genuinely incomplete answer on every model. Read the three prompts side by side: they differ only where the metric's own subject appears in the other metrics' exclusions.
 
 ### Try it
 

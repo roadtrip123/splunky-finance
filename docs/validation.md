@@ -306,3 +306,15 @@ That last case delivers the model's candidate rather than raising. The previous 
 Verified live against gpt-4o-mini: three runs of the two-part question, three genuinely incomplete candidates, and the reproduced "kept every part" candidate is now rejected by the verifier and forced. The Incomplete Answer scenario prompt is now the two-part restaurants question.
 
 Backend suite: 62 passed; lint passed; production build passed.
+
+## The completeness judge was told to ignore omissions
+
+Across both models and all three evaluation scenarios, `SplunkyRightCustomer` and `SplunkyNumericalCorrectness` scored correctly and `SplunkyAnswerWholeQuestion` stayed green on a genuinely incomplete answer. With the candidate now verifiably incomplete on every model, the remaining fault was in the judge.
+
+`JUDGE_PROMPT_SUFFIX` was one shared string appended to all three judges, and two of its clauses contradict this judge directly: *"the absence of a claim is not a failure"*, and an exclusion list naming *"an omitted part"* as another metric's concern. Both are correct for the other two judges — an absent figure is not a wrong figure, and an absent name is not a misnamed customer — and both tell the completeness judge to pass the one fault it exists to catch. It was doing what it was told.
+
+`judge_prompt(name)` now builds each prompt with the absence rule and exclusion list that suit it. For `SplunkyAnswerWholeQuestion` the rule is inverted — *"An omission is a failure here, whatever other metrics make of it"* — and "an omitted part" is removed from its exclusions. The other two are unchanged. A regression asserts the completeness judge is never told to ignore omissions and that the other two keep the rule.
+
+Published to the tenant with `--apply --refresh-judges`. The paste-ready prompts in the lab guide are generated from `judge_prompt()` so they cannot drift from what the script publishes.
+
+Backend suite: 63 passed; lint passed.
