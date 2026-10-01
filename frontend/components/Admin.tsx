@@ -53,6 +53,25 @@ type Status = {
     agent_control_url: string;
     galileo_api_key_set: boolean;
     galileo_api_key_masked: string;
+    splunk_ao_console_url: string;
+    splunk_ao_api_url: string;
+    splunk_ao_realm: string;
+    splunk_ao_api_key_set: boolean;
+    splunk_ao_api_key_masked: string;
+    splunk_ao_o11y_token_set: boolean;
+    splunk_ao_o11y_token_masked: string;
+    splunk_ao_o11y_api_token_set: boolean;
+    splunk_ao_o11y_api_token_masked: string;
+  };
+  observability: {
+    active: "galileo" | "splunk_ao";
+    backends: {
+      id: "galileo" | "splunk_ao";
+      name: string;
+      stream_label: string;
+      active: boolean;
+      configured: boolean;
+    }[];
   };
   endpoints: {
     endpoints: {
@@ -112,11 +131,17 @@ export default function Admin() {
   const landed = useRef(false);
   const [conn, setConn] = useState({
     galileo_api_key: "",
+    splunk_ao_api_key: "",
+    splunk_ao_o11y_token: "",
+    splunk_ao_o11y_api_token: "",
     galileo_project: "",
     galileo_log_stream: "",
     galileo_console_url: "",
     galileo_api_url: "",
     agent_control_url: "",
+    splunk_ao_console_url: "",
+    splunk_ao_api_url: "",
+    splunk_ao_realm: "",
   });
   const [seed, setSeed] = useState("42");
   const [date, setDate] = useState("2026-09-15");
@@ -135,6 +160,9 @@ export default function Admin() {
           galileo_console_url: s.connection.galileo_console_url,
           galileo_api_url: s.connection.galileo_api_url,
           agent_control_url: s.connection.agent_control_url,
+          splunk_ao_console_url: s.connection.splunk_ao_console_url,
+          splunk_ao_api_url: s.connection.splunk_ao_api_url,
+          splunk_ao_realm: s.connection.splunk_ao_realm,
         }));
       }
       setStatus(s);
@@ -174,6 +202,51 @@ export default function Admin() {
       setBusy(false);
     }
   }
+  // The connection form follows the active backend: Splunk AO's two deployment modes need
+  // different credentials, and showing all of them at once invites filling in the wrong set.
+  const activeId = status?.observability.active ?? "galileo";
+  const activeBackend = status?.observability.backends.find((b) => b.active) ?? {
+    id: "galileo" as const, name: "Galileo", stream_label: "log stream", active: true, configured: false,
+  };
+  const streamLabel = activeBackend.stream_label.replace(/^./, (c) => c.toUpperCase());
+  const connectionFields: [keyof typeof conn, string, string][] =
+    activeId === "splunk_ao"
+      ? [
+          ["splunk_ao_realm", "Realm (Observability Cloud, e.g. us1)", "text"],
+          ["splunk_ao_o11y_token", "O11y access token (INGEST)", "password"],
+          ["splunk_ao_o11y_api_token", "O11y API token (optional)", "password"],
+          ["splunk_ao_api_key", "API key (standalone only)", "password"],
+          ["splunk_ao_console_url", "Console URL (standalone only)", "text"],
+          ["splunk_ao_api_url", "API URL (standalone, optional)", "text"],
+          ["galileo_project", "Project", "text"],
+          ["galileo_log_stream", streamLabel, "text"],
+          ["agent_control_url", "Agent Control URL", "text"],
+        ]
+      : [
+          ["galileo_api_key", "API key", "password"],
+          ["galileo_project", "Project", "text"],
+          ["galileo_log_stream", streamLabel, "text"],
+          ["galileo_console_url", "Console URL", "text"],
+          ["galileo_api_url", "API URL", "text"],
+          ["agent_control_url", "Agent Control URL", "text"],
+        ];
+  function secretPlaceholder(key: string) {
+    const connection = status?.connection as Record<string, string | boolean> | undefined;
+    const set = connection?.[`${key}_set`];
+    if (set === undefined) return "";
+    return set ? `${String(connection?.[`${key}_masked`])} — leave blank to keep` : "paste your key";
+  }
+  const keySummary =
+    activeId === "splunk_ao"
+      ? status?.connection.splunk_ao_o11y_token_set
+        ? `O11y token ${status.connection.splunk_ao_o11y_token_masked}`
+        : status?.connection.splunk_ao_api_key_set
+          ? `API key ${status.connection.splunk_ao_api_key_masked}`
+          : "No credentials set"
+      : status?.connection.galileo_api_key_set
+        ? `API key ${status.connection.galileo_api_key_masked}`
+        : "No API key set";
+
   return (
     <>
       <header className="public-header">
@@ -666,38 +739,44 @@ export default function Admin() {
                       Paste your own API key and project. Saved to this instance only and applied
                       immediately — no restart. The key is never shown again once saved.
                     </p>
+                    {/* One backend at a time. Two would leave Agent Control without an
+                        adjudicator, and two tenants disagreeing on one tool call has no answer. */}
+                    <div className="admin-actions" role="group" aria-label="Observability backend">
+                      {status.observability.backends.map((b) => (
+                        <button
+                          key={b.id}
+                          className={`button small${b.active ? "" : " outline"}`}
+                          aria-pressed={b.active}
+                          disabled={busy || b.active}
+                          title={`Send traces to ${b.name}`}
+                          onClick={() =>
+                            action(async () => {
+                              await mutate("demo-admin/backends/active", { id: b.id }, true);
+                              setNotice(`Now logging to ${b.name}. The conversation was reset.`);
+                            })
+                          }
+                        >
+                          {b.name}
+                          {b.configured ? "" : " (not configured)"}
+                        </button>
+                      ))}
+                    </div>
                     <p>
-                      <strong>
-                        {status.connection.galileo_api_key_set
-                          ? `API key ${status.connection.galileo_api_key_masked}`
-                          : "No API key set"}
-                      </strong>{" "}
-                      · {status.galileo.connection}
+                      <strong>{activeBackend.name}</strong>
+                      {" · "}
+                      {keySummary}
+                      {" · "}
+                      {status.galileo.connection}
                     </p>
                     <div className="admin-stack">
-                      {(
-                        [
-                          ["galileo_api_key", "API key", "password"],
-                          ["galileo_project", "Project", "text"],
-                          ["galileo_log_stream", "Log stream", "text"],
-                          ["galileo_console_url", "Console URL", "text"],
-                          ["galileo_api_url", "API URL", "text"],
-                          ["agent_control_url", "Agent Control URL", "text"],
-                        ] as const
-                      ).map(([key, label, type]) => (
+                      {connectionFields.map(([key, label, type]) => (
                         <div key={key}>
                           <label htmlFor={key}>{label}</label>
                           <input
                             id={key}
                             type={type}
                             autoComplete="off"
-                            placeholder={
-                              key === "galileo_api_key"
-                                ? status.connection.galileo_api_key_set
-                                  ? `${status.connection.galileo_api_key_masked} — leave blank to keep`
-                                  : "paste your key"
-                                : ""
-                            }
+                            placeholder={secretPlaceholder(key)}
                             value={conn[key]}
                             onChange={(e) => setConn({ ...conn, [key]: e.target.value })}
                           />
@@ -711,7 +790,13 @@ export default function Admin() {
                         onClick={() =>
                           action(async () => {
                             await mutate("demo-admin/galileo/connection", conn, true, "PUT");
-                            setConn({ ...conn, galileo_api_key: "" });
+                            setConn({
+                              ...conn,
+                              galileo_api_key: "",
+                              splunk_ao_api_key: "",
+                              splunk_ao_o11y_token: "",
+                              splunk_ao_o11y_api_token: "",
+                            });
                             setNotice("Galileo connection saved.");
                           })
                         }

@@ -404,3 +404,21 @@ The failure was invisible from both ends: no span in Galileo, no exception for `
 `_log_controls` now serialises a non-string input and checks the return value, recording `control_telemetry: "span_rejected"` when the SDK refuses a span rather than implying the evidence reached the trace. Verified by exporting the same turn again: `[StepType.control] splunky-transfer-deny` now appears, at the trace root.
 
 Backend suite: 75 passed.
+
+## Splunk AO as a switchable backend
+
+`splunk_ao` is the Splunk Agent Observability rebrand of the same core — it imports `galileo_core` internally and the span methods have identical names — so the work was a seam plus renames, not a rewrite.
+
+**Stage 1** moved every SDK import into `app/observability/sdk.py`, which resolves a backend to the dozen symbols the application uses. No behaviour change; the suite stayed at 75. `stream_id_of()` reads `log_stream_id` or `agent_stream_id` without needing the backend, because the action gate and the turn record hold a logger but not a `Telemetry`. `ControlResult` needed no abstraction at all: `splunk_ao.logger.control` re-exports `galileo_core`'s class, so both resolve to the same type and a regression asserts it.
+
+**Stage 2** added the provider. Both packages install together — they resolve against `galileo-core 4.5.0` and nothing is downgraded — and only one is active at a time. Dual export was rejected deliberately: Agent Control would need an adjudicator, and two tenants disagreeing on one tool call has no good answer.
+
+The trap is the environment. `splunk_ao` has no namespace of its own: `SplunkAOConfig` subclasses `GalileoConfig` and bridges `SPLUNK_AO_*` into the `GALILEO_*` names, because galileo-core still reads them. It only fills a gap, so an explicit value wins — but a stale variable on either side points a backend at the wrong credential, silently, and a "Galileo" logger writing to Splunk AO is only noticeable by wondering why a tenant is empty. `configure_environment()` therefore sets the active backend's variables and **deletes the inactive backend's**, with a regression covering both directions.
+
+**Stage 3** added the switch, mirroring the model-endpoint control presenters already use: `set_active_backend` clears the cached scorer names, bumps the revision and starts a fresh conversation, so one tenant's session never contains the other's turns. The Setup tab shows a Galileo / Splunk AO selector and then the fields for whichever is active — Splunk AO's two deployment modes need different credentials, and showing all of them at once invites filling in the wrong set. All three new secrets are reported the way the Galileo key already was, set flag plus last four, and a regression asserts no endpoint returns one.
+
+Verified in the running container: both backends resolve to their own SDK, Galileo remains active, and `backends_view` reports Splunk AO as present but not configured.
+
+**Not yet verified:** no trace has been sent to a Splunk AO tenant, because no credentials for one exist here. And the Stage 0 spike found that `mask_genuine_answer` will not work on the SaaS path — `_sink.emit()` converts and queues each span the moment it concludes, before the gate ever runs, so mutating the in-memory tree afterwards changes nothing that has been emitted. Masking works on the standalone path. That is recorded in TODO.md as the open item.
+
+Backend suite: 81 passed; lint passed; production build passed.
