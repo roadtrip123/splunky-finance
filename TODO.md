@@ -74,15 +74,21 @@ of those is logged as a span by the LangChain callback whether or not a control 
 tool that ran would leave a `transfer_funds` span; the proof the block worked is that there is not
 one.
 
-## Support Splunk AO alongside Galileo
+## Switch between Galileo and Splunk AO
 
 Splunky Finance logs through the `galileo` package. Splunk Agent Observability uses `splunk_ao`,
 which is the same core rebranded — it imports `galileo_core` internally and the span methods have
 identical names. `~/healthcare-assistant` is already fully on `splunk_ao` and is the reference for
 the parts that differ.
 
-**Coexistence is proven.** `uv pip install --dry-run splunk-ao==0.4.0` into the backend venv
-resolves with nothing removed or downgraded: both packages need `galileo-core` and the ranges
+**One backend active at a time, switched in the portal.** Dual export was considered and rejected:
+Agent Control would need an adjudicator, and two tenants returning different verdicts on the same
+tool call is an ambiguity with no good answer. Evaluation cost would also roughly double, and the
+two tenants can disagree on a judge verdict, which is confusing rather than instructive. A switch
+gives the same before/after demo without any of that.
+
+**Coexistence of the two packages is proven.** `uv pip install --dry-run splunk-ao==0.4.0` into the
+backend venv resolves with nothing removed or downgraded: both need `galileo-core` and the ranges
 overlap (`>=4.4,<5` and `>=4.5,<5`) on the installed 4.5.0. It adds `splunk-ao` plus the OTLP
 exporter stack, 11 packages.
 
@@ -104,6 +110,50 @@ The differences are renames, each checked against the 0.4.0 wheel:
 
 `enable_evaluators` is signature-identical to `enable_metrics` apart from that one keyword.
 
+### The environment trap
+
+`splunk_ao` does **not** use a separate namespace. `SplunkAOConfig` subclasses `GalileoConfig`, and
+it bridges its own variables into the Galileo names because galileo-core still reads them:
+
+```python
+for new_key, old_key in _BRIDGE:          # SPLUNK_AO_API_KEY → GALILEO_API_KEY, etc.
+    if new_key in os.environ and old_key not in os.environ:
+        os.environ[old_key] = os.environ[new_key]
+```
+
+It only fills a gap, so an explicitly set `GALILEO_*` wins. But configure Splunk AO with Galileo
+unset and the Galileo SDK silently inherits Splunk AO's credentials — a "Galileo" logger writing to
+Splunk AO, which you would only notice by wondering why one tenant has no traces.
+
+`configure_environment()` must therefore **set the active provider's variables and delete the other
+provider's**, rather than only setting its own. Copy the pattern from
+`~/healthcare-assistant/setup_env.py`, which does exactly this for the standalone/o11y split.
+
+### Portal configuration
+
+The provider switch follows the **model endpoint** pattern already in the Setup tab, which
+presenters and participants already understand: a saved list, one active, switched without a
+restart. Reuse the shape rather than inventing a second one.
+
+- [ ] Extend `runtime/galileo-settings.json` with `observability` — saved backends plus
+      `active_backend`, alongside the existing `connection`, `endpoints` and `active_endpoint`.
+- [ ] `Telemetry` gains `backends_view()`, `save_backend()`, `delete_backend()`,
+      `set_active_backend()`, mirroring `endpoints_view()` / `save_endpoint()` /
+      `set_active_endpoint()` exactly.
+- [ ] Routes mirroring the endpoint ones: `PUT /api/demo-admin/backends`,
+      `POST /api/demo-admin/backends/active`, `DELETE /api/demo-admin/backends/{id}`.
+- [ ] Setup tab: a **Galileo / Splunk AO** selector, then the fields for whichever is chosen —
+      Galileo takes API key, project, log stream, console URL, API URL, Agent Control URL; Splunk
+      AO takes a deployment mode (standalone or o11y) and then either API key + console URL, or
+      realm + O11y token + optional O11y API token, plus project and agent stream.
+- [ ] Mask every key the same way the existing connection panel does: 8 bullets plus the last 4,
+      never echoed by any endpoint. The existing regression covers the pattern; extend it.
+- [ ] Switching backend must clear the cached scorer list and bump `revision`, as
+      `set_connection()` already does, or the portal reports the previous tenant's metrics.
+- [ ] A fresh instance starts blank on both, as it does today for Galileo.
+- [ ] Label the switch with what it changes — a switch that silently redirects telemetry is worse
+      than no switch. The status line should name the active backend and its project/stream.
+
 ### Stages
 
 - [ ] **Stage 0 — spike, ~20 min.** Install `splunk-ao` in a scratch venv, log one trace with an
@@ -114,20 +164,18 @@ The differences are renames, each checked against the 0.4.0 wheel:
       `Callback`, `enable_metrics`, `get_stream`, `Scorers`, `Traces`, `ControlResult` and a
       `stream_id(logger)` helper. Roughly 60 lines. No behaviour change, no new provider, suite
       still green. Safe to land at any time.
-- [ ] **Stage 2 — add `splunk_ao` behind the same seam**, with the standalone/o11y credential sets.
-      Copy the mode handling from `~/healthcare-assistant/setup_env.py`, including the part that
-      **deletes the unselected mode's environment variables** — both SDKs self-configure from the
-      environment, so a stale export silently routes to the wrong backend. That is the subtle
-      failure to design against, not the imports.
-- [ ] **Stage 3 — rename the user-facing wording.** "Galileo" appears 68 times in the frontend and
-      55 in docs, and log stream becomes agent stream. Drive it off the active provider. Last,
-      because it is cosmetic and touches everything.
+- [ ] **Stage 2 — add `splunk_ao` behind the seam**, with the two credential modes and the
+      environment handling above.
+- [ ] **Stage 3 — the portal switch**, per the section above.
+- [ ] **Stage 4 — rename the user-facing wording.** "Galileo" appears 68 times in the frontend and
+      55 in docs, and log stream becomes agent stream. Drive it off the active backend so the
+      labels follow the switch. Last, because it is cosmetic and touches everything.
 
 Expect `BUILTIN_METRICS` to need a per-provider map: tenant metric slugs differ. The existing
 preflight that checks names against the tenant before enabling will catch it.
 
-**Not before the workshop.** Stages 0 and 1 are safe now; Stage 2 changes how a working demo
-reaches its tenant.
+**Not before the workshop.** Stages 0 and 1 are safe now; Stage 2 onwards changes how a working
+demo reaches its tenant.
 
 ## Before the workshop
 
