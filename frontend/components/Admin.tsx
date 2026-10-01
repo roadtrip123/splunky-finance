@@ -130,7 +130,7 @@ export default function Admin() {
   type EndpointKey = keyof typeof endpoints;
   const [endpoint, setEndpoint] = useState<EndpointKey>("openai");
   const [model, setModel] = useState({ id: "", name: "", api_key: "", model: "", base_url: "" });
-  const [tab, setTab] = useState<"demo" | "evidence" | "setup" | "tools">("demo");
+  const [tab, setTab] = useState<"demo" | "setup" | "tools">("demo");
   const landed = useRef(false);
   const [conn, setConn] = useState({
     galileo_api_key: "",
@@ -327,7 +327,7 @@ export default function Admin() {
                 Demo workspace<span className="green">.</span>
               </h1>
               <p className="muted">
-                Actual configuration, controlled faults, and live evidence.
+                Actual configuration and controlled faults.
                 Live controls for your connected banking chat.
               </p>
             </div>
@@ -477,7 +477,6 @@ export default function Admin() {
                   {(
                     [
                       ["demo", "Demo"],
-                      ["evidence", "Evidence"],
                       ["setup", "Setup"],
                       ["tools", "Troubleshooting"],
                     ] as const
@@ -522,66 +521,6 @@ export default function Admin() {
                     </div>
                   )}
                   <DemoWorkspace onEvidence={refresh} />
-                </div>
-                <div role="tabpanel" hidden={tab !== "evidence"}>
-                  <section className="admin-card">
-                    <h2>Latest chat evidence</h2>
-                    <button
-                      className="button outline small"
-                      disabled={busy}
-                      onClick={() =>
-                        action(() =>
-                          mutate("demo-admin/evaluations/refresh", {}, true),
-                        )
-                      }
-                    >
-                      Fetch actual {activeBackend.name} scores
-                    </button>
-                    {!status.events.length ? (
-                      <p className="muted">
-                        No demo responses yet. No scores or decisions are
-                        fabricated.
-                      </p>
-                    ) : (
-                      status.events
-                        .slice()
-                        .reverse()
-                        .map((e) => (
-                          <details className="event" key={e.run_id}>
-                            <summary>
-                              {e.scenario} · {e.endpoint || e.model} · {e.duration_seconds}s ·{" "}
-                              {e.action_decisions?.length
-                                ? `action ${String(e.action_decisions[0].decision)}`
-                                : "live model + optional injection"}
-                            </summary>
-                            <p className="mono">
-                              Run {e.run_id}
-                              <br />
-                              Trace {e.trace_id || "unavailable"}
-                              <br />
-                              Candidate hash {e.candidate_hash}
-                            </p>
-                            <h3>Raw model output</h3>
-                            <p>{e.raw_model_output}</p>
-                            <h3>Candidate output</h3>
-                            <p>{e.candidate_output}</p>
-                            <h3>Customer-visible answer</h3>
-                            <p>{e.final_output}</p>
-                            <pre>
-                              {JSON.stringify(
-                                {
-                                  decision: e.decision,
-                                  evaluation: e.evaluation,
-                                  action_decisions: e.action_decisions,
-                                },
-                                null,
-                                2,
-                              )}
-                            </pre>
-                          </details>
-                        ))
-                    )}
-                  </section>
                 </div>
                 <div role="tabpanel" hidden={tab !== "setup"}>
                   <section className="admin-card">
