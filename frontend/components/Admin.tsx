@@ -859,6 +859,33 @@ export default function Admin() {
                           />
                           <small className="field-hint" id={`${key}-hint`}>
                             {hint}
+                            {type === "password" &&
+                              (status.connection as Record<string, string | boolean>)[
+                                `${key}_set`
+                              ] === true && (
+                                <>
+                                  {" "}
+                                  <button
+                                    className="text-button"
+                                    disabled={busy}
+                                    title="Remove the saved value. A blank field keeps it."
+                                    onClick={() =>
+                                      action(async () => {
+                                        await mutate(
+                                          "demo-admin/galileo/connection",
+                                          { ...conn, [key]: "", clear: [key] },
+                                          true,
+                                          "PUT",
+                                        );
+                                        setConn({ ...conn, [key]: "" });
+                                        setNotice(`${label} cleared.`);
+                                      })
+                                    }
+                                  >
+                                    Clear saved value
+                                  </button>
+                                </>
+                              )}
                           </small>
                         </div>
                       ))}

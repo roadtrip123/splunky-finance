@@ -67,6 +67,8 @@ class GalileoConnection(StrictModel):
     splunk_ao_o11y_token: str = Field(default="", max_length=400)
     splunk_ao_o11y_api_token: str = Field(default="", max_length=400)
     splunk_ao_agent_control_url: str = Field(default="", max_length=400)
+    # Named explicitly, because a blank field means "leave unchanged" and always will.
+    clear: list[str] = Field(default_factory=list, max_length=20)
 
 
 class ActiveBackend(StrictModel):
@@ -531,7 +533,8 @@ def create_app(settings=None, model_builder=None, protection_adapter=None):
             value = getattr(payload, name)
             if value and not value.startswith(("http://", "https://")):
                 raise HTTPException(422, f"{name} must be an http(s) URL")
-        telemetry.set_connection(payload.model_dump())
+        values = payload.model_dump()
+        telemetry.set_connection(values, clear=values.pop("clear", []))
         status = await telemetry.check_connection(force=True) if telemetry.enabled else telemetry.status
         # The API key is never echoed back; the connection payload reports only whether one is set.
         return envelope(request, {"galileo": dict(status), "connection": telemetry.connection()})

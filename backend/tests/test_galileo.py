@@ -761,3 +761,30 @@ def test_connection_errors_name_a_cause_without_echoing_sdk_text(settings):
 
     assert "404" in telemetry._connection_error(Exception("404 not found"))
     assert "could not be reached" in telemetry._connection_error(Exception("Connection refused"))
+
+
+def test_a_saved_credential_can_be_cleared(client, settings):
+    """A blank field means "leave unchanged", so without this there is no way back from a bad key.
+
+    Pasting the wrong token meant living with it: every subsequent save skipped the blank field
+    and kept the old value.
+    """
+    headers = login(client, True)
+    telemetry = client.app.state.telemetry
+    telemetry.set_connection({"splunk_ao_o11y_token": "wrong-token", "galileo_project": "p"})
+    assert settings.splunk_ao_o11y_token.get_secret_value() == "wrong-token"
+
+    # A blank field alone keeps it, which is the behaviour being worked around.
+    telemetry.set_connection({"splunk_ao_o11y_token": ""})
+    assert settings.splunk_ao_o11y_token.get_secret_value() == "wrong-token"
+
+    response = client.put(
+        "/api/demo-admin/galileo/connection",
+        headers=headers,
+        json={"clear": ["splunk_ao_o11y_token"]},
+    )
+    assert response.status_code == 200
+    assert settings.splunk_ao_o11y_token.get_secret_value() == ""
+    assert telemetry.connection()["splunk_ao_o11y_token_set"] is False
+    # Everything else survives the clear.
+    assert settings.galileo_project == "p"

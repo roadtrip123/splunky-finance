@@ -7,6 +7,8 @@ from pathlib import Path
 from typing import ClassVar
 from uuid import uuid4
 
+from pydantic import SecretStr
+
 
 class Telemetry:
     """One logger per turn: no shared current trace across concurrent customer requests."""
@@ -98,9 +100,7 @@ class Telemetry:
         return configured if configured in BACKENDS else GALILEO
 
     def apply_connection(self, values):
-        """Copy saved connection details onto settings, treating the API key as a secret."""
-        from pydantic import SecretStr
-
+        """Copy saved connection details onto settings, treating credentials as secrets."""
         for field in self.CONNECTION_FIELDS:
             value = values.get(field)
             if not isinstance(value, str) or not value:
@@ -167,9 +167,18 @@ class Telemetry:
         os.replace(temporary, self.toggle_path)
         os.chmod(self.toggle_path, 0o600)
 
-    def set_connection(self, values):
-        """Save connection details and apply them without a restart."""
+    def set_connection(self, values, clear=()):
+        """Save connection details and apply them without a restart.
+
+        A blank field is left unchanged, so a key survives an edit to the project name. That left
+        no way to remove one: pasting the wrong token meant living with it. `clear` names fields
+        to drop outright, which is the only way back from a bad credential.
+        """
         current = dict(self._saved().get("connection") or {})
+        for field in clear:
+            if field in self.CONNECTION_FIELDS:
+                current.pop(field, None)
+                setattr(self.settings, field, SecretStr("") if field in self.SECRET_FIELDS else "")
         for field in self.CONNECTION_FIELDS:
             value = values.get(field)
             if isinstance(value, str) and value:
