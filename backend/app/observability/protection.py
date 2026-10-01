@@ -118,10 +118,19 @@ class Protection:
 
     def _log_controls(self, logger, evaluated, result, span_input, applies_to, stage, details):
         try:
+            import json
+
             from galileo_core.schemas.logging.control import ControlResult
 
+            # add_control_span takes a string and swallows every exception it raises, returning
+            # None. The action gate passes the tool-call arguments, which are a dict, so the span
+            # that proves a control ran was silently dropped on exactly the path that needs it --
+            # no span, no error, not even the control_telemetry marker below.
+            if not isinstance(span_input, str):
+                span_input = json.dumps(span_input, default=str)
+
             for control in evaluated:
-                logger.add_control_span(
+                span = logger.add_control_span(
                     input=span_input,
                     name=control.control_name,
                     output=ControlResult(
@@ -134,6 +143,11 @@ class Protection:
                     check_stage=stage,
                     applies_to=applies_to,
                 )
+                if span is None:
+                    # The SDK refused it and told nobody. Record that rather than implying the
+                    # control's own evidence reached the trace.
+                    details["control_telemetry"] = "span_rejected"
+                    continue
                 logger.conclude()
         except Exception:  # noqa: BLE001 - isolate SDK failures without exposing credential-bearing errors
             # Logging failure cannot change the already verified gate decision.

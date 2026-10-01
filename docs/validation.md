@@ -394,3 +394,13 @@ Added to the same file: where every definition lives, how to apply and re-versio
 `docs/workshop-lab.md` gained a table of what the app does so the participants' judges can score anything, and a warning that the completeness judge is the flakiest part of the lab. `docs/workshop.md` and `README.md` were corrected to match.
 
 Backend suite: 74 passed.
+
+## The control's own span was never reaching the trace
+
+Dumping a real exported trace for an armed `money_transfer` turn showed no control span at all. Isolating `add_control_span` explained it: the method takes `input: str`, and it is decorated with `@warn_catch_exception(exceptions=(Exception,))`, so anything it raises is swallowed and it returns `None`. The action gate passes `request.tool_call["args"]` — a dict — so the span was dropped on exactly the path that needs it. The answer gate passes a string and was unaffected.
+
+The failure was invisible from both ends: no span in Galileo, no exception for `_log_controls` to catch, and so not even the `control_telemetry: "failed"` marker that exists for this purpose. `action_decisions` in the trace output was the only evidence a control had run.
+
+`_log_controls` now serialises a non-string input and checks the return value, recording `control_telemetry: "span_rejected"` when the SDK refuses a span rather than implying the evidence reached the trace. Verified by exporting the same turn again: `[StepType.control] splunky-transfer-deny` now appears, at the trace root.
+
+Backend suite: 75 passed.

@@ -67,3 +67,66 @@ async def test_unconfigured_gate_fails_closed(settings):
     assert answer == FALLBACK and not decision["verified"]
     answer, decision = await Protection(settings).check("candidate", "question", {}, None, False)
     assert answer == "candidate" and decision["decision"] == "disabled"
+
+
+@pytest.mark.asyncio
+async def test_action_gate_logs_a_control_span_from_dict_arguments():
+    """The span that proves a control ran must survive the action gate's arguments.
+
+    `add_control_span` takes a string and is decorated to swallow every exception it raises,
+    returning None. The action gate passes the tool call's arguments, which are a dict, so the
+    span was dropped silently on exactly the path that needs it: no span, no error, and not even
+    the control_telemetry marker, because nothing ever reached our own handler.
+    """
+    from uuid import uuid4
+
+    from galileo import GalileoLogger
+
+    from app.observability.protection import Protection
+
+    captured = []
+    original = GalileoLogger.__init__
+
+    def initialize(self, **kwargs):
+        original(self, project="offline", log_stream="offline",
+                 ingestion_hook=lambda request: captured.extend(request.traces))
+        self.project_id, self.log_stream_id = str(uuid4()), str(uuid4())
+
+    GalileoLogger.__init__ = initialize
+    try:
+        logger = GalileoLogger()
+        logger.start_trace(input="q", name="t")
+
+        class Verdict:
+            def model_dump(self, mode="json"):
+                return {"matched": True}
+
+        class Control:
+            control_id, control_name, action, result = 887, "splunky-transfer-deny", "deny", Verdict()
+
+        class Result:
+            matches, non_matches, errors = [Control()], [], []
+            is_safe, confidence, reason = False, 1.0, "matched"
+
+        protection = Protection.__new__(Protection)
+        protection.settings = type("S", (), {"agent_control_agent_name": "my-bank-agent"})()
+        details = {}
+        result = Result()
+        # A dict, exactly as awrap_tool_call hands it over.
+        protection._log_controls(
+            logger, result.matches, result,
+            {"to_account": "1234", "amount_cents": 10000}, "tool_call", "pre", details,
+        )
+        logger.conclude(output="done", conclude_all=True)
+        logger.flush()
+    finally:
+        GalileoLogger.__init__ = original
+
+    def every(spans):
+        for span in spans or []:
+            yield span
+            yield from every(getattr(span, "spans", None))
+
+    controls = [s for s in every(captured[-1].spans) if "control" in str(getattr(s, "type", "")).lower()]
+    assert [s.name for s in controls] == ["splunky-transfer-deny"]
+    assert details.get("control_telemetry") != "span_rejected"
