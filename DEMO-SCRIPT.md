@@ -9,6 +9,10 @@ This walkthrough demonstrates four distinct layers:
 
 All accounts, transactions, policies, and faults are synthetic. Two tools do things a later refusal cannot undo: one moves money, and one reads any account by number without an ownership check. Both exist so the guardrail has real actions to stop, and both only ever touch this synthetic ledger. No payment, repayment, or account-change tool exists.
 
+Span-by-span flows for every scenario, taken from real exported traces, are in
+[docs/scenario-flows.md](docs/scenario-flows.md) — useful when someone asks what is actually
+happening rather than what it demonstrates.
+
 ## Before the audience arrives
 
 The presenter portal controls a connected banking chat. Both browsers communicate through the server; no direct browser-to-browser connection is used.
