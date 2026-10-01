@@ -477,7 +477,11 @@ export default function Admin() {
                     [
                       ["demo", "Demo"],
                       ["setup", "Setup"],
-                      ["tools", "Troubleshooting"],
+                      // Only the dataset reset lives here now, and workshop mode hides that,
+                      // which would leave participants an empty tab.
+                      ...(status.demo_mode !== "workshop"
+                        ? ([["tools", "Troubleshooting"]] as const)
+                        : []),
                     ] as const
                   ).map(([key, label]) => (
                     <button
@@ -686,7 +690,7 @@ export default function Admin() {
                             "PUT",
                           );
                           setModel({ id: "", name: "", api_key: "", model: "", base_url: "" });
-                          setNotice("Endpoint saved. Use Test my setup to call it.");
+                          setNotice("Endpoint saved.");
                         })
                       }
                     >
@@ -887,41 +891,6 @@ export default function Admin() {
                   </section>
                 </div>
                 <div role="tabpanel" hidden={tab !== "tools"}>
-                  <section className="admin-card">
-                    <div className="admin-actions">
-                      <button
-                        className="button outline small"
-                        disabled={busy}
-                        onClick={() =>
-                          action(async () => {
-                            const job = await mutate<{ job_id: string }>(
-                              "demo-admin/preflight",
-                              {},
-                              true,
-                            );
-                            setNotice(
-                              "Preflight started. This explicitly makes model API calls.",
-                            );
-                            let done = false;
-                            while (!done) {
-                              await new Promise((r) => setTimeout(r, 1500));
-                              const result = await api<{
-                                state: string;
-                                result: unknown;
-                              }>(`demo-admin/preflight/${job.job_id}`);
-                              done = result.state !== "running";
-                              if (done)
-                                setNotice(
-                                  `Preflight ${result.state}: ${JSON.stringify(result.result)}`,
-                                );
-                            }
-                          })
-                        }
-                      >
-                        Test my setup
-                      </button>
-                    </div>
-                  </section>
                   {status.demo_mode !== "workshop" && (
                   <section className="admin-card">
                     <h2>Reset synthetic data</h2>

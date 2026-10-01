@@ -56,7 +56,7 @@ The Galileo status should read `connected`. If it does not, check the project an
 
 > If your endpoint is OpenAI-compatible, paste the key **without** any `Bearer ` prefix. Some providers hand you a full header value like `Bearer tv-pat-...`; the client adds `Bearer` itself, and a doubled prefix fails with 401.
 
-**Check it works.** On the **Troubleshooting** tab press **Test my setup**. It makes one real model call and asks the agent to use a banking tool. A successful result lists an observed tool call.
+**Check it works.** Send a question in the customer tab and confirm you get an answer. If the model replies but nothing appears in your Galileo project, the usual cause is an endpoint that answers chat but cannot emit tool calls — every scenario here depends on a tool call. Your instructor can confirm an endpoint with `python3 scripts/check_endpoint.py --base-url <url> --model <model> --api-key <key>`.
 
 Then send a question in the customer tab:
 
