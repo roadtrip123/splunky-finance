@@ -352,12 +352,15 @@ export default function Admin() {
                     </small>
                   </article>
                   <article className="admin-card">
-                    <span className="mini-label">GALILEO</span>
+                    {/* Backend-neutral: the card reports whichever backend is active, and
+                        names it, so a status of "connected" is never ambiguous about where. */}
+                    <span className="mini-label">AGENT OBSERVABILITY STATUS</span>
                     <h3 aria-live="polite">
                       {status.galileo.enabled
                         ? status.galileo.connection
                         : "disabled"}
                     </h3>
+                    <p>{activeBackend.name}</p>
                     <button
                       className="button outline small"
                       disabled={
@@ -378,8 +381,8 @@ export default function Admin() {
                       }
                     >
                       {status.galileo.enabled
-                        ? "Disable Galileo"
-                        : "Enable Galileo"}
+                        ? `Disable ${activeBackend.name}`
+                        : `Enable ${activeBackend.name}`}
                     </button>
                     <button
                       className="text-button"
@@ -390,7 +393,7 @@ export default function Admin() {
                         )
                       }
                     >
-                      Check Galileo connection
+                      Check {activeBackend.name} connection
                     </button>
                     <small>
                       Enabled by default. This switch applies to all demo chats
@@ -484,7 +487,7 @@ export default function Admin() {
                     >
                       {label}
                       {key === "setup" && !status.connection.galileo_api_key_set && (
-                        <span className="tab-dot" title="No Galileo API key set yet">
+                        <span className="tab-dot" title="No observability credentials set yet">
                           ●
                         </span>
                       )}
@@ -528,7 +531,7 @@ export default function Admin() {
                         )
                       }
                     >
-                      Fetch actual Galileo scores
+                      Fetch actual {activeBackend.name} scores
                     </button>
                     {!status.events.length ? (
                       <p className="muted">
@@ -764,8 +767,9 @@ export default function Admin() {
                   <h2>Connect to Splunk Agent Observability / Galileo</h2>
                   {status.demo_mode === "workshop" && (
                     <p className="muted">
-                      Create the project, log stream, evaluators and guardrail in the Galileo
-                      console yourself — that is the lab. This panel only points the app at them.
+                      Create the project, {activeBackend.stream_label}, evaluators and guardrail
+                      in the {activeBackend.name} console yourself — that is the lab. This panel
+                      only points the app at them.
                     </p>
                   )}
                     <p className="muted">
@@ -870,7 +874,7 @@ export default function Admin() {
                               splunk_ao_o11y_token: "",
                               splunk_ao_o11y_api_token: "",
                             });
-                            setNotice("Galileo connection saved.");
+                            setNotice(`${activeBackend.name} connection saved.`);
                           })
                         }
                       >

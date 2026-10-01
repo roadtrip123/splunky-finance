@@ -272,7 +272,7 @@ relying on it live** — a block alone does not prove a control ran.
 ## Known limits
 
 - Built-in span-level evaluators score **every** LLM span, the injected answer included. Read the score on `customer-visible-answer` and expect questions about the others.
-- **Fetch actual Galileo scores** reads trace-level metrics. Span-level built-in values may not appear there; read them in the console until this is confirmed against a live tenant.
+- **Fetch actual scores** reads trace-level metrics. Span-level built-in values may not appear there; read them in the console until this is confirmed against a live tenant.
 - `pending_or_unconfigured` means no value was retrieved yet. It is not a failed score and must not be presented as one.
 - Context Adherence has been confirmed returning real values from the live tenant. The other built-ins listed under **Deliberately not enabled** have not, so verify one real score before presenting any of them.
 - `SplunkyAnswerWholeQuestion` scored correctly on 8 of 10 live runs after the trace-masking fix, with the candidate verified incomplete beforehand. The remaining two are unexplained. Two candidate causes point opposite ways: an `unverified_rewrite` shipping a complete answer, or judge variance. The `fault_method` field on a `true` trace distinguishes them. The other two judges have been unanimous throughout.

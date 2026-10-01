@@ -118,7 +118,7 @@ Everything published comes from one file, `backend/app/observability/setup_defin
 
 [docs/evaluators.md](docs/evaluators.md) is the reference: every metric and why it is enabled, which are deliberately left off, how the guardrails are built and how the application obeys them, and the four logging choices without which none of it scores correctly. Verify binding and 100% metric sampling in the tenant console. The regex rejects a controlled condition known before the demo; it is not a general semantic policy validator. Tenant permissions and model entitlements differ between accounts.
 
-Presenter evidence shows real IDs, raw model output, injected candidate, delivered answer, candidate hash, control decisions, usage when supplied, and export status. Scores remain unavailable until retrieved from Galileo. Use “Fetch actual Galileo scores” after asynchronous evaluation completes. No fabricated scores, costs, trace links, or successful controls are displayed.
+Presenter evidence shows real IDs, raw model output, injected candidate, delivered answer, candidate hash, control decisions, usage when supplied, and export status. Scores remain unavailable until retrieved from Galileo. Use “Fetch actual scores” after asynchronous evaluation completes. No fabricated scores, costs, trace links, or successful controls are displayed.
 
 ## Verification
 
@@ -157,6 +157,6 @@ Run `docker compose up --build -d` and open the exact configured origin. HTTP lo
 
 ## Galileo admin switch and connection status
 
-Galileo starts enabled by default. The presenter workspace has Enable/Disable Galileo and Check Galileo connection buttons. The switch applies to all demo chats, persists in `runtime/galileo-settings.json` (or the Docker data volume), and overrides the environment startup default until changed again. Changes wait for active chat/connection work to finish. The toggle and connection check require an authenticated presenter and CSRF validation.
+Observability starts enabled by default. The **Agent Observability Status** card reports whichever backend is active and names it, and its enable/disable and connection-check buttons are labelled with that backend. The switch applies to all demo chats, persists in `runtime/galileo-settings.json` (or the Docker data volume), and overrides the environment startup default until changed again. Changes wait for active chat/connection work to finish. The toggle and connection check require an authenticated presenter and CSRF validation.
 
 Connection status distinguishes disabled, unconfigured (missing key), checking, connected (SDK resolved the configured target), and failed. Last check/connection times and actual export status are separate: connected does not imply that a trace was exported or scored. The startup check and manual check do not invoke a paid model. Existing traces can finish exporting before disable, and protection remains fail-closed if Galileo is disabled. Keys and passwords are never exposed by these endpoints.

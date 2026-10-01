@@ -81,7 +81,7 @@ test("presenter can enable and disable Galileo with honest missing-key status", 
     .fill("test-presenter-password-only");
   await page.getByRole("button", { name: "Log in" }).click();
   const enable = page.getByRole("button", {
-    name: "Enable Galileo",
+    name: "Enable Galileo",  // labelled with the active backend
     exact: true,
   });
   const disable = page.getByRole("button", {

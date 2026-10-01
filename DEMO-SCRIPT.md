@@ -19,7 +19,7 @@ The presenter portal controls a connected banking chat. Both browsers communicat
    - **Model provider** should become `connected` after a successful model request.
    - **Galileo** should show `connected`; `Export: exported` appears only after a trace flush succeeds.
    - **Dataset** should show the intended seed, reference date, version, and transaction count.
-4. Select **Check Galileo connection** if the connection state is unclear. This verifies the configured Galileo target but does not make a model call or prove a trace was exported.
+4. Select **Check <backend> connection** if the connection state is unclear — the button and the **Agent Observability Status** card are both named after whichever backend is active, Galileo or Splunk AO. It verifies the configured target but does not make a model call or prove a trace was exported.
 5. Optionally select **Run paid preflight**. This explicitly calls the selected model and asks it to invoke `get_accounts`. A successful result must list an observed tool call; it tests provider access, the agent loop, the banking tool, and trace export. It does not test every scenario, metric, or Agent Control.
 6. If metrics and Agent Control are part of the presentation, verify them in the Galileo tenant before the session. [docs/evaluators.md](docs/evaluators.md) lists every metric, why it is enabled, and which are deliberately left off. Run `scripts/configure_galileo.py` without `--apply` only to validate the local control schema. Remote creation requires an explicit reviewed `--apply` operation.
 
@@ -225,7 +225,7 @@ Read the actual decision in the portal: a blocked transfer does not by itself pr
    - **Candidate output** — the same answer with the largest purchase gone.
    - **Customer-visible answer** — the candidate delivered while protection is off.
    - **Evidence** and trace identifiers — the reference material available to evaluation.
-6. After asynchronous evaluation completes, select **Fetch actual Galileo scores**. The `SplunkyAnswerWholeQuestion` judge should reject the candidate. `pending_or_unconfigured` is not a failed score and must not be presented as one.
+6. After asynchronous evaluation completes, select **Fetch actual scores**. The `SplunkyAnswerWholeQuestion` judge should reject the candidate. `pending_or_unconfigured` is not a failed score and must not be presented as one.
 
 The genuine answer is in the presenter evidence but **not** in the Galileo trace: it is rewritten out
 of every span before export. Judges are handed the whole trace, and a judge that found the missing
@@ -240,7 +240,7 @@ say which is which.
 2. Send the displayed restaurant-spending question in the connected banking chat; model context resets automatically.
 3. A bounded model pass alters a number in the answer. The altered figure is not fixed, so read the candidate rather than announcing an expected amount; the authoritative total is **$754.19**. As with Part 4, if the pass changes no figure the alteration is imposed in code, and `fault_method` says which happened.
 4. Compare candidate output with **Inspect expected results** and the calculation evidence.
-5. Fetch actual Galileo scores. A configured `SplunkyNumericalCorrectness` metric should reject the altered amount.
+5. Fetch actual scores. A configured `SplunkyNumericalCorrectness` metric should reject the altered amount.
 
 **What this shows:** a numerically plausible answer still fails when it disagrees with deterministic integer-cent calculations.
 
