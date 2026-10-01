@@ -444,3 +444,17 @@ On Observability Cloud the logger exports over OTLP: project and stream are reso
 The resolved ids are kept on `Telemetry.target`, cleared whenever the backend or the connection changes.
 
 **Knock-on, not yet addressed.** `Protection._evaluate` targets Agent Control with `stream_id_of(logger)`, which is `None` on OTLP for the same reason. The guardrail therefore cannot target a stream on Splunk AO Observability Cloud and will raise "No resolved log stream" before it reaches the gateway. It needs the resolved id from `Telemetry.target` rather than the logger. Recorded in TODO.md.
+
+## Two sessions on Splunk AO, the named one empty
+
+Galileo showed one session, `My Bank Agent`, holding the turn's trace. Splunk AO showed two: `My Bank Agent` with zero traces, and a second named `session` holding all the spans.
+
+`start_session` publishes the session id into a **ContextVar**, via `_set_active_session_id`. `begin()` calls it inside `asyncio.to_thread`, and a worker thread's context does not flow back to the request — the same trap the code already documents for the parent span, hitting a second variable. So the API created the named session and the spans were exported from a context with no session id, leaving the backend to invent one to hold them.
+
+Galileo is unaffected: it keeps the id on the logger object rather than in a ContextVar, which is why one backend was right and the other was not on identical code. The re-bind is therefore conditional on `_set_active_session_id` existing — calling `set_session` on Galileo's logger disturbs an export that already works, which three existing regressions caught immediately.
+
+Verified against the live tenant: the API session id and `get_effective_session_id()` in the request context now match, and the trace exports.
+
+Unrelated but visible in the same comparison: Splunk AO shows no `bank-chat-turn` root row, because the OTLP path does not emit the Trace object itself — only spans, which carry the trace id. And it labels spans with OpenTelemetry semantic conventions (`invoke_agent`, `invoke_workflow`, `execute_tool`, `chat`) rather than the plain names Galileo shows. Both are SDK behaviour, not configuration.
+
+Backend suite: 90 passed.

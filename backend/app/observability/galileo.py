@@ -617,10 +617,22 @@ class Telemetry:
                 logger = sdk.new_logger(
                     project=self.settings.galileo_project, stream=self.settings.galileo_log_stream
                 )
-                logger.start_session(name="My Bank Agent", external_id=metadata["conversation_id"])
-                return logger
+                session = logger.start_session(
+                    name="My Bank Agent", external_id=metadata["conversation_id"]
+                )
+                return logger, session
 
-            logger = await asyncio.wait_for(asyncio.to_thread(initialize), timeout=15)
+            logger, session_id = await asyncio.wait_for(asyncio.to_thread(initialize), timeout=15)
+            # Re-bind the session in this context. `start_session` publishes the id into a
+            # ContextVar, and it ran in a worker thread whose context does not flow back here, so
+            # spans exported from this request carried no session. The named session was created
+            # through the API and stayed empty while the backend invented a second one, called
+            # "session", to hold the spans. Same ContextVar trap as the parent span below.
+            # Only where the id is context-local. Galileo keeps it on the logger object, which
+            # does flow back, and re-binding there disturbs an export that already works.
+            if session_id and hasattr(logger, "_set_active_session_id"):
+                with suppress(Exception):
+                    logger.set_session(str(session_id))
             # The SDK parent is a ContextVar: a worker thread's value does not flow
             # back to this request. Start the root here so agent callback tasks inherit it.
             label = metadata.get("endpoint") or metadata.get("model") or ""

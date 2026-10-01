@@ -844,3 +844,46 @@ def test_the_traces_client_uses_each_sdks_stream_keyword():
         stub = dataclasses.replace(backend(name), Traces=lambda _s=seen, **kw: _s.update(kw))
         stub.traces(project_id="p", stream_id="s")
         assert seen == {"project_id": "p", keyword: "s"}, (name, seen)
+
+
+@pytest.mark.asyncio
+async def test_the_session_is_rebound_in_the_request_context(settings, monkeypatch):
+    """start_session publishes the id into a ContextVar, from inside a worker thread.
+
+    That context does not flow back, so spans exported from the request carried no session: the
+    named session stayed empty and the backend invented a second one called "session" to hold
+    the spans.
+    """
+    from app.observability.galileo import Telemetry
+
+    settings.galileo_enabled = True
+    settings.galileo_api_key = SecretStr("k")
+    bound = []
+
+    class Logger:
+        project_id = agent_stream_id = None
+
+        def _set_active_session_id(self, session_id):
+            """Present on splunk_ao only; its presence is what selects the re-bind."""
+
+        def start_session(self, **kwargs):
+            assert kwargs["name"] == "My Bank Agent"
+            return "session-42"
+
+        def set_session(self, session_id):
+            bound.append(session_id)
+
+        def start_trace(self, **kwargs):
+            return SimpleNamespace(id="trace-1")
+
+    telemetry = Telemetry(settings)
+    sdk = SimpleNamespace(
+        name="splunk_ao",
+        new_logger=lambda **kwargs: Logger(),
+        stream_id=lambda logger: None,
+        callback=lambda logger: object(),
+    )
+    monkeypatch.setattr(type(telemetry), "backend", property(lambda self: sdk))
+
+    assert await telemetry.begin("q", {"conversation_id": "c", "run_id": "r"}) is not None
+    assert bound == ["session-42"]
