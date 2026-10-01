@@ -466,7 +466,17 @@ Verified against the live tenant: the API session id and `get_effective_session_
 
 The mechanism is visible in those external ids. The API-created session is keyed on `external_id` = the **conversation id**. The OTLP side carries its session as `gen_ai.conversation.id` baggage holding the SDK's generated **session UUID**, and the backend creates a session keyed on that string, naming it `session` because no name travels with it. The two keys are different values, so they can never dedupe to one row.
 
-The likely fix is to align them — put the conversation id in the baggage so the span-side session matches the `external_id` the API session was created with. That is **unverified**: the probe for it timed out on the OTLP exporter thread before producing a row. The alternative is to stop calling `start_session` on this backend entirely, which yields one session per conversation named `session` — correct grouping, no name. Recorded in TODO.md.
+**Fixed by aligning the keys.** Comparing with Galileo made the mechanism obvious: Galileo attaches the session to the ingest request itself —
+
+```python
+TracesIngestRequest(traces=..., session_id=..., session_external_id=..., experiment_id=...)
+```
+
+— one call carrying the traces and the session identity together, so the server links them and a second session is impossible. OTLP has no such request. The only channel is one opaque string in `gen_ai.conversation.id` baggage, and the SDK was putting the session UUID there while the API session had been created with the conversation id as its external id.
+
+Setting the baggage to the conversation id makes both sides agree. Verified against the tenant: a turn with conversation id `diag-single-001` produced exactly one session row, named `My Bank Agent`, where every previous run produced a pair.
+
+This also means the duplicate was specific to Observability Cloud. Splunk AO standalone flushes through an ingest request like Galileo and would never have shown it.
 
 Unrelated but visible in the same comparison: Splunk AO shows no `bank-chat-turn` root row, because the OTLP path does not emit the Trace object itself — only spans, which carry the trace id. And it labels spans with OpenTelemetry semantic conventions (`invoke_agent`, `invoke_workflow`, `execute_tool`, `chat`) rather than the plain names Galileo shows. Both are SDK behaviour, not configuration.
 

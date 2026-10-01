@@ -630,9 +630,22 @@ class Telemetry:
             # "session", to hold the spans. Same ContextVar trap as the parent span below.
             # Only where the id is context-local. Galileo keeps it on the logger object, which
             # does flow back, and re-binding there disturbs an export that already works.
+            #
+            # Galileo attaches the session to the ingest request itself, carrying both the id and
+            # the external id with the batch, so the server links them and one session results.
+            # OTLP has no such request: the only channel is one opaque string in
+            # `gen_ai.conversation.id` baggage. The SDK puts the session UUID there, while the
+            # API session was created with the conversation id as its external id -- two
+            # different keys, so the backend made a second, unnamed session for the spans.
+            # Putting the conversation id in the baggage makes the span side agree with the
+            # external id the named session already has.
             if session_id and hasattr(logger, "_set_active_session_id"):
                 with suppress(Exception):
                     logger.set_session(str(session_id))
+                with suppress(Exception):
+                    from splunk_ao.session_context import set_session_context
+
+                    set_session_context(metadata["conversation_id"])
             # The SDK parent is a ContextVar: a worker thread's value does not flow
             # back to this request. Start the root here so agent callback tasks inherit it.
             label = metadata.get("endpoint") or metadata.get("model") or ""
