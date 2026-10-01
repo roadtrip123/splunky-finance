@@ -244,3 +244,16 @@ def test_a_blocked_action_says_why_it_could_not_be_verified(settings):
     assert allowed is False
     assert decision["diagnosis"]["cause"] == "request_failed"
     assert decision["diagnosis"]["error"] == "TimeoutError"
+
+
+def test_setup_button_is_hidden_unless_asked_for(client, settings):
+    """It writes judges, metrics and control bindings into whatever tenant is connected."""
+    headers = login(client, True)
+    assert client.get("/api/demo-admin/status", headers=headers).json()["setup_button"] is False
+
+    settings.demo_setup_button = True
+    assert client.get("/api/demo-admin/status", headers=headers).json()["setup_button"] is True
+
+    # Never in a workshop, where building it by hand is the lab.
+    settings.demo_mode = "workshop"
+    assert client.get("/api/demo-admin/status", headers=headers).json()["setup_button"] is False

@@ -63,6 +63,10 @@ class Settings(BaseSettings):
     allow_private_lan_http: bool = False
     # "workshop" hides presenter-only controls that confuse a solo lab participant.
     demo_mode: Literal["presenter", "workshop"] = "presenter"
+    # "Set up my project" creates the judges, enables the metrics and binds the controls in one
+    # click. Hidden unless asked for: it writes to whatever tenant is connected, and in a lab it
+    # would skip the exercise. Set DEMO_SETUP_BUTTON=true to show it.
+    demo_setup_button: bool = False
     app_origin: str = "http://localhost:3000"
     data_dir: Path = Path("../runtime")
     policy_dir: Path = Path("../data/policies")

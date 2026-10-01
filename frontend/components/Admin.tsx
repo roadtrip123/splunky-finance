@@ -45,6 +45,7 @@ type Status = {
   console_url: string | null;
   protection_status: string;
   demo_mode: "presenter" | "workshop";
+  setup_button: boolean;
   connection: {
     galileo_project: string;
     galileo_log_stream: string;
@@ -910,9 +911,10 @@ export default function Admin() {
                       >
                         Save and connect
                       </button>
-                      {/* Workshop participants create metrics and controls themselves; that is
-                          the lab. This shortcut would skip it. */}
-                      {status.demo_mode !== "workshop" && (
+                      {/* Hidden unless DEMO_SETUP_BUTTON is set: it writes judges, metrics and
+                          control bindings into whatever tenant is connected, and in a workshop it
+                          would skip the exercise. */}
+                      {status.setup_button && (
                       <button
                         className="button outline small"
                         disabled={busy || !status.connection.galileo_api_key_set}

@@ -112,6 +112,8 @@ PYTHONPATH=. .venv/bin/python ../scripts/configure_galileo.py
 PYTHONPATH=. .venv/bin/python ../scripts/configure_galileo.py --apply
 ```
 
+**Set up my project** in the portal does the same thing in one click, but is hidden unless `DEMO_SETUP_BUTTON=true`: it writes judges, metrics and control bindings into whatever tenant is connected, and in a workshop it would skip the exercise. It is never shown in workshop mode.
+
 The default invocation validates the control schemas without remote changes. `--apply` creates the custom boolean judges, enables the built-in evaluators, and creates and binds two server-side regex controls, one per gated tool, at the `pre` stage. `--apply --refresh-judges` publishes a new version of each judge; editing a prompt without it changes nothing in the tenant.
 
 Everything published comes from one file, `backend/app/observability/setup_definitions.py`: the judge rubrics, the prompt builder, the built-in metric slugs, and the control definitions. The guardrail's deny-list is generated from the dataset, so it cannot drift from the accounts that exist.
