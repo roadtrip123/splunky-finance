@@ -71,6 +71,7 @@ type Status = {
       stream_label: string;
       active: boolean;
       configured: boolean;
+      mode: "" | "o11y" | "standalone";
     }[];
   };
   endpoints: {
@@ -206,22 +207,32 @@ export default function Admin() {
   // different credentials, and showing all of them at once invites filling in the wrong set.
   const activeId = status?.observability.active ?? "galileo";
   const activeBackend = status?.observability.backends.find((b) => b.active) ?? {
-    id: "galileo" as const, name: "Galileo", stream_label: "log stream", active: true, configured: false,
+    id: "galileo" as const, name: "Galileo", stream_label: "log stream", active: true,
+    configured: false, mode: "" as const,
   };
   const streamLabel = activeBackend.stream_label.replace(/^./, (c) => c.toUpperCase());
+  // Splunk AO's two deployments are mutually exclusive and need different credentials. Show one
+  // set, chosen here, rather than nine fields where six are wrong for whichever you are using.
+  const [aoMode, setAoMode] = useState<"o11y" | "standalone">("o11y");
   const connectionFields: [keyof typeof conn, string, string][] =
     activeId === "splunk_ao"
-      ? [
-          ["splunk_ao_realm", "Realm (Observability Cloud, e.g. us1)", "text"],
-          ["splunk_ao_o11y_token", "O11y access token (INGEST)", "password"],
-          ["splunk_ao_o11y_api_token", "O11y API token (optional)", "password"],
-          ["splunk_ao_api_key", "API key (standalone only)", "password"],
-          ["splunk_ao_console_url", "Console URL (standalone only)", "text"],
-          ["splunk_ao_api_url", "API URL (standalone, optional)", "text"],
-          ["galileo_project", "Project", "text"],
-          ["galileo_log_stream", streamLabel, "text"],
-          ["agent_control_url", "Agent Control URL", "text"],
-        ]
+      ? aoMode === "o11y"
+        ? [
+            ["splunk_ao_realm", "Realm, e.g. us1", "text"],
+            ["splunk_ao_o11y_token", "Access token (INGEST + agent_observability_admin)", "password"],
+            ["splunk_ao_o11y_api_token", "API token — optional, only to separate CRUD from ingest", "password"],
+            ["galileo_project", "Project", "text"],
+            ["galileo_log_stream", streamLabel, "text"],
+            ["agent_control_url", "Agent Control URL — blank derives it from the realm", "text"],
+          ]
+        : [
+            ["splunk_ao_api_key", "API key", "password"],
+            ["splunk_ao_console_url", "Console URL", "text"],
+            ["splunk_ao_api_url", "API URL — optional, derived from the console URL", "text"],
+            ["galileo_project", "Project", "text"],
+            ["galileo_log_stream", streamLabel, "text"],
+            ["agent_control_url", "Agent Control URL", "text"],
+          ]
       : [
           ["galileo_api_key", "API key", "password"],
           ["galileo_project", "Project", "text"],
@@ -728,7 +739,7 @@ export default function Admin() {
                   </div>
                 </section>
                 <section className="admin-card">
-                  <h2>Connect to Galileo</h2>
+                  <h2>Connect to Splunk Agent Observability / Galileo</h2>
                   {status.demo_mode === "workshop" && (
                     <p className="muted">
                       Create the project, log stream, evaluators and guardrail in the Galileo
@@ -761,6 +772,26 @@ export default function Admin() {
                         </button>
                       ))}
                     </div>
+                    {activeId === "splunk_ao" && (
+                      <div className="admin-actions" role="group" aria-label="Splunk AO deployment">
+                        {(
+                          [
+                            ["o11y", "Observability Cloud"],
+                            ["standalone", "Standalone"],
+                          ] as const
+                        ).map(([id, label]) => (
+                          <button
+                            key={id}
+                            className={`button small${aoMode === id ? "" : " outline"}`}
+                            aria-pressed={aoMode === id}
+                            disabled={busy}
+                            onClick={() => setAoMode(id)}
+                          >
+                            {label}
+                          </button>
+                        ))}
+                      </div>
+                    )}
                     <p>
                       <strong>{activeBackend.name}</strong>
                       {" · "}

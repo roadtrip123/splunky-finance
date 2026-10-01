@@ -354,6 +354,7 @@ class Telemetry:
                     "stream_label": STREAM_LABEL[name],
                     "active": name == active,
                     "configured": self._credentials_for(name),
+                    "mode": self.splunk_ao_mode() if name == "splunk_ao" else "",
                 }
                 for name in BACKENDS
             ],
@@ -474,10 +475,52 @@ class Telemetry:
             for variable in variables:
                 os.environ.pop(variable, None)
         os.environ.update(self._backend_environment(active))
+        self.apply_agent_control_defaults()
 
     def backend_credentials_present(self):
         """True when the active backend has enough to authenticate."""
         return self._credentials_for(self.backend_name())
+
+    def splunk_ao_mode(self):
+        """Which Splunk AO deployment the saved credentials describe.
+
+        The two are mutually exclusive and need different fields, a different Agent Control host
+        and a different gateway header, so the mode is derived from what is set rather than asked
+        for twice. O11y wins when both are present, matching the SDK's own precedence.
+        """
+        s = self.settings
+        if s.splunk_ao_realm and (
+            s.splunk_ao_o11y_token.get_secret_value() or s.splunk_ao_o11y_api_token.get_secret_value()
+        ):
+            return "o11y"
+        if s.splunk_ao_api_key.get_secret_value() and s.splunk_ao_console_url:
+            return "standalone"
+        return ""
+
+    # Agent Control sits behind the same gateway as each backend's API, so it authenticates with
+    # that deployment's own credential on the header the gateway expects.
+    AGENT_CONTROL_HEADERS: ClassVar[dict] = {
+        "galileo": "Galileo-API-Key",
+        "o11y": "X-SF-Token",
+        "standalone": "Splunk-AO-API-Key",
+    }
+
+    def apply_agent_control_defaults(self):
+        """Point Agent Control at the active backend's gateway.
+
+        Left alone, a Splunk AO turn would send a Galileo header to a Splunk gateway and be
+        rejected, with nothing in the message saying why.
+        """
+        s = self.settings
+        if self.backend_name() != "splunk_ao":
+            s.agent_control_api_key_header = self.AGENT_CONTROL_HEADERS["galileo"]
+            return
+        mode = self.splunk_ao_mode()
+        s.agent_control_api_key_header = self.AGENT_CONTROL_HEADERS.get(mode or "standalone")
+        # Derive from the realm so the host always matches the credential's realm. A mismatched
+        # host returns 401 from the runtime token exchange.
+        if mode == "o11y" and not s.agent_control_url:
+            s.agent_control_url = f"https://app.{s.splunk_ao_realm}.signalfx.com/ao/agent-control"
 
     def _credentials_for(self, name):
         if name != "splunk_ao":

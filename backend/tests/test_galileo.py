@@ -697,3 +697,29 @@ def test_switching_backend_is_admin_only_and_starts_a_fresh_conversation(client)
     assert {b["stream_label"] for b in view["backends"]} == {"log stream", "agent stream"}
     # It survives a reload, like the model switch.
     assert client.app.state.telemetry.backend_name() == "splunk_ao"
+
+
+def test_agent_control_header_follows_the_active_backend(settings):
+    """A Galileo header sent to a Splunk gateway is rejected with nothing saying why."""
+    from app.observability.galileo import Telemetry
+
+    telemetry = Telemetry(settings)
+    telemetry.configure_environment()
+    assert settings.agent_control_api_key_header == "Galileo-API-Key"
+
+    telemetry._persist(active_backend="splunk_ao")
+    settings.splunk_ao_realm = "us1"
+    settings.splunk_ao_o11y_token = SecretStr("ingest")
+    settings.agent_control_url = ""
+    telemetry.configure_environment()
+    assert telemetry.splunk_ao_mode() == "o11y"
+    assert settings.agent_control_api_key_header == "X-SF-Token"
+    # Derived from the realm: the token is realm-scoped, so a mismatched host 401s.
+    assert settings.agent_control_url == "https://app.us1.signalfx.com/ao/agent-control"
+
+    settings.splunk_ao_realm, settings.splunk_ao_o11y_token = "", SecretStr("")
+    settings.splunk_ao_api_key = SecretStr("standalone-key")
+    settings.splunk_ao_console_url = "https://console.example.com"
+    telemetry.configure_environment()
+    assert telemetry.splunk_ao_mode() == "standalone"
+    assert settings.agent_control_api_key_header == "Splunk-AO-API-Key"
