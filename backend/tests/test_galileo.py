@@ -1,5 +1,6 @@
 from types import SimpleNamespace
 
+import pytest
 from conftest import login
 from pydantic import SecretStr
 
@@ -787,3 +788,45 @@ def test_a_saved_credential_can_be_cleared(client, settings):
     assert telemetry.connection()["splunk_ao_o11y_token_set"] is False
     # Everything else survives the clear.
     assert settings.galileo_project == "p"
+
+
+@pytest.mark.asyncio
+async def test_begin_works_when_the_logger_resolves_no_ids(settings, monkeypatch):
+    """On OTLP the logger has no log_stream_id, and reading it raised inside begin().
+
+    The broad except turned that into "initialization failed": the session was created and the
+    trace never was, which looks like "I can see sessions but no traces" in the console.
+    """
+    from app.observability.galileo import Telemetry
+
+    settings.galileo_enabled = True
+    settings.galileo_api_key = SecretStr("k")
+
+    class OtlpLogger:
+        """Exposes agent_stream_id only, and leaves both ids unresolved, as splunk_ao does."""
+
+        project_id = None
+        agent_stream_id = None
+
+        def start_session(self, **kwargs):
+            return "session"
+
+        def start_trace(self, **kwargs):
+            return SimpleNamespace(id="trace-1")
+
+    telemetry = Telemetry(settings)
+    telemetry.target = {"project_id": "resolved-project", "stream_id": "resolved-stream"}
+    sdk = SimpleNamespace(
+        name="splunk_ao",
+        new_logger=lambda **kwargs: OtlpLogger(),
+        stream_id=lambda logger: getattr(logger, "agent_stream_id", None),
+        callback=lambda logger: object(),
+    )
+    monkeypatch.setattr(type(telemetry), "backend", property(lambda self: sdk))
+
+    turn = await telemetry.begin("q", {"conversation_id": "c", "run_id": "r"})
+    assert turn is not None, telemetry.status.get("last_error")
+    assert turn["trace_id"] == "trace-1"
+    # The ids come from what the connection check resolved through the API.
+    assert telemetry.status["log_stream_id"] == "resolved-stream"
+    assert telemetry.status["project_id"] == "resolved-project"

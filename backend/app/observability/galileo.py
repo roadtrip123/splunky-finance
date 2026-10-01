@@ -636,8 +636,13 @@ class Telemetry:
                 last_error=None,
                 last_checked_at=time.time(),
                 last_connected_at=time.time(),
-                project_id=str(logger.project_id),
-                log_stream_id=str(logger.log_stream_id),
+                # On OTLP the logger resolves neither id: project and stream travel as span
+                # resource attributes. Fall back to what the connection check resolved through
+                # the API. Reading the attribute directly raised here, and the broad except
+                # turned that into "initialization failed" -- the session was created, the trace
+                # never was, which is exactly "I can see sessions but no traces".
+                project_id=str(logger.project_id or self.target.get("project_id") or ""),
+                log_stream_id=str(sdk.stream_id(logger) or self.target.get("stream_id") or ""),
             )
             self.pending[id(logger)] = logger
             return {
@@ -652,7 +657,7 @@ class Telemetry:
             self.status.update(
                 state="failed",
                 connection="failed",
-                last_error="Galileo initialization failed; check server configuration",
+                last_error=f"{self.backend_label()} initialization failed; check server configuration",
             )
             return None
 
@@ -980,3 +985,9 @@ class Telemetry:
                 await asyncio.wait_for(asyncio.to_thread(logger.flush), 10)
             except Exception:  # noqa: BLE001 - isolate SDK failures without exposing credential-bearing errors
                 self.status["export"] = "failed"
+            # The OTLP path runs a BatchSpanProcessor on a non-daemon thread, which keeps the
+            # process alive after the work is done. Flushing drains it; only terminate stops it.
+            terminate = getattr(logger, "terminate", None)
+            if terminate:
+                with suppress(Exception):
+                    await asyncio.wait_for(asyncio.to_thread(terminate), 5)
