@@ -49,6 +49,9 @@ class Settings(BaseSettings):
     splunk_ao_realm: str = ""
     splunk_ao_o11y_token: SecretStr = SecretStr("")
     splunk_ao_o11y_api_token: SecretStr = SecretStr("")
+    # Agent Control lives behind each backend's own gateway, so the URL cannot be shared: a
+    # Galileo URL left in place sends a Splunk token to the Galileo gateway and 401s.
+    splunk_ao_agent_control_url: str = ""
     demo_seed: int = 42
     demo_reference_date: date = date(2026, 9, 15)
     demo_timezone: str = "Australia/Brisbane"

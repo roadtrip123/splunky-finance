@@ -64,6 +64,7 @@ class Telemetry:
         "splunk_ao_realm",
         "splunk_ao_o11y_token",
         "splunk_ao_o11y_api_token",
+        "splunk_ao_agent_control_url",
     )
     SECRET_FIELDS = (
         "galileo_api_key",
@@ -126,6 +127,7 @@ class Telemetry:
             "splunk_ao_console_url": s.splunk_ao_console_url,
             "splunk_ao_api_url": s.splunk_ao_api_url,
             "splunk_ao_realm": s.splunk_ao_realm,
+            "splunk_ao_agent_control_url": s.splunk_ao_agent_control_url,
         }
         # Every secret is reported the same way: whether it is set, and the last four characters.
         # No endpoint returns a key, on either backend.
@@ -401,12 +403,22 @@ class Telemetry:
                     logger = sdk.new_logger(
                         project=self.settings.galileo_project, stream=self.settings.galileo_log_stream
                     )
+                    # The SDK does not raise when it cannot resolve the project; it leaves the id
+                    # unset. Passing that on as a path parameter produced a UUID validation error
+                    # that hid the real cause -- a 401 on the project lookup. Ask by name instead,
+                    # so whatever actually went wrong is the exception that reaches the caller.
+                    if not logger.project_id:
+                        sdk.get_stream(
+                            name=self.settings.galileo_log_stream,
+                            project_name=self.settings.galileo_project,
+                        )
+                        raise ValueError("Project unavailable")
                     # A fresh authenticated API read avoids claiming connection from cached IDs.
                     stream = sdk.get_stream(
                         name=self.settings.galileo_log_stream, project_id=str(logger.project_id)
                     )
                     if stream is None:
-                        raise ValueError("Configured log stream unavailable")
+                        raise ValueError("Configured stream unavailable")
                     return logger
 
                 logger = await asyncio.wait_for(asyncio.to_thread(connect), 15)
@@ -419,11 +431,9 @@ class Telemetry:
                     project_id=str(logger.project_id),
                     log_stream_id=str(sdk.stream_id(logger)),
                 )
-            except Exception:  # noqa: BLE001 - sanitize credential-bearing SDK errors
+            except Exception as exc:  # noqa: BLE001 - sanitize credential-bearing SDK errors
                 self.status.update(
-                    state="failed",
-                    connection="failed",
-                    last_error="Galileo connection failed; check API key, endpoint, and project permissions",
+                    state="failed", connection="failed", last_error=self._connection_error(exc)
                 )
             return dict(self.status)
 
@@ -481,6 +491,51 @@ class Telemetry:
         """True when the active backend has enough to authenticate."""
         return self._credentials_for(self.backend_name())
 
+    def _stream_word(self):
+        from app.observability.sdk import STREAM_LABEL
+
+        return STREAM_LABEL.get(self.backend_name(), "log stream")
+
+    def _connection_error(self, exc):
+        """A cause a presenter can act on, without echoing SDK error text.
+
+        The generic message used to be the only signal, which made a rejected token and an
+        unreachable host look identical. SDK text can carry URLs and credential headers, so only
+        the status code is read out of it, never the message.
+        """
+        text = str(exc)
+        label = self.backend_label()
+        if "401" in text or "Authentication" in type(exc).__name__ or "Unauthorized" in text:
+            if self.backend_name() == "splunk_ao" and self.splunk_ao_mode() == "o11y":
+                return (
+                    f"{label} rejected the credentials (401). API routes need an API token: an "
+                    "ingest-only token is rejected here. Check the API token field, or give the "
+                    "access token both INGEST and agent_observability_admin."
+                )
+            return f"{label} rejected the credentials (401). Check the API key has not expired."
+        if "403" in text:
+            return f"{label} accepted the credentials but refused the request (403). Check permissions."
+        if "404" in text:
+            return f"{label} could not find the project or stream (404). Create them in the console first."
+        # A rejected token and a missing project are indistinguishable from here: with no
+        # permission to list projects the SDK reports the named one as not found. Say both.
+        if "not found" in text.lower():
+            return (
+                f"{label} could not find the project or {self._stream_word()}. Either it does not "
+                "exist yet — create it in the console first — or the token cannot list it. On "
+                "Observability Cloud an ingest-only token is rejected on API routes."
+            )
+        if "Project unavailable" in text or "stream unavailable" in text:
+            return (
+                f"{label} authenticated but the project or {self._stream_word()} was not found. "
+                "Create them in the console first; the app cannot connect to a project that does "
+                "not exist."
+            )
+        for marker in ("timed out", "Timeout", "Connection", "resolve"):
+            if marker in text:
+                return f"{label} could not be reached. Check the realm or console URL and the network."
+        return f"{label} connection failed; check credentials, endpoint, and project permissions"
+
     def splunk_ao_mode(self):
         """Which Splunk AO deployment the saved credentials describe.
 
@@ -517,9 +572,13 @@ class Telemetry:
             return
         mode = self.splunk_ao_mode()
         s.agent_control_api_key_header = self.AGENT_CONTROL_HEADERS.get(mode or "standalone")
-        # Derive from the realm so the host always matches the credential's realm. A mismatched
-        # host returns 401 from the runtime token exchange.
-        if mode == "o11y" and not s.agent_control_url:
+        # Each backend has its own gateway. Sharing one field meant a Splunk AO turn kept the
+        # Galileo Agent Control URL and sent an X-SF-Token to the Galileo gateway.
+        if s.splunk_ao_agent_control_url:
+            s.agent_control_url = s.splunk_ao_agent_control_url
+        elif mode == "o11y" and s.splunk_ao_realm:
+            # Derive from the realm so the host always matches the credential's realm. A
+            # mismatched host returns 401 from the runtime token exchange.
             s.agent_control_url = f"https://app.{s.splunk_ao_realm}.signalfx.com/ao/agent-control"
 
     def _credentials_for(self, name):

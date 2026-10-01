@@ -66,6 +66,7 @@ class GalileoConnection(StrictModel):
     splunk_ao_realm: str = Field(default="", max_length=64)
     splunk_ao_o11y_token: str = Field(default="", max_length=400)
     splunk_ao_o11y_api_token: str = Field(default="", max_length=400)
+    splunk_ao_agent_control_url: str = Field(default="", max_length=400)
 
 
 class ActiveBackend(StrictModel):

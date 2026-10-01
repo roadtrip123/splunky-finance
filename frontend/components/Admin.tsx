@@ -56,6 +56,7 @@ type Status = {
     splunk_ao_console_url: string;
     splunk_ao_api_url: string;
     splunk_ao_realm: string;
+    splunk_ao_agent_control_url: string;
     splunk_ao_api_key_set: boolean;
     splunk_ao_api_key_masked: string;
     splunk_ao_o11y_token_set: boolean;
@@ -135,6 +136,7 @@ export default function Admin() {
     splunk_ao_api_key: "",
     splunk_ao_o11y_token: "",
     splunk_ao_o11y_api_token: "",
+    splunk_ao_agent_control_url: "",
     galileo_project: "",
     galileo_log_stream: "",
     galileo_console_url: "",
@@ -164,6 +166,7 @@ export default function Admin() {
           splunk_ao_console_url: s.connection.splunk_ao_console_url,
           splunk_ao_api_url: s.connection.splunk_ao_api_url,
           splunk_ao_realm: s.connection.splunk_ao_realm,
+          splunk_ao_agent_control_url: s.connection.splunk_ao_agent_control_url,
         }));
       }
       setStatus(s);
@@ -226,14 +229,14 @@ export default function Admin() {
               "Observability Cloud → your profile → Organizations. For example us1 or eu0. The console, API and trace ingest endpoints are all derived from this."],
             ["splunk_ao_o11y_token", "Access token", "password", true,
               "Observability Cloud → Settings → Access tokens. Needs both the INGEST and agent_observability_admin permissions, and you must be an org admin to create one."],
-            ["splunk_ao_o11y_api_token", "API token", "password", false,
-              "Only if you want reads and writes on a separate token from trace ingest. Leave blank and the access token above does both."],
+            ["splunk_ao_o11y_api_token", "API token", "password", true,
+              "Used for every API call: projects, agent streams and the Agent Control token exchange. This is NOT the ingest token — an ingest-only token is rejected with 401 here. Leave blank only if the access token above also has agent_observability_admin."],
             ["galileo_project", "Project", "text", false,
               "Observability Cloud → Agent Observability → All projects. Create it there first; the app cannot connect to a project that does not exist."],
             ["galileo_log_stream", streamLabel, "text", false,
               "The agent stream traces are written to, listed on the project home screen."],
-            ["agent_control_url", "Agent Control URL", "text", false,
-              "Leave blank to derive https://app.<realm>.signalfx.com/ao/agent-control. Only set it if your org uses the observability.splunkcloud.com host instead."],
+            ["splunk_ao_agent_control_url", "Agent Control URL", "text", false,
+              "Leave blank to derive https://app.<realm>.signalfx.com/ao/agent-control. Set it only if your org uses the observability.splunkcloud.com host. Kept separate from the Galileo one, which belongs to a different gateway."],
           ]
         : [
             ["splunk_ao_api_key", "API key", "password", true,
@@ -246,7 +249,7 @@ export default function Admin() {
               "Create it in the console first; the app cannot connect to a project that does not exist."],
             ["galileo_log_stream", streamLabel, "text", false,
               "The agent stream traces are written to, listed on the project home screen."],
-            ["agent_control_url", "Agent Control URL", "text", false,
+            ["splunk_ao_agent_control_url", "Agent Control URL", "text", false,
               "Your console's /api/agent-control path. Needed only for the guardrail."],
           ]
       : [

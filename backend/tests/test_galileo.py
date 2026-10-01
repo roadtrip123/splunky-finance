@@ -723,3 +723,41 @@ def test_agent_control_header_follows_the_active_backend(settings):
     telemetry.configure_environment()
     assert telemetry.splunk_ao_mode() == "standalone"
     assert settings.agent_control_api_key_header == "Splunk-AO-API-Key"
+
+
+def test_agent_control_url_is_not_shared_between_backends(settings):
+    """Each backend has its own gateway.
+
+    One shared field meant a Splunk AO turn kept the Galileo Agent Control URL and sent an
+    X-SF-Token to the Galileo gateway, which 401s with nothing naming the cause.
+    """
+    from app.observability.galileo import Telemetry
+
+    settings.agent_control_url = "https://agent-control.multitenant.galileocloud.io"
+    telemetry = Telemetry(settings)
+    telemetry._persist(active_backend="splunk_ao")
+    settings.splunk_ao_realm = "au0"
+    settings.splunk_ao_o11y_token = SecretStr("ingest")
+
+    telemetry.configure_environment()
+    assert settings.agent_control_url == "https://app.au0.signalfx.com/ao/agent-control"
+
+    settings.splunk_ao_agent_control_url = "https://app.au0.observability.splunkcloud.com/ao/agent-control"
+    telemetry.configure_environment()
+    assert settings.agent_control_url == settings.splunk_ao_agent_control_url
+
+
+def test_connection_errors_name_a_cause_without_echoing_sdk_text(settings):
+    """A rejected token and an unreachable host used to produce the same sentence."""
+    from app.observability.galileo import Telemetry
+
+    telemetry = Telemetry(settings)
+    telemetry._persist(active_backend="splunk_ao")
+    settings.splunk_ao_realm, settings.splunk_ao_o11y_token = "au0", SecretStr("t")
+
+    unauthorised = telemetry._connection_error(Exception('status 401 Unauthorized at /ao/api/projects'))
+    assert "401" in unauthorised and "ingest-only token is rejected" in unauthorised
+    assert "/ao/api/projects" not in unauthorised
+
+    assert "404" in telemetry._connection_error(Exception("404 not found"))
+    assert "could not be reached" in telemetry._connection_error(Exception("Connection refused"))
