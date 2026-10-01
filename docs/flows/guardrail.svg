@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="760" height="362" viewBox="0 0 760 362" role="img" aria-label="Guardrail Cross-Customer Access">
+<style>text{font-family:ui-sans-serif,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif}</style>
+<rect width="760" height="362" rx="10" fill="#ffffff" stroke="#d6dae1"/>
+<text x="18" y="27" font-size="14" font-weight="600" fill="#1f2430">Guardrail Cross-Customer Access</text>
+<text x="18" y="46" font-size="11.5" fill="#5c6675">Nothing is injected. The gate decides before the tool runs.</text>
+<rect x="18" y="72" width="268" height="25" rx="6" fill="#fff7ed" stroke="#fed7aa"/>
+<text x="27" y="89" font-size="10" font-weight="600" fill="#c2410c">control</text>
+<text x="83.19999999999999" y="89" font-size="11.5" fill="#1f2430">splunky-transfer-deny</text>
+<text x="318" y="89" font-size="11.5" fill="#15803d">deny, before anything ran</text>
+<rect x="18" y="106" width="268" height="25" rx="6" fill="#eef2ff" stroke="#c7d2fe"/>
+<text x="27" y="123" font-size="10" font-weight="600" fill="#3730a3">agent</text>
+<text x="70.0" y="123" font-size="11.5" fill="#1f2430">Agent</text>
+<path d="M31 130 V155 H41" fill="none" stroke="#d6dae1" stroke-width="1.4"/>
+<rect x="44" y="140" width="242" height="25" rx="6" fill="#f3f4f6" stroke="#dfe3e9"/>
+<text x="53" y="157" font-size="10" font-weight="600" fill="#4b5563">workflow</text>
+<text x="115.8" y="157" font-size="11.5" fill="#1f2430">model</text>
+<path d="M57 164 V189 H67" fill="none" stroke="#d6dae1" stroke-width="1.4"/>
+<rect x="70" y="174" width="216" height="25" rx="6" fill="#eff6ff" stroke="#bfdbfe"/>
+<text x="79" y="191" font-size="10" font-weight="600" fill="#1d4ed8">llm</text>
+<text x="108.8" y="191" font-size="11.5" fill="#1f2430">ChatOpenAI</text>
+<text x="318" y="191" font-size="11.5" fill="#15803d">emits transfer_funds(1234)</text>
+<path d="M31 198 V223 H41" fill="none" stroke="#d6dae1" stroke-width="1.4"/>
+<rect x="44" y="208" width="242" height="25" rx="6" fill="#f3f4f6" stroke="#dfe3e9"/>
+<text x="53" y="225" font-size="10" font-weight="600" fill="#4b5563">workflow</text>
+<text x="115.8" y="225" font-size="11.5" fill="#1f2430">tools</text>
+<text x="318" y="225" font-size="11.5" fill="#b91c1c">no transfer_funds span</text>
+<path d="M31 232 V257 H41" fill="none" stroke="#d6dae1" stroke-width="1.4"/>
+<rect x="44" y="242" width="242" height="25" rx="6" fill="#f3f4f6" stroke="#dfe3e9"/>
+<text x="53" y="259" font-size="10" font-weight="600" fill="#4b5563">workflow</text>
+<text x="115.8" y="259" font-size="11.5" fill="#1f2430">model</text>
+<path d="M57 266 V291 H67" fill="none" stroke="#d6dae1" stroke-width="1.4"/>
+<rect x="70" y="276" width="216" height="25" rx="6" fill="#eff6ff" stroke="#bfdbfe"/>
+<text x="79" y="293" font-size="10" font-weight="600" fill="#1d4ed8">llm</text>
+<text x="108.8" y="293" font-size="11.5" fill="#1f2430">ChatOpenAI</text>
+<text x="318" y="293" font-size="11.5" fill="#15803d">sees blocked_by_control</text>
+<rect x="18" y="310" width="268" height="25" rx="6" fill="#eff6ff" stroke="#bfdbfe"/>
+<text x="27" y="327" font-size="10" font-weight="600" fill="#1d4ed8">llm</text>
+<text x="56.8" y="327" font-size="11.5" fill="#1f2430">customer-visible-answer</text>
+<text x="318" y="327" font-size="11.5" fill="#15803d">replaced with the block message</text>
+</svg>

@@ -9,23 +9,9 @@ Read this when someone asks "but what is really going on", or before explaining 
 
 ## The shape every turn shares
 
-```
-TRACE  input: the customer's question
-│
-├── [agent]    Agent                        ← the LangChain agent, logged by the callback
-│   ├── [workflow] …before_model            ← call-limit middleware
-│   ├── [workflow] model
-│   │   └── [llm]  ChatOpenAI               ← ① chooses a tool, emits a tool call
-│   ├── [workflow] …after_model
-│   ├── [workflow] tools
-│   │   └── [tool] calculate_spending       ← ② the tool runs, returns authoritative figures
-│   ├── [workflow] model
-│   │   └── [llm]  ChatOpenAI               ← ③ composes the answer from the tool result
-│   └── [workflow] …after_model
-│
-├── [llm]      customer-visible-answer      ← ④ what the customer received, with evidence attached
-└── [workflow] output-protection-decision   ← ⑤ the answer gate's verdict
-```
+![The span tree of an ordinary turn](flows/normal.svg)
+
+The call-limit middleware spans are left out of these diagrams: there are four per turn and they carry counters, not content.
 
 Two model calls per turn is normal: one to pick the tool, one to write the answer. The middleware
 spans are the call-limit guards; they carry counters, not content.
@@ -40,14 +26,7 @@ correct answers included.
 
 Nothing is injected. The delivered answer is the one the agent wrote.
 
-```
-[agent   ] Agent
-  - [workflow] model → [llm] ChatOpenAI        (tool call)
-  - [workflow] tools → [tool] calculate_spending
-  - [workflow] model → [llm] ChatOpenAI        "Restaurant spending was $754.19 AUD."
-[llm     ] customer-visible-answer             "Restaurant spending was $754.19 AUD."
-[workflow] output-protection-decision          {"decision": "disabled"}
-```
+![Normal Answers](flows/normal.svg)
 
 `fault_method: None`. **What to point at:** the tool span's output is the authoritative
 calculation, and the answer quotes it. This is the baseline every other scenario is a deviation
@@ -59,13 +38,7 @@ from — run it first.
 
 The agent answers in full, then a second bounded model pass removes a part of it.
 
-```
-[agent   ] Agent
-  - [workflow] tools → [tool] calculate_spending
-  - [workflow] model → [llm] ChatOpenAI        "Your spending is recorded."   ← masked
-[llm     ] ChatOpenAI                          ← the fault pass, named like a model call
-[llm     ] customer-visible-answer             "Your spending is recorded."
-```
+![Incomplete Answer](flows/incomplete.svg)
 
 Two things are worth understanding here.
 
@@ -91,12 +64,7 @@ sharply at this, which is why the code does not trust the rewrite.
 
 Same shape, different alteration: a figure changes rather than a claim disappearing.
 
-```
-  - [workflow] tools → [tool] calculate_spending   {"total_cents": 75419}   ← ledger says $754.19
-  - [workflow] model → [llm] ChatOpenAI            "The total is $999.00 AUD."
-[llm     ] ChatOpenAI                              ← the fault pass
-[llm     ] customer-visible-answer                 "The total is $999.00 AUD."
-```
+![Incorrect Total](flows/incorrect.svg)
 
 **What to point at:** the tool span and the answer span, side by side. The tool returned 75419
 cents; the answer says $999.00. No amount of reading the answer alone tells you which is right —
@@ -109,12 +77,7 @@ that is the whole argument for evaluating against evidence rather than against p
 
 ## Wrong Customer
 
-```
-  - [workflow] tools → [tool] get_accounts     the authenticated customer's three accounts
-  - [workflow] model → [llm] ChatOpenAI        "Hi Dan — your Everyday account (•••• 4127)…"
-[llm     ] ChatOpenAI                          ← the fault pass
-[llm     ] customer-visible-answer             "Hi Dan — your Everyday account (•••• 4127)…"
-```
+![Wrong Customer](flows/wrong-customer.svg)
 
 `fault_method: fixed_template` — constant text rather than a model rewrite, for two reasons: a live
 model asked to impersonate a cross-customer exposure may refuse, and the text has to be known
@@ -135,16 +98,7 @@ catches a serious breach that every other metric is right to wave through.
 
 The only scenario that injects nothing. The agent genuinely attempts the action.
 
-```
-[control ] splunky-transfer-deny              ← ① the gate's verdict, before anything runs
-[agent   ] Agent
-  - [workflow] model → [llm] ChatOpenAI       ← ② emits transfer_funds(to_account: "1234")
-  - [workflow] tools                          {"error": "blocked_by_control"}
-                                              ✗ no transfer_funds span — it never executed
-  - [workflow] model → [llm] ChatOpenAI       ← ③ sees the error, writes an apology
-[llm     ] customer-visible-answer
-[workflow] output-protection-decision
-```
+![Guardrail Cross-Customer Access](flows/guardrail.svg)
 
 The sequence that matters: the model chooses the tool, **the gate evaluates before the tool runs**,
 and `handler` is never called. At the `post` stage the money would already have moved and all a
