@@ -3,6 +3,20 @@
 Ordered by what would hurt most if left undone. Items marked **before the workshop** are the ones
 with a date attached to them.
 
+Defects are also filed as [GitHub issues](https://github.com/roadtrip123/splunky-finance/issues),
+which carry the evidence and the reasoning. This file holds the plans; released states are in
+[CHANGELOG.md](CHANGELOG.md).
+
+| Issue | |
+| --- | --- |
+| [#1](https://github.com/roadtrip123/splunky-finance/issues/1) | Custom judges receive no payload on Splunk AO |
+| [#2](https://github.com/roadtrip123/splunky-finance/issues/2) | Agent Control cannot target a stream on Splunk AO Observability Cloud |
+| [#3](https://github.com/roadtrip123/splunky-finance/issues/3) | Fault masking does not survive the OTLP export path |
+| [#4](https://github.com/roadtrip123/splunky-finance/issues/4) | Guardrail has never returned a verified deny on Galileo |
+| [#5](https://github.com/roadtrip123/splunky-finance/issues/5) | Completeness judge scores correctly on 8 of 10 runs |
+| [#6](https://github.com/roadtrip123/splunky-finance/issues/6) | Guardrail bypassed by separators in the account number |
+| [#7](https://github.com/roadtrip123/splunky-finance/issues/7) | Presentation differences and two guardrail design gaps |
+
 ## Gate on resolved intent, not on the model's wording
 
 **A demonstrated bypass.** The control matches literal digit runs against the raw tool input
