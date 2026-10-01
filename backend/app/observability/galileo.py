@@ -19,6 +19,11 @@ class Telemetry:
         # Resolved by the connection check. Agent Control targets a stream by id, and on
         # Observability Cloud the logger exports over OTLP and never resolves one.
         self.target: dict = {}
+        # An operator who set AGENT_CONTROL_API_KEY_HEADER explicitly meant it. Remember whether
+        # the value differs from the field default, so deriving a header per backend never
+        # silently overwrites a deliberate one.
+        default_header = type(settings).model_fields["agent_control_api_key_header"].default
+        self._header_is_explicit = settings.agent_control_api_key_header != default_header
         self.toggle_path = Path(settings.data_dir) / "galileo-settings.json"
         try:
             saved = json.loads(self.toggle_path.read_text())
@@ -578,10 +583,12 @@ class Telemetry:
         """
         s = self.settings
         if self.backend_name() != "splunk_ao":
-            s.agent_control_api_key_header = self.AGENT_CONTROL_HEADERS["galileo"]
+            if not self._header_is_explicit:
+                s.agent_control_api_key_header = self.AGENT_CONTROL_HEADERS["galileo"]
             return
         mode = self.splunk_ao_mode()
-        s.agent_control_api_key_header = self.AGENT_CONTROL_HEADERS.get(mode or "standalone")
+        if not self._header_is_explicit:
+            s.agent_control_api_key_header = self.AGENT_CONTROL_HEADERS.get(mode or "standalone")
         # Each backend has its own gateway. Sharing one field meant a Splunk AO turn kept the
         # Galileo Agent Control URL and sent an X-SF-Token to the Galileo gateway.
         if s.splunk_ao_agent_control_url:

@@ -887,3 +887,28 @@ async def test_the_session_is_rebound_in_the_request_context(settings, monkeypat
 
     assert await telemetry.begin("q", {"conversation_id": "c", "run_id": "r"}) is not None
     assert bound == ["session-42"]
+
+
+def test_an_explicit_agent_control_header_is_never_overwritten(settings):
+    """Deriving a header per backend must not silently discard a deliberate one."""
+    from app.observability.galileo import Telemetry
+
+    settings.agent_control_api_key_header = "Custom-Header-From-Env"
+    telemetry = Telemetry(settings)
+    telemetry.configure_environment()
+    assert settings.agent_control_api_key_header == "Custom-Header-From-Env"
+
+    telemetry._persist(active_backend="splunk_ao")
+    settings.splunk_ao_realm, settings.splunk_ao_o11y_token = "au0", SecretStr("t")
+    telemetry.configure_environment()
+    assert settings.agent_control_api_key_header == "Custom-Header-From-Env"
+
+
+def test_an_unset_agent_control_header_still_follows_the_backend(settings):
+    from app.observability.galileo import Telemetry
+
+    telemetry = Telemetry(settings)
+    telemetry._persist(active_backend="splunk_ao")
+    settings.splunk_ao_realm, settings.splunk_ao_o11y_token = "au0", SecretStr("t")
+    telemetry.configure_environment()
+    assert settings.agent_control_api_key_header == "X-SF-Token"
