@@ -188,6 +188,29 @@ demo reaches its tenant.
 - [ ] While there: the Agent Control target type is still the string `"log_stream"`. Confirm
       whether Splunk AO expects `agent_stream`, since the rest of the vocabulary was renamed.
 
+## The custom judges cannot work on Splunk AO as written
+
+The OTLP path never emits the trace object — `if isinstance(finished_step, Trace): return` in
+`splunk_ao/logger/logger.py` — so `conclude(output=json.dumps(record))` is dropped. Galileo shows
+the record as the trace output; Splunk AO synthesises the row from spans and shows the plain
+answer.
+
+Every custom judge reads that record: *"The trace output is JSON containing question,
+candidate_output and evidence."* On Splunk AO it never arrives, so all three would score nothing.
+Context Adherence is unaffected, being span-level.
+
+- [ ] **Log the record as a span as well**, so it survives a transport that drops the trace. An
+      `output-protection-decision` workflow span already carries structured JSON, so the shape is
+      proven; this would be a sibling carrying the evaluation payload.
+- [ ] Decide whether to do it on both backends or only where the trace is dropped. Both is
+      simpler and makes one judge prompt work everywhere; it adds a redundant span on Galileo,
+      where the same JSON is already the trace output.
+- [ ] The judge prompts then need to name the span rather than "the trace output", and the lab
+      sheet with them.
+
+This is what makes Splunk AO usable for evaluation rather than only for tracing. Until it is done,
+a switch to Splunk AO silently stops the three custom metrics from scoring.
+
 ## Splunk AO trace presentation differs from Galileo
 
 Not bugs, but the two backends will never look identical side by side. Worth a sentence in the
