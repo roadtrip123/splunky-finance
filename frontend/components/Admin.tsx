@@ -106,7 +106,6 @@ export default function Admin() {
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState(false);
-  const [expected, setExpected] = useState<Record<string, unknown>>();
   // Sharon AI and "custom" are OpenAI-compatible endpoints: same provider, different base URL.
   const endpoints = {
     openai: { label: "OpenAI", provider: "openai", url: "", needsUrl: false, needsKey: true },
@@ -889,7 +888,6 @@ export default function Admin() {
                 </div>
                 <div role="tabpanel" hidden={tab !== "tools"}>
                   <section className="admin-card">
-                    <h2>{status.demo_mode === "workshop" ? "Check my setup" : "Demo diagnostics"}</h2>
                     <div className="admin-actions">
                       <button
                         className="button outline small"
@@ -922,18 +920,7 @@ export default function Admin() {
                       >
                         Test my setup
                       </button>
-                      <button
-                        className="button outline small"
-                        onClick={() =>
-                          action(async () =>
-                            setExpected(await api("demo-admin/expected-results")),
-                          )
-                        }
-                      >
-                        Inspect expected results
-                      </button>
                     </div>
-                    {expected && <pre>{JSON.stringify(expected, null, 2)}</pre>}
                   </section>
                   {status.demo_mode !== "workshop" && (
                   <section className="admin-card">

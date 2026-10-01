@@ -52,7 +52,7 @@ Tom and Dan are real customers of the bank with real balances, reachable by acco
 name. They are what makes the guardrail in Part 7 prevent a genuine exposure rather than a staged
 one, and what makes the Wrong Customer answer in Part 6 leak real data rather than invented text.
 
-Use **Inspect expected results** in the presenter workspace to retrieve the active dataset values. If the dataset seed or reference date was changed, that live output is authoritative rather than this table.
+These hold for the default seed and reference date. If either was changed, `GET /api/demo-admin/expected-results` returns the live values and is authoritative over this table.
 
 ## What each evaluator looks for
 
@@ -243,7 +243,7 @@ say which is which.
 1. Click **Enable Incorrect Total**.
 2. Send the displayed restaurant-spending question in the connected banking chat; model context resets automatically.
 3. A bounded model pass alters a number in the answer. The altered figure is not fixed, so read the candidate rather than announcing an expected amount; the authoritative total is **$754.19**. As with Part 4, if the pass changes no figure the alteration is imposed in code, and `fault_method` says which happened.
-4. Compare candidate output with **Inspect expected results** and the calculation evidence.
+4. Compare the answer with the authoritative total above, and with the tool span's output in the trace.
 5. Fetch actual scores. A configured `SplunkyNumericalCorrectness` metric should reject the altered amount.
 
 **What this shows:** a numerically plausible answer still fails when it disagrees with deterministic integer-cent calculations.
