@@ -42,7 +42,15 @@ In `/demo-admin`, open the **Setup** tab.
 
 **Model endpoint.** Choose your provider, fill in the key and model, and press **Add endpoint**. Sharon AI and any other OpenAI-compatible service use the OpenAI protocol with their own base URL, which the preset fills in for you.
 
-**Connect to Galileo.** Paste your API key, project and log stream, the console and API URLs, and the Agent Control URL. Press **Save and connect**. It applies immediately; nothing restarts.
+**Connect to Splunk Agent Observability / Galileo.** Choose where traces are sent — one backend at a time. The form then asks only for that backend's credentials, each marked required or optional with a note saying where to find it:
+
+| Backend | Required |
+| --- | --- |
+| Galileo | API key, project, log stream |
+| Splunk AO · Observability Cloud | realm and an access token — the console, API and ingest endpoints are derived from the realm |
+| Splunk AO · Standalone | API key and console URL |
+
+Press **Save and connect**. It applies immediately; nothing restarts. Switching backend resets the conversation, so a session never contains turns from both.
 
 The Galileo status should read `connected`. If it does not, check the project and log stream names match exactly what you created.
 

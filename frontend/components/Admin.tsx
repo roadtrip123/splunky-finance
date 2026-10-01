@@ -214,32 +214,54 @@ export default function Admin() {
   // Splunk AO's two deployments are mutually exclusive and need different credentials. Show one
   // set, chosen here, rather than nine fields where six are wrong for whichever you are using.
   const [aoMode, setAoMode] = useState<"o11y" | "standalone">("o11y");
-  const connectionFields: [keyof typeof conn, string, string][] =
+  // Each field says whether it is required and where the value comes from, because the two
+  // Splunk AO deployments want different credentials from different screens of a different
+  // product. A label alone leaves people guessing which half of the form applies to them.
+  type Field = [keyof typeof conn, string, string, boolean, string];
+  const connectionFields: Field[] =
     activeId === "splunk_ao"
       ? aoMode === "o11y"
         ? [
-            ["splunk_ao_realm", "Realm, e.g. us1", "text"],
-            ["splunk_ao_o11y_token", "Access token (INGEST + agent_observability_admin)", "password"],
-            ["splunk_ao_o11y_api_token", "API token — optional, only to separate CRUD from ingest", "password"],
-            ["galileo_project", "Project", "text"],
-            ["galileo_log_stream", streamLabel, "text"],
-            ["agent_control_url", "Agent Control URL — blank derives it from the realm", "text"],
+            ["splunk_ao_realm", "Realm", "text", true,
+              "Observability Cloud → your profile → Organizations. For example us1 or eu0. The console, API and trace ingest endpoints are all derived from this."],
+            ["splunk_ao_o11y_token", "Access token", "password", true,
+              "Observability Cloud → Settings → Access tokens. Needs both the INGEST and agent_observability_admin permissions, and you must be an org admin to create one."],
+            ["splunk_ao_o11y_api_token", "API token", "password", false,
+              "Only if you want reads and writes on a separate token from trace ingest. Leave blank and the access token above does both."],
+            ["galileo_project", "Project", "text", false,
+              "Observability Cloud → Agent Observability → All projects. Create it there first; the app cannot connect to a project that does not exist."],
+            ["galileo_log_stream", streamLabel, "text", false,
+              "The agent stream traces are written to, listed on the project home screen."],
+            ["agent_control_url", "Agent Control URL", "text", false,
+              "Leave blank to derive https://app.<realm>.signalfx.com/ao/agent-control. Only set it if your org uses the observability.splunkcloud.com host instead."],
           ]
         : [
-            ["splunk_ao_api_key", "API key", "password"],
-            ["splunk_ao_console_url", "Console URL", "text"],
-            ["splunk_ao_api_url", "API URL — optional, derived from the console URL", "text"],
-            ["galileo_project", "Project", "text"],
-            ["galileo_log_stream", streamLabel, "text"],
-            ["agent_control_url", "Agent Control URL", "text"],
+            ["splunk_ao_api_key", "API key", "password", true,
+              "Agent Observability → your profile menu → API keys → Create new key. It is shown once, so copy it before closing the dialog."],
+            ["splunk_ao_console_url", "Console URL", "text", true,
+              "The address you log in at, for example https://console.subdomain.yourcompany.com."],
+            ["splunk_ao_api_url", "API URL", "text", false,
+              "Derived from the console URL. Only set it for a non-standard deployment."],
+            ["galileo_project", "Project", "text", false,
+              "Create it in the console first; the app cannot connect to a project that does not exist."],
+            ["galileo_log_stream", streamLabel, "text", false,
+              "The agent stream traces are written to, listed on the project home screen."],
+            ["agent_control_url", "Agent Control URL", "text", false,
+              "Your console's /api/agent-control path. Needed only for the guardrail."],
           ]
       : [
-          ["galileo_api_key", "API key", "password"],
-          ["galileo_project", "Project", "text"],
-          ["galileo_log_stream", streamLabel, "text"],
-          ["galileo_console_url", "Console URL", "text"],
-          ["galileo_api_url", "API URL", "text"],
-          ["agent_control_url", "Agent Control URL", "text"],
+          ["galileo_api_key", "API key", "password", true,
+            "Galileo console → your profile menu → API keys. It is shown once, so copy it before closing the dialog."],
+          ["galileo_project", "Project", "text", true,
+            "Create it in the Galileo console first; the app cannot connect to a project that does not exist."],
+          ["galileo_log_stream", streamLabel, "text", true,
+            "The log stream traces are written to, listed on the project home screen."],
+          ["galileo_console_url", "Console URL", "text", false,
+            "The address you log in at. Leave blank for the default tenant."],
+          ["galileo_api_url", "API URL", "text", false,
+            "Derived from the console URL. Only set it for a non-standard deployment."],
+          ["agent_control_url", "Agent Control URL", "text", false,
+            "Needed only for the guardrail. Your instructor has it."],
         ];
   function secretPlaceholder(key: string) {
     const connection = status?.connection as Record<string, string | boolean> | undefined;
@@ -752,6 +774,10 @@ export default function Admin() {
                     </p>
                     {/* One backend at a time. Two would leave Agent Control without an
                         adjudicator, and two tenants disagreeing on one tool call has no answer. */}
+                    <p className="muted">
+                      Choose where traces are sent. One at a time — switching resets the
+                      conversation so a session never contains turns from both.
+                    </p>
                     <div className="admin-actions" role="group" aria-label="Observability backend">
                       {status.observability.backends.map((b) => (
                         <button
@@ -792,6 +818,13 @@ export default function Admin() {
                         ))}
                       </div>
                     )}
+                    {activeId === "splunk_ao" && (
+                      <p className="muted">
+                        {aoMode === "o11y"
+                          ? "Splunk Observability Cloud. Two fields: the realm and an access token. The console, API and trace ingest endpoints are all derived from the realm, which is why they are not asked for."
+                          : "A self-hosted Agent Observability deployment. Two fields: an API key and the console URL you log in at."}
+                      </p>
+                    )}
                     <p>
                       <strong>{activeBackend.name}</strong>
                       {" · "}
@@ -800,17 +833,26 @@ export default function Admin() {
                       {status.galileo.connection}
                     </p>
                     <div className="admin-stack">
-                      {connectionFields.map(([key, label, type]) => (
+                      {connectionFields.map(([key, label, type, required, hint]) => (
                         <div key={key}>
-                          <label htmlFor={key}>{label}</label>
+                          <label htmlFor={key}>
+                            {label}{" "}
+                            <span className="field-optional">
+                              {required ? "(required)" : "(optional)"}
+                            </span>
+                          </label>
                           <input
                             id={key}
                             type={type}
                             autoComplete="off"
+                            aria-describedby={`${key}-hint`}
                             placeholder={secretPlaceholder(key)}
                             value={conn[key]}
                             onChange={(e) => setConn({ ...conn, [key]: e.target.value })}
                           />
+                          <small className="field-hint" id={`${key}-hint`}>
+                            {hint}
+                          </small>
                         </div>
                       ))}
                     </div>

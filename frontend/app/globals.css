@@ -1107,6 +1107,19 @@ td small {
   width: 100%;
   font-size: 12px;
 }
+/* Where to find a credential, under the field that wants it. Nobody should have to leave the
+   portal to work out which of two deployments they are configuring. */
+.field-hint {
+  display: block;
+  margin-top: 4px;
+  font-size: 11px;
+  line-height: 1.45;
+  opacity: 0.72;
+}
+.field-optional {
+  font-weight: 400;
+  opacity: 0.66;
+}
 .scenario-question {
   display: flex;
   align-items: baseline;
