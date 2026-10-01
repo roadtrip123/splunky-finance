@@ -3,6 +3,77 @@
 Ordered by what would hurt most if left undone. Items marked **before the workshop** are the ones
 with a date attached to them.
 
+## Gate on resolved intent, not on the model's wording
+
+**A demonstrated bypass.** The control matches literal digit runs against the raw tool input
+(`\b1234\b`), while `Banking.resolve()` strips every non-digit before looking the account up. The
+two disagree about what "1234" means, so a separator walks straight through:
+
+| `to_account` | Control | Actually reaches |
+| --- | --- | --- |
+| `"1234"` | DENY | Tom Whitfield |
+| `"#1234"` | DENY | Tom Whitfield |
+| `"1 2 3 4"` | allow | **Tom Whitfield** |
+| `"12-34"` | allow | **Tom Whitfield** |
+| `"4-1-2-7"` | allow | **Dan Whitfield** |
+
+A canonicalisation differential, which is the standard failure of any guardrail matching surface
+content while the system acts on a normalised form. The control did what it was told; the control
+and the resolver were told different things.
+
+**Tightening the regex is the wrong fix** — it moves the goalposts to `"one two three four"`. Send
+the gate what the tool is about to do instead. The app already computes it one line before it would
+execute.
+
+- [ ] `ActionGuard` takes the `banking` instance. It is constructed in the same scope as
+      `build_tools(banking, evidence)`, so this is plumbing, not restructuring.
+- [ ] `check_action` sends a canonical `step_input` rather than the raw arguments:
+      ```json
+      {"tool": "transfer_funds", "amount_cents": 10000,
+       "target_account": "•••• 1234", "target_owner": "Tom Whitfield",
+       "target_is_authenticated_customer": false,
+       "raw_arguments": {"to_account": "12-34", "amount_cents": 10000}}
+      ```
+      Keep `raw_arguments` so the audit trail still shows what the model actually wrote.
+- [ ] Control condition becomes a selector on `input.target_is_authenticated_customer` for `false`,
+      replacing the generated name/number deny-list. `Step.input` accepts any JSON value and
+      `ControlSelector.path` selects a slice of the step payload, so this is supported by the
+      models. **Unverified against the live server:** dotted-path selection into a nested field
+      needs one tenant test. If it is not supported, fall back to a regex on the whole input for
+      `"target_is_authenticated_customer":\s*false`, which is equally paraphrase-proof because the
+      app computed the value.
+- [ ] `_foreign_account_pattern()` and its generated deny-list become unnecessary. Delete, along
+      with the test that asserts the pattern only matches foreign accounts.
+- [ ] Update the paste-ready JSON in [docs/workshop-lab.md](docs/workshop-lab.md) and the Agent
+      Control section of [docs/evaluators.md](docs/evaluators.md), including the reason — "match
+      the resolved action, not the wording" is the transferable lesson and a better lab exercise
+      than copying a regex.
+- [ ] Regression: the probe table above, asserting every row denies.
+
+This also improves the demo. "The guardrail evaluates the resolved action, so rephrasing the
+request does not help" is a stronger claim than showing a list of blocked account numbers — and it
+survives the question a partner will ask, which is whether they can just word it differently.
+
+**Not blocking the workshop.** The demo questions use the plain account number and work correctly.
+Worth doing before anyone adversarial sees it.
+
+### Two related weaknesses, same area
+
+- [ ] **The gate is opt-in per run.** `check_action` returns `{"decision": "disabled"}` when the
+      scenario is not armed. Deliberate — the demo shows the transfer executing, then blocks it —
+      but it means the guardrail is a toggle, not an always-on control. Say so out loud rather than
+      letting the room assume otherwise.
+- [ ] **`GATED_TOOLS` is a hardcoded allowlist of two.** Add a money-moving tool and forget the
+      tuple and it is ungated, silently. Deny-by-default, gating everything not on a read-only
+      list, is the safer shape and is a small change.
+
+Not a weakness, and worth stating when asked: there is **no code execution tool** — no `eval`,
+`exec`, `subprocess` or REPL anywhere in the app — so the model cannot write and run a script to
+reach the banking functions. It can only emit calls against the seven bound schemas, and every one
+of those is logged as a span by the LangChain callback whether or not a control evaluated it. A
+tool that ran would leave a `transfer_funds` span; the proof the block worked is that there is not
+one.
+
 ## Support Splunk AO alongside Galileo
 
 Splunky Finance logs through the `galileo` package. Splunk Agent Observability uses `splunk_ao`,
