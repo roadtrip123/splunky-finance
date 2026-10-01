@@ -28,26 +28,25 @@ def test_toggle_is_admin_only_csrf_checked_and_persistent(client, settings):
 
 
 async def test_connection_requires_successful_sdk_resolution(settings, monkeypatch):
-    import galileo
-
     settings.galileo_enabled = True
     settings.galileo_api_key = settings.openai_api_key
     calls = []
 
-    def connect(**kwargs):
+    def lookup(**kwargs):
         calls.append(kwargs)
-        return SimpleNamespace(project_id="test-project", log_stream_id="test-stream")
+        return SimpleNamespace(id="test-stream", project_id="test-project")
 
-    monkeypatch.setattr(galileo, "GalileoLogger", connect)
-    monkeypatch.setattr(
-        "galileo.log_streams.get_log_stream", lambda **kwargs: SimpleNamespace(id="test-stream")
-    )
+    # The target is resolved through the API, not from the logger: on Observability Cloud the
+    # logger exports over OTLP and never resolves ids at all.
+    monkeypatch.setattr("galileo.log_streams.get_log_stream", lookup)
     telemetry = Telemetry(settings)
     status = await telemetry.check_connection()
     assert status["connection"] == "connected" and status["last_connected_at"]
     assert status["export"] == "not_attempted"
+    assert status["project_id"] == "test-project" and status["log_stream_id"] == "test-stream"
+    assert telemetry.target == {"project_id": "test-project", "stream_id": "test-stream"}
     await telemetry.check_connection()
-    assert len(calls) == 1
+    assert len(calls) == 1, "a successful check should be cached"
 
 
 async def test_connection_errors_do_not_expose_sdk_secrets(settings, monkeypatch):

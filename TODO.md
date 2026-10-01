@@ -177,6 +177,17 @@ preflight that checks names against the tenant before enabling will catch it.
 **Not before the workshop.** Stages 0 and 1 are safe now; Stage 2 onwards changes how a working
 demo reaches its tenant.
 
+## Agent Control cannot target a stream on Splunk AO Observability Cloud
+
+- [ ] `Protection._evaluate` builds its `EvaluationRequest` with `stream_id_of(logger)`. On OTLP
+      the logger never resolves an id — project and stream are resource attributes — so this is
+      `None` and the gate raises "No resolved log stream" before reaching the gateway. The
+      connection check already resolves the real id through the API and keeps it on
+      `Telemetry.target`; the gate needs that instead of the logger. Pass the turn, or the ids,
+      into `check_action`.
+- [ ] While there: the Agent Control target type is still the string `"log_stream"`. Confirm
+      whether Splunk AO expects `agent_stream`, since the rest of the vocabulary was renamed.
+
 ## Before the workshop
 
 - [ ] **Prove the guardrail returns a verified deny.** It blocks, but by failing closed:

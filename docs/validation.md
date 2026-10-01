@@ -434,3 +434,13 @@ More seriously, the pattern opened with `(?i)`. That is a Python inline flag. Ja
 `_foreign_account_pattern()` now builds case insensitivity from character classes, which every engine understands. Verified accepted by both Python's `re` and node's `RegExp`, matching `tom`, `TOM WHITFIELD`, `Dan Whitfield` and `1234` while leaving the customer's own `2058` and `1042` alone. Republished to controls 886, 887, 1029 and 1030, all four confirmed carrying a pattern with no inline flag. A regression asserts `(?` never appears in a generated pattern.
 
 Backend suite: 87 passed.
+
+## The readiness check assumed an API-resolving logger
+
+Splunk AO reported "authenticated but the project or agent stream was not found" against a tenant where both existed and were correctly named. The fault was the check, not the tenant.
+
+On Observability Cloud the logger exports over OTLP: project and stream are resource attributes on the spans, there is no API resolution step, and `project_id` and `agent_stream_id` are `None` by design. The check required an id on the logger and read its absence as a missing project. It now resolves the target through the API — `get_stream(name=..., project_name=...)` — and takes the ids from that, which works on both backends and removes a UUID-validation path that previously hid a 401 behind a schema error.
+
+The resolved ids are kept on `Telemetry.target`, cleared whenever the backend or the connection changes.
+
+**Knock-on, not yet addressed.** `Protection._evaluate` targets Agent Control with `stream_id_of(logger)`, which is `None` on OTLP for the same reason. The guardrail therefore cannot target a stream on Splunk AO Observability Cloud and will raise "No resolved log stream" before it reaches the gateway. It needs the resolved id from `Telemetry.target` rather than the logger. Recorded in TODO.md.

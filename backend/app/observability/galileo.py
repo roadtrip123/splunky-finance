@@ -16,6 +16,9 @@ class Telemetry:
     def __init__(self, settings):
         self.settings = settings
         self.enabled = settings.galileo_enabled
+        # Resolved by the connection check. Agent Control targets a stream by id, and on
+        # Observability Cloud the logger exports over OTLP and never resolves one.
+        self.target: dict = {}
         self.toggle_path = Path(settings.data_dir) / "galileo-settings.json"
         try:
             saved = json.loads(self.toggle_path.read_text())
@@ -185,6 +188,7 @@ class Telemetry:
                 current[field] = value
         self.apply_connection(current)
         self._persist(current)
+        self.target = {}
         self.scorers, self.scorers_at = {}, 0.0
         self.revision += 1
         self.status.update(
@@ -337,6 +341,7 @@ class Telemetry:
             raise ValueError(f"Unknown observability backend {name!r}")
         self._persist(active_backend=name)
         self._backend = None
+        self.target = {}
         self.scorers, self.scorers_at = {}, 0.0
         self.revision += 1
         self.status.update(
@@ -409,36 +414,32 @@ class Telemetry:
                 sdk = self.backend
 
                 def connect():
-                    logger = sdk.new_logger(
-                        project=self.settings.galileo_project, stream=self.settings.galileo_log_stream
-                    )
-                    # The SDK does not raise when it cannot resolve the project; it leaves the id
-                    # unset. Passing that on as a path parameter produced a UUID validation error
-                    # that hid the real cause -- a 401 on the project lookup. Ask by name instead,
-                    # so whatever actually went wrong is the exception that reaches the caller.
-                    if not logger.project_id:
-                        sdk.get_stream(
-                            name=self.settings.galileo_log_stream,
-                            project_name=self.settings.galileo_project,
-                        )
-                        raise ValueError("Project unavailable")
-                    # A fresh authenticated API read avoids claiming connection from cached IDs.
+                    # Resolve through the API rather than from the logger. On Observability Cloud
+                    # the logger exports over OTLP and never resolves ids at all -- project and
+                    # stream travel as resource attributes -- so `project_id is None` is normal
+                    # there, not a failure. Reading it as one reported a correctly configured
+                    # tenant as "project not found".
                     stream = sdk.get_stream(
-                        name=self.settings.galileo_log_stream, project_id=str(logger.project_id)
+                        name=self.settings.galileo_log_stream,
+                        project_name=self.settings.galileo_project,
                     )
                     if stream is None:
                         raise ValueError("Configured stream unavailable")
-                    return logger
+                    return str(getattr(stream, "project_id", "") or ""), str(
+                        getattr(stream, "id", "") or ""
+                    )
 
-                logger = await asyncio.wait_for(asyncio.to_thread(connect), 15)
-                if not logger.project_id or not sdk.stream_id(logger):
-                    raise ValueError("Unresolved Galileo target")
+                project_id, stream_id = await asyncio.wait_for(asyncio.to_thread(connect), 15)
+                if not stream_id:
+                    raise ValueError("Configured stream unavailable")
+                # Agent Control targets a stream by id, and on OTLP the logger cannot supply one.
+                self.target = {"project_id": project_id, "stream_id": stream_id}
                 self.status.update(
                     state="connected",
                     connection="connected",
                     last_connected_at=time.time(),
-                    project_id=str(logger.project_id),
-                    log_stream_id=str(sdk.stream_id(logger)),
+                    project_id=project_id,
+                    log_stream_id=stream_id,
                 )
             except Exception as exc:  # noqa: BLE001 - sanitize credential-bearing SDK errors
                 self.status.update(
