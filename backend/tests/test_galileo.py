@@ -830,3 +830,17 @@ async def test_begin_works_when_the_logger_resolves_no_ids(settings, monkeypatch
     # The ids come from what the connection check resolved through the API.
     assert telemetry.status["log_stream_id"] == "resolved-stream"
     assert telemetry.status["project_id"] == "resolved-project"
+
+
+def test_the_traces_client_uses_each_sdks_stream_keyword():
+    """`Traces(log_stream_id=...)` raises a TypeError on Splunk AO, where it is agent_stream_id."""
+    import dataclasses
+
+    from app.observability.sdk import backend
+
+    # Constructing a real client needs tenant auth, so capture the keywords instead.
+    for name, keyword in (("galileo", "log_stream_id"), ("splunk_ao", "agent_stream_id")):
+        seen = {}
+        stub = dataclasses.replace(backend(name), Traces=lambda _s=seen, **kw: _s.update(kw))
+        stub.traces(project_id="p", stream_id="s")
+        assert seen == {"project_id": "p", keyword: "s"}, (name, seen)

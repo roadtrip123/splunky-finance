@@ -611,8 +611,8 @@ def create_app(settings=None, model_builder=None, protection_adapter=None):
         for record in list(chat.events)[-10:]:
             if run and record.get("presenter_run_id") == run["id"] and record.get("trace_id"):
                 try:
-                    traces = telemetry.backend.Traces(
-                        project_id=record["project_id"], log_stream_id=record["log_stream_id"]
+                    traces = telemetry.backend.traces(
+                        project_id=record["project_id"], stream_id=record["log_stream_id"]
                     )
                     remote = await asyncio.wait_for(traces.get_trace(record["trace_id"]), 10)
                     metrics = remote.get("metrics", {}) or {}

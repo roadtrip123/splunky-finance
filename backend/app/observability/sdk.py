@@ -49,6 +49,10 @@ class Backend:
     def get_stream(self, **kwargs):
         return self._get_stream(**kwargs)
 
+    def traces(self, *, project_id, stream_id):
+        """The trace-reading client. The stream keyword differs with the rest of the vocabulary."""
+        return self.Traces(**{"project_id": project_id, self._stream_attr: stream_id})
+
     def stream_id(self, logger):
         """`log_stream_id` on Galileo, `agent_stream_id` on Splunk AO."""
         return getattr(logger, self._stream_attr, None)
