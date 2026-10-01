@@ -49,6 +49,8 @@ class Telemetry:
         self.scorers = {}
         self.scorers_at = 0.0
 
+    # Project and stream are shared: both backends call the same two things by different names,
+    # and a participant who renames their project should not have to do it twice.
     CONNECTION_FIELDS = (
         "galileo_api_key",
         "galileo_project",
@@ -56,6 +58,18 @@ class Telemetry:
         "galileo_console_url",
         "galileo_api_url",
         "agent_control_url",
+        "splunk_ao_api_key",
+        "splunk_ao_console_url",
+        "splunk_ao_api_url",
+        "splunk_ao_realm",
+        "splunk_ao_o11y_token",
+        "splunk_ao_o11y_api_token",
+    )
+    SECRET_FIELDS = (
+        "galileo_api_key",
+        "splunk_ao_api_key",
+        "splunk_ao_o11y_token",
+        "splunk_ao_o11y_api_token",
     )
 
     @property
@@ -67,6 +81,11 @@ class Telemetry:
         if getattr(self, "_backend", None) is None or self._backend.name != name:
             self._backend = resolve(name)
         return self._backend
+
+    def backend_label(self):
+        from app.observability.sdk import DISPLAY_NAME
+
+        return DISPLAY_NAME.get(self.backend_name(), self.backend_name())
 
     def backend_name(self):
         from app.observability.sdk import BACKENDS, GALILEO
@@ -85,7 +104,8 @@ class Telemetry:
             value = values.get(field)
             if not isinstance(value, str) or not value:
                 continue
-            setattr(self.settings, field, SecretStr(value) if field.endswith("_key") else value)
+            secret = field in self.SECRET_FIELDS
+            setattr(self.settings, field, SecretStr(value) if secret else value)
 
     @staticmethod
     def mask(secret):
@@ -97,16 +117,23 @@ class Telemetry:
     def connection(self):
         """Current connection details. The API key is only ever returned masked."""
         s = self.settings
-        key = s.galileo_api_key.get_secret_value()
-        return {
+        view = {
             "galileo_project": s.galileo_project,
             "galileo_log_stream": s.galileo_log_stream,
             "galileo_console_url": s.galileo_console_url,
             "galileo_api_url": s.galileo_api_url,
             "agent_control_url": s.agent_control_url,
-            "galileo_api_key_set": bool(key),
-            "galileo_api_key_masked": self.mask(key),
+            "splunk_ao_console_url": s.splunk_ao_console_url,
+            "splunk_ao_api_url": s.splunk_ao_api_url,
+            "splunk_ao_realm": s.splunk_ao_realm,
         }
+        # Every secret is reported the same way: whether it is set, and the last four characters.
+        # No endpoint returns a key, on either backend.
+        for field in self.SECRET_FIELDS:
+            secret = getattr(s, field).get_secret_value()
+            view[f"{field}_set"] = bool(secret)
+            view[f"{field}_masked"] = self.mask(secret)
+        return view
 
     def _saved(self):
         try:
@@ -114,13 +141,16 @@ class Telemetry:
         except (OSError, ValueError, TypeError, AttributeError):
             return {}
 
-    def _persist(self, connection=None, endpoints=None, active_endpoint=None):
+    def _persist(self, connection=None, endpoints=None, active_endpoint=None, active_backend=None):
         previous = self._saved()
         saved = {"enabled": self.enabled}
         connection = previous.get("connection") if connection is None else connection
         if endpoints is None:
             endpoints = self._load_endpoints(previous)
             active_endpoint = previous.get("active_endpoint")
+        active_backend = previous.get("active_backend") if active_backend is None else active_backend
+        if active_backend:
+            saved["active_backend"] = active_backend
         if connection:
             saved["connection"] = connection
         if endpoints:
@@ -283,6 +313,52 @@ class Telemetry:
         self._persist(endpoints=endpoints, active_endpoint=identifier)
         self.apply_endpoint(chosen)
 
+    def set_active_backend(self, name):
+        """Switch observability backend. One is active at a time.
+
+        Cached scorer names belong to the previous tenant, so they go with it; without that the
+        portal reports the old tenant's metrics against the new one. The revision bump is what
+        the connected banking session watches, same as a connection change.
+        """
+        from app.observability.sdk import BACKENDS
+
+        if name not in BACKENDS:
+            raise ValueError(f"Unknown observability backend {name!r}")
+        self._persist(active_backend=name)
+        self._backend = None
+        self.scorers, self.scorers_at = {}, 0.0
+        self.revision += 1
+        self.status.update(
+            revision=self.revision,
+            backend=name,
+            state="unconfigured",
+            connection="not_checked",
+            project_id=None,
+            log_stream_id=None,
+            last_checked_at=None,
+            last_error=None,
+        )
+        return self.backends_view()
+
+    def backends_view(self):
+        """What the portal shows: every backend, which is active, and whether it can authenticate."""
+        from app.observability.sdk import BACKENDS, DISPLAY_NAME, STREAM_LABEL
+
+        active = self.backend_name()
+        return {
+            "active": active,
+            "backends": [
+                {
+                    "id": name,
+                    "name": DISPLAY_NAME[name],
+                    "stream_label": STREAM_LABEL[name],
+                    "active": name == active,
+                    "configured": self._credentials_for(name),
+                }
+                for name in BACKENDS
+            ],
+        }
+
     def set_enabled(self, enabled):
         self.enabled = enabled
         self._persist()
@@ -310,7 +386,9 @@ class Telemetry:
             self.status["last_checked_at"] = time.time()
             if not self.settings.galileo_api_key.get_secret_value():
                 self.status.update(
-                    state="unconfigured", connection="unconfigured", last_error="Galileo API key missing"
+                    state="unconfigured",
+                    connection="unconfigured",
+                    last_error=f"{self.backend_label()} credentials missing",
                 )
                 return dict(self.status)
             self.status.update(state="checking", connection="checking", last_error=None)
@@ -348,18 +426,76 @@ class Telemetry:
                 )
             return dict(self.status)
 
-    def configure_environment(self):
+    # Every variable either SDK inspects. The inactive backend's are deleted rather than left
+    # alone, because splunk_ao does not have its own namespace: SplunkAOConfig subclasses
+    # GalileoConfig and bridges SPLUNK_AO_* into the GALILEO_* names, since galileo-core still
+    # reads those. It only fills a gap, so an explicit GALILEO_* wins -- but configure Splunk AO
+    # with Galileo unset and the Galileo SDK silently inherits Splunk AO's credentials. A
+    # "Galileo" logger writing to Splunk AO is only noticeable by wondering why a tenant is empty.
+    BACKEND_ENV_VARS: ClassVar[dict] = {
+        "galileo": (
+            "GALILEO_API_KEY", "GALILEO_CONSOLE_URL", "GALILEO_API_URL",
+            "GALILEO_PROJECT", "GALILEO_LOG_STREAM",
+        ),
+        "splunk_ao": (
+            "SPLUNK_AO_API_KEY", "SPLUNK_AO_CONSOLE_URL", "SPLUNK_AO_API_URL",
+            "SPLUNK_AO_REALM", "SPLUNK_AO_O11Y_TOKEN", "SPLUNK_AO_O11Y_API_TOKEN",
+            "SPLUNK_AO_PROJECT", "SPLUNK_AO_AGENT_STREAM",
+        ),
+    }
+
+    def _backend_environment(self, name):
+        """The variables one backend needs, with empty values dropped."""
         s = self.settings
-        os.environ["GALILEO_API_KEY"] = s.galileo_api_key.get_secret_value()
-        for name in ("galileo_console_url", "galileo_api_url"):
-            if getattr(s, name):
-                os.environ[name.upper()] = getattr(s, name)
+        if name == "splunk_ao":
+            values = {
+                "SPLUNK_AO_API_KEY": s.splunk_ao_api_key.get_secret_value(),
+                "SPLUNK_AO_CONSOLE_URL": s.splunk_ao_console_url,
+                "SPLUNK_AO_API_URL": s.splunk_ao_api_url,
+                "SPLUNK_AO_REALM": s.splunk_ao_realm,
+                "SPLUNK_AO_O11Y_TOKEN": s.splunk_ao_o11y_token.get_secret_value(),
+                "SPLUNK_AO_O11Y_API_TOKEN": s.splunk_ao_o11y_api_token.get_secret_value(),
+                "SPLUNK_AO_PROJECT": s.galileo_project,
+                "SPLUNK_AO_AGENT_STREAM": s.galileo_log_stream,
+            }
+        else:
+            values = {
+                "GALILEO_API_KEY": s.galileo_api_key.get_secret_value(),
+                "GALILEO_CONSOLE_URL": s.galileo_console_url,
+                "GALILEO_API_URL": s.galileo_api_url,
+            }
+        return {k: v for k, v in values.items() if v}
+
+    def configure_environment(self):
+        active = self.backend_name()
+        for name, variables in self.BACKEND_ENV_VARS.items():
+            if name == active:
+                continue
+            for variable in variables:
+                os.environ.pop(variable, None)
+        os.environ.update(self._backend_environment(active))
+
+    def backend_credentials_present(self):
+        """True when the active backend has enough to authenticate."""
+        return self._credentials_for(self.backend_name())
+
+    def _credentials_for(self, name):
+        if name != "splunk_ao":
+            return bool(self.settings.galileo_api_key.get_secret_value())
+        s = self.settings
+        standalone = s.splunk_ao_api_key.get_secret_value() and s.splunk_ao_console_url
+        o11y = s.splunk_ao_realm and (
+            s.splunk_ao_o11y_token.get_secret_value() or s.splunk_ao_o11y_api_token.get_secret_value()
+        )
+        return bool(standalone or o11y)
 
     async def begin(self, prompt, metadata):
         if not self.enabled:
             return None
-        if not self.settings.galileo_api_key.get_secret_value():
-            self.status.update(state="unconfigured", last_error="Galileo API key missing")
+        if not self.backend_credentials_present():
+            self.status.update(
+                state="unconfigured", last_error=f"{self.backend_label()} credentials missing"
+            )
             return None
         self.configure_environment()
         try:

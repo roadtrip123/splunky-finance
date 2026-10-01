@@ -1,6 +1,7 @@
 from types import SimpleNamespace
 
 from conftest import login
+from pydantic import SecretStr
 
 from app.observability.galileo import Telemetry
 
@@ -17,7 +18,7 @@ def test_toggle_is_admin_only_csrf_checked_and_persistent(client, settings):
     assert response.status_code == 200
     status = response.json()["galileo"]
     assert status["enabled"] and status["connection"] == "unconfigured"
-    assert status["last_error"] == "Galileo API key missing"
+    assert status["last_error"] == "Galileo credentials missing"
     assert client.put(route, headers=admin, json=payload).status_code == 409
     restored = Telemetry(settings)
     assert restored.enabled
@@ -589,3 +590,110 @@ def test_the_completeness_judge_does_not_count_evidence_as_an_answer():
     whole = judge_prompt("SplunkyAnswerWholeQuestion")
     assert "not what it said" in whole
     assert "does not count as an answered part" in whole
+
+
+def test_both_backends_resolve_to_their_own_sdk():
+    """One seam, two SDKs. splunk_ao is the same core rebranded, so the renames are the whole gap."""
+    from app.observability.sdk import BACKENDS, DISPLAY_NAME, backend
+
+    resolved = {name: backend(name) for name in BACKENDS}
+    assert resolved["galileo"].Logger.__name__ == "GalileoLogger"
+    assert resolved["splunk_ao"].Logger.__name__ == "SplunkAOLogger"
+    assert resolved["galileo"]._stream_attr == "log_stream_id"
+    assert resolved["splunk_ao"]._stream_attr == "agent_stream_id"
+    assert set(DISPLAY_NAME) == set(BACKENDS)
+    # Both SDKs re-export the same ControlResult from galileo_core, so the gate needs no branch.
+    assert resolved["galileo"].ControlResult is resolved["splunk_ao"].ControlResult
+
+
+def test_stream_id_reads_either_sdks_attribute():
+    from app.observability.sdk import stream_id_of
+
+    assert stream_id_of(SimpleNamespace(log_stream_id="g1")) == "g1"
+    assert stream_id_of(SimpleNamespace(agent_stream_id="s1")) == "s1"
+    assert stream_id_of(SimpleNamespace()) is None
+
+
+def test_switching_backend_deletes_the_other_providers_environment(settings, monkeypatch):
+    """splunk_ao has no namespace of its own.
+
+    SplunkAOConfig subclasses GalileoConfig and bridges SPLUNK_AO_* into the GALILEO_* names,
+    because galileo-core still reads those. It only fills a gap, so leaving a stale GALILEO_API_KEY
+    in the environment while Splunk AO is active would point the bridge at the wrong credential --
+    and leaving SPLUNK_AO_* set while Galileo is active lets the bridge populate GALILEO_* behind
+    our back. Both directions are cleared.
+    """
+    import os
+
+    from app.observability.galileo import Telemetry
+
+    settings.galileo_api_key = SecretStr("galileo-key")
+    settings.splunk_ao_realm = "us1"
+    settings.splunk_ao_o11y_token = SecretStr("o11y-token")
+    telemetry = Telemetry(settings)
+
+    monkeypatch.setattr(telemetry, "backend_name", lambda: "splunk_ao")
+    telemetry.configure_environment()
+    assert os.environ.get("SPLUNK_AO_REALM") == "us1"
+    assert "GALILEO_API_KEY" not in os.environ
+
+    monkeypatch.setattr(telemetry, "backend_name", lambda: "galileo")
+    telemetry.configure_environment()
+    assert os.environ.get("GALILEO_API_KEY") == "galileo-key"
+    assert "SPLUNK_AO_REALM" not in os.environ and "SPLUNK_AO_O11Y_TOKEN" not in os.environ
+
+
+def test_credentials_present_understands_both_splunk_ao_modes(settings):
+    from app.observability.galileo import Telemetry
+
+    telemetry = Telemetry(settings)
+    telemetry._persist(active_backend="splunk_ao")
+    assert telemetry.backend_name() == "splunk_ao"
+    assert not telemetry.backend_credentials_present()
+
+    settings.splunk_ao_realm, settings.splunk_ao_o11y_token = "us1", SecretStr("t")
+    assert telemetry.backend_credentials_present()
+
+    settings.splunk_ao_realm, settings.splunk_ao_o11y_token = "", SecretStr("")
+    settings.splunk_ao_api_key, settings.splunk_ao_console_url = SecretStr("k"), "https://c.example"
+    assert telemetry.backend_credentials_present()
+
+
+def test_no_endpoint_ever_returns_a_splunk_ao_secret(client, settings):
+    """Same guarantee as the Galileo key, extended to all three Splunk AO secrets."""
+    settings.splunk_ao_api_key = SecretStr("sao-standalone-secret")
+    settings.splunk_ao_o11y_token = SecretStr("sao-ingest-secret")
+    settings.splunk_ao_o11y_api_token = SecretStr("sao-api-secret")
+    headers = login(client, True)
+    body = client.get("/api/demo-admin/status", headers=headers).text
+    for secret in ("sao-standalone-secret", "sao-ingest-secret", "sao-api-secret"):
+        assert secret not in body
+    connection = client.app.state.telemetry.connection()
+    assert connection["splunk_ao_o11y_token_set"] is True
+    assert connection["splunk_ao_o11y_token_masked"].endswith("cret")
+    assert "sao-ingest-secret" not in str(connection)
+
+
+def test_switching_backend_is_admin_only_and_starts_a_fresh_conversation(client):
+    headers = login(client, True)
+    # Rejected without an admin session, whether CSRF or auth catches it first.
+    customer = login(client, False)
+    for attempt in (
+        client.post("/api/demo-admin/backends/active", json={"id": "splunk_ao"}),
+        client.post("/api/demo-admin/backends/active", headers=customer, json={"id": "splunk_ao"}),
+    ):
+        assert attempt.status_code in (401, 403), attempt.status_code
+    assert (
+        client.post("/api/demo-admin/backends/active", headers=headers, json={"id": "nope"}).status_code
+        == 404
+    )
+    response = client.post(
+        "/api/demo-admin/backends/active", headers=headers, json={"id": "splunk_ao"}
+    )
+    assert response.status_code == 200
+    view = response.json()["data"] if "data" in response.json() else response.json()
+    assert view["active"] == "splunk_ao"
+    assert [b["id"] for b in view["backends"]] == ["galileo", "splunk_ao"]
+    assert {b["stream_label"] for b in view["backends"]} == {"log stream", "agent stream"}
+    # It survives a reload, like the model switch.
+    assert client.app.state.telemetry.backend_name() == "splunk_ao"

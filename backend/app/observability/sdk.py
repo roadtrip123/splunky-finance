@@ -20,6 +20,8 @@ BACKENDS = (GALILEO, SPLUNK_AO)
 # What each backend calls the stream a trace is written to. The concept is identical; only the
 # word differs, and it reaches the env vars, the portal labels and the Agent Control target.
 STREAM_LABEL = {GALILEO: "log stream", SPLUNK_AO: "agent stream"}
+# What to call each backend on screen and in a status message.
+DISPLAY_NAME = {GALILEO: "Galileo", SPLUNK_AO: "Splunk AO"}
 
 
 @dataclass(frozen=True)

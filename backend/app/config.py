@@ -38,6 +38,17 @@ class Settings(BaseSettings):
     agent_control_api_key_header: str = "Galileo-API-Key"
     agent_control_runtime_token_header: str = "X-Agent-Control-Runtime-Token"
     galileo_protection_enabled: bool = False
+    # Which observability SDK is active. One at a time: two backends would leave Agent Control
+    # without an adjudicator, and two tenants disagreeing on one tool call has no good answer.
+    observability_backend: str = "galileo"
+    # Splunk AO, standalone deployment. Mirrors the Galileo fields above.
+    splunk_ao_api_key: SecretStr = SecretStr("")
+    splunk_ao_console_url: str = ""
+    splunk_ao_api_url: str = ""
+    # Splunk AO, Observability Cloud. The SDK derives console, API and OTLP ingest from the realm.
+    splunk_ao_realm: str = ""
+    splunk_ao_o11y_token: SecretStr = SecretStr("")
+    splunk_ao_o11y_api_token: SecretStr = SecretStr("")
     demo_seed: int = 42
     demo_reference_date: date = date(2026, 9, 15)
     demo_timezone: str = "Australia/Brisbane"

@@ -9,6 +9,9 @@ dependencies = [
   "langchain==1.4.0", "langchain-openai==1.6.2",
   "langchain-anthropic==1.7.2", "langchain-ollama==1.1.0",
   "galileo[langchain]==2.6.0", "agent-control-sdk[galileo]==8.7.0",
+  # The Splunk Agent Observability rebrand of the same core. Both resolve against
+  # galileo-core 4.5.0, so they install side by side; only one is ever active.
+  "splunk-ao==0.4.0",
 ]
 
 [dependency-groups]

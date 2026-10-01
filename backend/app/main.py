@@ -60,6 +60,16 @@ class GalileoConnection(StrictModel):
     galileo_console_url: str = Field(default="", max_length=400)
     galileo_api_url: str = Field(default="", max_length=400)
     agent_control_url: str = Field(default="", max_length=400)
+    splunk_ao_api_key: str = Field(default="", max_length=400)
+    splunk_ao_console_url: str = Field(default="", max_length=400)
+    splunk_ao_api_url: str = Field(default="", max_length=400)
+    splunk_ao_realm: str = Field(default="", max_length=64)
+    splunk_ao_o11y_token: str = Field(default="", max_length=400)
+    splunk_ao_o11y_api_token: str = Field(default="", max_length=400)
+
+
+class ActiveBackend(StrictModel):
+    id: str = Field(min_length=1, max_length=32)
 
 
 class DemoSettings(StrictModel):
@@ -484,6 +494,25 @@ def create_app(settings=None, model_builder=None, protection_adapter=None):
         chat.provider_status = {"state": "unverified" if settings.provider_configured else "unconfigured"}
         return envelope(request, telemetry.endpoints_view())
 
+    @app.post("/api/demo-admin/backends/active")
+    async def activate_backend(request: Request, payload: ActiveBackend):
+        """Switch observability backend. One is active at a time.
+
+        Same shape as the model switch: a fresh conversation, because the previous backend's
+        session belongs to the previous tenant and mixing the two makes the traces hard to read.
+        """
+        current = session(request, "admin", True)
+        _busy()
+        try:
+            view = telemetry.set_active_backend(payload.id)
+        except ValueError:
+            raise HTTPException(404, "Unknown observability backend") from None
+        chat.clear(current)
+        run = chat.run(current)
+        if run:
+            run["revision"] += 1
+        return envelope(request, view)
+
     @app.delete("/api/demo-admin/endpoints/{identifier}")
     async def remove_endpoint(request: Request, identifier: str):
         session(request, "admin", True)
@@ -554,6 +583,7 @@ def create_app(settings=None, model_builder=None, protection_adapter=None):
                 "demo_mode": settings.demo_mode,
                 "connection": telemetry.connection(),
                 "endpoints": telemetry.endpoints_view(),
+                "observability": telemetry.backends_view(),
                 "run": run,
                 "events": events[-10:],
                 "scenarios": SCENARIOS,
