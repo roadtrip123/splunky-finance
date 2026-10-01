@@ -58,6 +58,25 @@ class Telemetry:
         "agent_control_url",
     )
 
+    @property
+    def backend(self):
+        """The active observability SDK, resolved lazily and re-resolved when switched."""
+        from app.observability.sdk import backend as resolve
+
+        name = self.backend_name()
+        if getattr(self, "_backend", None) is None or self._backend.name != name:
+            self._backend = resolve(name)
+        return self._backend
+
+    def backend_name(self):
+        from app.observability.sdk import BACKENDS, GALILEO
+
+        saved = self._saved().get("active_backend")
+        if saved in BACKENDS:
+            return saved
+        configured = getattr(self.settings, "observability_backend", GALILEO)
+        return configured if configured in BACKENDS else GALILEO
+
     def apply_connection(self, values):
         """Copy saved connection details onto settings, treating the API key as a secret."""
         from pydantic import SecretStr
@@ -297,16 +316,14 @@ class Telemetry:
             self.status.update(state="checking", connection="checking", last_error=None)
             self.configure_environment()
             try:
-                from galileo import GalileoLogger
+                sdk = self.backend
 
                 def connect():
-                    from galileo.log_streams import get_log_stream
-
-                    logger = GalileoLogger(
-                        project=self.settings.galileo_project, log_stream=self.settings.galileo_log_stream
+                    logger = sdk.new_logger(
+                        project=self.settings.galileo_project, stream=self.settings.galileo_log_stream
                     )
                     # A fresh authenticated API read avoids claiming connection from cached IDs.
-                    stream = get_log_stream(
+                    stream = sdk.get_stream(
                         name=self.settings.galileo_log_stream, project_id=str(logger.project_id)
                     )
                     if stream is None:
@@ -314,14 +331,14 @@ class Telemetry:
                     return logger
 
                 logger = await asyncio.wait_for(asyncio.to_thread(connect), 15)
-                if not logger.project_id or not logger.log_stream_id:
+                if not logger.project_id or not sdk.stream_id(logger):
                     raise ValueError("Unresolved Galileo target")
                 self.status.update(
                     state="connected",
                     connection="connected",
                     last_connected_at=time.time(),
                     project_id=str(logger.project_id),
-                    log_stream_id=str(logger.log_stream_id),
+                    log_stream_id=str(sdk.stream_id(logger)),
                 )
             except Exception:  # noqa: BLE001 - sanitize credential-bearing SDK errors
                 self.status.update(
@@ -346,12 +363,11 @@ class Telemetry:
             return None
         self.configure_environment()
         try:
-            from galileo import GalileoLogger
-            from galileo.handlers.langchain import GalileoAsyncCallback
+            sdk = self.backend
 
             def initialize():
-                logger = GalileoLogger(
-                    project=self.settings.galileo_project, log_stream=self.settings.galileo_log_stream
+                logger = sdk.new_logger(
+                    project=self.settings.galileo_project, stream=self.settings.galileo_log_stream
                 )
                 logger.start_session(name="My Bank Agent", external_id=metadata["conversation_id"])
                 return logger
@@ -380,9 +396,8 @@ class Telemetry:
                 "logger": logger,
                 "trace_id": str(trace.id),
                 "started": time.perf_counter_ns(),
-                "callback": GalileoAsyncCallback(
-                    galileo_logger=logger, start_new_trace=False, flush_on_chain_end=False
-                ),
+                "callback": sdk.callback(logger),
+                "backend": sdk.name,
             }
         except Exception:  # noqa: BLE001 - isolate SDK failures without exposing credential-bearing errors
             # SDK exception text can include URLs or credential headers; never expose it.
@@ -418,21 +433,17 @@ class Telemetry:
         self.configure_environment()
 
         def apply():
-            from galileo import GalileoLogger
-            from galileo.log_streams import enable_metrics
-            from galileo.scorers import Scorers
-
             from app.observability.setup_definitions import BUILTIN_METRICS, JUDGES
 
-            s = self.settings
-            available = {str(getattr(row, "name", "")) for row in Scorers().list()}
+            s, sdk = self.settings, self.backend
+            available = {str(getattr(row, "name", "")) for row in sdk.Scorers().list()}
             wanted = [m for m in list(JUDGES) + BUILTIN_METRICS if m in available]
             missing = [m for m in list(JUDGES) + BUILTIN_METRICS if m not in available]
-            enable_metrics(
-                project_name=s.galileo_project, log_stream_name=s.galileo_log_stream, metrics=wanted
+            sdk.enable_metrics(
+                project_name=s.galileo_project, stream_name=s.galileo_log_stream, metrics=wanted
             )
-            logger = GalileoLogger(project=s.galileo_project, log_stream=s.galileo_log_stream)
-            return wanted, missing, str(logger.log_stream_id)
+            logger = sdk.new_logger(project=s.galileo_project, stream=s.galileo_log_stream)
+            return wanted, missing, str(sdk.stream_id(logger))
 
         metrics, missing, log_stream_id = await asyncio.wait_for(asyncio.to_thread(apply), 60)
         controls = await self._bind_controls(log_stream_id)
@@ -500,12 +511,12 @@ class Telemetry:
             return self.scorers
         self.configure_environment()
 
-        def load():
-            from galileo.scorers import Scorers
+        sdk = self.backend
 
+        def load():
             return {
                 str(row.id): str(row.name)
-                for row in Scorers().list()
+                for row in sdk.Scorers().list()
                 if getattr(row, "id", None) and getattr(row, "name", None)
             }
 

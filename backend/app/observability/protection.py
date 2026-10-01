@@ -47,9 +47,12 @@ class Protection:
         from agent_control import AgentControlClient
         from agent_control_models import EvaluationRequest, EvaluationResponse, Step
 
-        target_id = str(logger.log_stream_id)
-        if not logger.log_stream_id:
+        from app.observability.sdk import stream_id_of
+
+        stream_id = stream_id_of(logger)
+        if not stream_id:
             raise ValueError("No resolved log stream")
+        target_id = str(stream_id)
         request = EvaluationRequest(
             agent_name=s.agent_control_agent_name,
             target_type="log_stream",

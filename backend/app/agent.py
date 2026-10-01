@@ -19,6 +19,7 @@ from app.demo.expected_results import previous_months
 from app.demo.scenarios import FAULT_METHODS, inject
 from app.llm import model_factory
 from app.observability.protection import BLOCKED
+from app.observability.sdk import stream_id_of
 from app.tools import build_tools
 
 
@@ -311,7 +312,8 @@ class ChatService:
                     "usage": usage,
                     "cost_usd": None,
                     "project_id": str(turn["logger"].project_id) if turn else None,
-                    "log_stream_id": str(turn["logger"].log_stream_id) if turn else None,
+                    "log_stream_id": str(stream_id_of(turn["logger"])) if turn else None,
+                    "observability_backend": turn.get("backend") if turn else None,
                     "duration_seconds": round(time.monotonic() - started, 3),
                     "evaluation": {"state": "not_verified" if turn else "unavailable", "scores": None},
                 }
