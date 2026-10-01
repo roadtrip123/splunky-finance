@@ -523,6 +523,35 @@ export default function Admin() {
                       ))}
                     </div>
                   )}
+                  {/* Same place as the model switch, because a presenter comparing backends is
+                      doing the same thing as one comparing models: send, switch, send again. */}
+                  <div className="switcher">
+                    <span className="mini-label">OBSERVABILITY</span>
+                    {status.observability.backends.map((b) => (
+                      <button
+                        key={b.id}
+                        className={`button ${b.active ? "" : "outline"} small`}
+                        aria-pressed={b.active}
+                        disabled={busy || b.active || !b.configured}
+                        title={
+                          b.configured
+                            ? `Send traces to ${b.name}`
+                            : `${b.name} has no credentials yet — add them under Setup`
+                        }
+                        onClick={() =>
+                          action(async () => {
+                            await mutate("demo-admin/backends/active", { id: b.id }, true);
+                            setNotice(
+                              `Now logging to ${b.name}. The conversation was reset, so the next message starts a new session.`,
+                            );
+                          })
+                        }
+                      >
+                        {b.name}
+                        {b.configured ? "" : " ·  not configured"}
+                      </button>
+                    ))}
+                  </div>
                   <DemoWorkspace onEvidence={refresh} />
                 </div>
                 <div role="tabpanel" hidden={tab !== "setup"}>

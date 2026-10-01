@@ -138,6 +138,20 @@ The custom judges are unaffected by this. They read `evidence` from the trace ou
 
 Ask each scenario's displayed example question anyway. That is what each Part is written around, and the policy question is the only one that exercises the retriever span.
 
+## Switching observability backend
+
+The **OBSERVABILITY** switch sits beside the model switch on the Demo tab. It changes where traces
+are sent — Galileo or Splunk Agent Observability — one at a time, and the status card names the
+active one so "connected" is never ambiguous about where.
+
+Switching resets the conversation, as a model switch does, so one tenant's session never contains
+the other's turns. A backend with no credentials saved is shown but disabled.
+
+Two differences to expect, neither a fault. Splunk AO shows no `bank-chat-turn` root row, because
+the OTLP transport exports spans rather than the trace object. And it labels spans with
+OpenTelemetry semantic conventions — `invoke_agent`, `execute_tool`, `chat` — where Galileo uses
+the plain names. Same spans, different vocabulary.
+
 ## Comparing models
 
 Configure each endpoint once under **Setup**, then switch between them with one click on the **Demo** tab. The switch applies to your next message; a turn already running keeps the endpoint it started with.
