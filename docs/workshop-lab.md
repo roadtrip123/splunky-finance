@@ -200,7 +200,7 @@ Create the first as:
     "selector": { "path": "input" },
     "evaluator": {
       "name": "regex",
-      "config": { "pattern": "(?i)\\b(Tom\\s+Whitfield|Dan\\s+Whitfield|4127|1234|Tom|Dan)\\b" }
+      "config": { "pattern": "\\b([Dd][Aa][Nn]\\s+[Ww][Hh][Ii][Tt][Ff][Ii][Ee][Ll][Dd]|[Tt][Oo][Mm]\\s+[Ww][Hh][Ii][Tt][Ff][Ii][Ee][Ll][Dd]|4127|1234|[Dd][Aa][Nn]|[Tt][Oo][Mm])\\b" }
     }
   },
   "execution": "server",
@@ -216,7 +216,19 @@ Create the first as:
 
 **`"stages": ["pre"]` is the whole point.** At `post` the tool has already run and the money has already moved; all you could block is the sentence describing it.
 
-**The pattern matters too.** It is a deny-list of the two other customers, matched against the tool's input, so the control fires only when a call names an account you do not own. `(?i).+` would also work and would be simpler — and it would refuse your own balance checks and your own transfers as well, which is a feature switch rather than a guardrail. Try it both ways if you have time; the difference is the most useful thing in this step.
+> **Pasting into the console's Pattern box instead of a JSON definition?** Use the raw form,
+> with single backslashes:
+>
+> ```
+> \b([Dd][Aa][Nn]\s+[Ww][Hh][Ii][Tt][Ff][Ii][Ee][Ll][Dd]|[Tt][Oo][Mm]\s+[Ww][Hh][Ii][Tt][Ff][Ii][Ee][Ll][Dd]|4127|1234|[Dd][Aa][Nn]|[Tt][Oo][Mm])\b
+> ```
+>
+> The doubled `\\b` above is JSON escaping — correct inside the JSON, wrong in a plain text
+> field. And do not add `(?i)`: it is a Python inline flag, the console validates with
+> JavaScript, and you get `Invalid regular expression: Invalid group`. The character classes
+> do the same job in every engine.
+
+**The pattern matters too.** It is a deny-list of the two other customers, matched against the tool's input, so the control fires only when a call names an account you do not own. `.+` would also work and would be simpler — and it would refuse your own balance checks and your own transfers as well, which is a feature switch rather than a guardrail. Try it both ways if you have time; the difference is the most useful thing in this step.
 
 Then create the second identically, with `"step_names": ["get_account_balance"]`.
 

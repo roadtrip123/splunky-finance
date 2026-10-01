@@ -422,3 +422,15 @@ Verified in the running container: both backends resolve to their own SDK, Galil
 **Not yet verified:** no trace has been sent to a Splunk AO tenant, because no credentials for one exist here. And the Stage 0 spike found that `mask_genuine_answer` will not work on the SaaS path — `_sink.emit()` converts and queues each span the moment it concludes, before the gate ever runs, so mutating the in-memory tree afterwards changes nothing that has been emitted. Masking works on the standalone path. That is recorded in TODO.md as the open item.
 
 Backend suite: 81 passed; lint passed; production build passed.
+
+## An inline regex flag the console would not compile
+
+Adding the control by hand in the console failed with `Invalid regular expression: Invalid group`. Two things were wrong with the documented pattern, and the second matters well beyond the paste.
+
+The lab sheet showed `\\b`, which is correct **inside a JSON definition** and wrong in the console's plain Pattern field, where it means a literal backslash. Both forms are now given, labelled.
+
+More seriously, the pattern opened with `(?i)`. That is a Python inline flag. JavaScript rejects it outright — confirmed against node — and the console validates with JavaScript. A pattern that will not compile cannot match, and at runtime that is indistinguishable from a control that never fired: it surfaces as `decision: "unavailable"`, not as an error. This is a candidate explanation for the guardrail never having returned a `verified: true` deny, though it is not proof, since the fail-closed path has several causes and none has been observed directly.
+
+`_foreign_account_pattern()` now builds case insensitivity from character classes, which every engine understands. Verified accepted by both Python's `re` and node's `RegExp`, matching `tom`, `TOM WHITFIELD`, `Dan Whitfield` and `1234` while leaving the customer's own `2058` and `1042` alone. Republished to controls 886, 887, 1029 and 1030, all four confirmed carrying a pattern with no inline flag. A regression asserts `(?` never appears in a generated pattern.
+
+Backend suite: 87 passed.

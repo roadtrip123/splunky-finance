@@ -442,3 +442,19 @@ def test_a_one_sentence_answer_can_still_lose_a_part(raw):
     forced = _force_incomplete(raw)
     assert "$754.19" in forced
     assert "$119.68" not in forced
+
+
+def test_the_guardrail_pattern_uses_no_inline_flags():
+    """`(?i)` is a Python inline flag and other engines reject it as an invalid group.
+
+    The console validates a pattern with JavaScript, which refuses to compile it, and an engine
+    that cannot compile a pattern cannot match anything — indistinguishable at runtime from a
+    control that simply never fired, which is what `unavailable` looks like in action_decisions.
+    """
+    pattern = _foreign_account_pattern()
+    assert "(?" not in pattern, pattern
+    # Still case-insensitive, via character classes.
+    for probe in ("tom", "TOM WHITFIELD", "Dan Whitfield", "1234"):
+        assert re.search(pattern, f'{{"to_account": "{probe}"}}'), probe
+    for allowed in ("my savings account", "2058", "1042"):
+        assert not re.search(pattern, f'{{"to_account": "{allowed}"}}'), allowed

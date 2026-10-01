@@ -192,7 +192,7 @@ Both are built by `_tool_deny_control(tool_name)` and differ only in the tool th
 {
   "condition": {
     "selector": { "path": "input" },
-    "evaluator": { "name": "regex", "config": { "pattern": "(?i)\\b(Tom\\s+Whitfield|Dan\\s+Whitfield|4127|1234|Tom|Dan)\\b" } }
+    "evaluator": { "name": "regex", "config": { "pattern": "\\b([Dd][Aa][Nn]\\s+[Ww][Hh][Ii][Tt][Ff][Ii][Ee][Ll][Dd]|[Tt][Oo][Mm]\\s+[Ww][Hh][Ii][Tt][Ff][Ii][Ee][Ll][Dd]|4127|1234|[Dd][Aa][Nn]|[Tt][Oo][Mm])\\b" } }
   },
   "execution": "server",
   "scope": { "step_types": ["tool"], "step_names": ["transfer_funds"], "stages": ["pre"] },
@@ -207,7 +207,13 @@ Three parts matter.
 and the balance has been read, and all a control can block is the sentence describing it. At `pre`
 the step carries no output yet, so the condition matches the call itself.
 
-**The pattern is a deny-list, not `(?i).+`.** Matching everything also refuses the customer's own
+**No inline flags.** `(?i)` is a Python construct; other engines reject it as an invalid group,
+and the console's own validator is one of them. A pattern that will not compile cannot match,
+which at runtime is indistinguishable from a control that never fired — it surfaces as
+`unavailable`, not as an error. Case insensitivity comes from character classes instead, which
+every engine understands.
+
+**The pattern is a deny-list, not `.+`.** Matching everything also refuses the customer's own
 balance checks and their own transfers, which makes the guardrail a feature switch rather than a
 guardrail — and a guardrail that breaks the product is not one anybody ships. `_foreign_account_pattern()`
 generates it from `OTHER_CUSTOMERS` in the dataset generator, so the tenant definition cannot drift

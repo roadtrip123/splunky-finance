@@ -25,7 +25,21 @@ def _foreign_account_pattern():
         terms.append(other["owner_name"].split()[0])
     # Longest first so "Tom Whitfield" is preferred over "Tom" in the reported match.
     unique = sorted(set(terms), key=len, reverse=True)
-    return "(?i)\\b(" + "|".join(t.replace(" ", "\\s+") for t in unique) + ")\\b"
+    body = "|".join(_either_case(t).replace(" ", "\\s+") for t in unique)
+    return "\\b(" + body + ")\\b"
+
+
+def _either_case(term):
+    """Make a term case-insensitive with character classes rather than an inline flag.
+
+    `(?i)` is a Python inline flag. The console validates a pattern with JavaScript, which
+    rejects it outright as an invalid group, and an engine that will not compile the pattern
+    cannot match anything -- which is indistinguishable at runtime from a control that simply
+    never fired. Character classes work in every engine.
+    """
+    return "".join(
+        f"[{c.upper()}{c.lower()}]" if c.isalpha() else c for c in term
+    )
 
 
 def _tool_deny_control(tool_name):
