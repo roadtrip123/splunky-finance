@@ -188,6 +188,29 @@ demo reaches its tenant.
 - [ ] While there: the Agent Control target type is still the string `"log_stream"`. Confirm
       whether Splunk AO expects `agent_stream`, since the rest of the vocabulary was renamed.
 
+## Splunk AO creates two sessions per conversation
+
+Confirmed against the tenant: every conversation produces a `My Bank Agent` session with no
+traces, and a second session named `session` holding the spans, created on flush.
+
+The keys differ and cannot match. The API session is keyed on `external_id` = the conversation
+id. The OTLP side carries its session as `gen_ai.conversation.id` baggage holding the SDK's
+generated session UUID, and the backend creates a session on that string, unnamed.
+
+Re-binding the session in the request context (`47d78f9`) was needed — without it the ids did
+not even agree — but it did not merge the rows.
+
+- [ ] **Try aligning the keys**: put the conversation id into the session context rather than the
+      SDK's UUID, so the span-side session matches the `external_id` the API session already has.
+      Unverified; the probe for it timed out on the exporter thread.
+- [ ] **Fallback if that fails**: stop calling `start_session` on this backend. One session per
+      conversation, correct grouping, named `session` rather than `My Bank Agent`. Worse label,
+      no empty duplicate.
+- [ ] Either way, note in the demo script that Splunk AO shows no `bank-chat-turn` root row —
+      the OTLP path does not emit the Trace object, only spans — and labels spans with
+      OpenTelemetry semantic conventions (`invoke_agent`, `execute_tool`, `chat`). Both are SDK
+      behaviour, so the two backends will never look identical side by side.
+
 ## Before the workshop
 
 - [ ] **Prove the guardrail returns a verified deny.** It blocks, but by failing closed:

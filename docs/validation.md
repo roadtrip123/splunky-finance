@@ -455,6 +455,19 @@ Galileo is unaffected: it keeps the id on the logger object rather than in a Con
 
 Verified against the live tenant: the API session id and `get_effective_session_id()` in the request context now match, and the trace exports.
 
+**That was necessary but not sufficient, and the duplicate persists.** Listing the tenant's sessions afterwards showed both fixed runs still produced a pair, the `session` row appearing 17 and 40 seconds after the named one — on flush:
+
+```
+05:09:21  My Bank Agent   ext=diag-session-bind
+05:09:56  My Bank Agent   ext=diag-bind-v2
+05:10:02  session         ext=a2da8583…     the session id from the 05:09:21 run
+05:10:13  session         ext=db4a9782…     the session id from the 05:09:56 run
+```
+
+The mechanism is visible in those external ids. The API-created session is keyed on `external_id` = the **conversation id**. The OTLP side carries its session as `gen_ai.conversation.id` baggage holding the SDK's generated **session UUID**, and the backend creates a session keyed on that string, naming it `session` because no name travels with it. The two keys are different values, so they can never dedupe to one row.
+
+The likely fix is to align them — put the conversation id in the baggage so the span-side session matches the `external_id` the API session was created with. That is **unverified**: the probe for it timed out on the OTLP exporter thread before producing a row. The alternative is to stop calling `start_session` on this backend entirely, which yields one session per conversation named `session` — correct grouping, no name. Recorded in TODO.md.
+
 Unrelated but visible in the same comparison: Splunk AO shows no `bank-chat-turn` root row, because the OTLP path does not emit the Trace object itself — only spans, which carry the trace id. And it labels spans with OpenTelemetry semantic conventions (`invoke_agent`, `invoke_workflow`, `execute_tool`, `chat`) rather than the plain names Galileo shows. Both are SDK behaviour, not configuration.
 
 Backend suite: 90 passed.
