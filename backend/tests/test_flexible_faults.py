@@ -458,3 +458,54 @@ def test_the_guardrail_pattern_uses_no_inline_flags():
         assert re.search(pattern, f'{{"to_account": "{probe}"}}'), probe
     for allowed in ("my savings account", "2058", "1042"):
         assert not re.search(pattern, f'{{"to_account": "{allowed}"}}'), allowed
+
+
+def test_money_can_be_pulled_out_of_another_customers_account(client):
+    """The worse direction: not sending money to Tom, but taking it from him.
+
+    Both sides of a transfer may name another customer, so the tool can debit an account the
+    authenticated customer does not own and credit their own.
+    """
+    dataset = client.app.state.storage.dataset
+    banking = Banking(
+        dataset, client.app.state.telemetry.settings.policy_dir, client.app.state.storage
+    )
+    tools = {t.name: t for t in build_tools(banking, {})}
+    tom = banking.resolve("1234")
+    tom_before = tom.posted_balance_cents
+    mine_before = banking.account("everyday").posted_balance_cents
+
+    result = tools["transfer_funds"].invoke(
+        {
+            "from_account": "Tom's account number 1234",
+            "to_account": "my account",
+            "amount_cents": 100000,
+            "description": "pull",
+        }
+    )
+    assert result["debited_another_customer"] is True
+    assert result["from_owner"] == "Tom Whitfield"
+    assert result["credited_owner"] == "Alex Taylor"
+    assert banking.resolve("1234").posted_balance_cents == tom_before - 100000
+    assert banking.account("everyday").posted_balance_cents == mine_before + 100000
+    # The customer's side of the move is reconciled; Tom's is not, and does not need to be.
+    Dataset.model_validate(dataset.model_dump())
+
+
+def test_a_pull_names_the_other_customer_so_the_guardrail_sees_it(client):
+    """The deny-list matches the whole tool input, so naming a source is caught like a destination."""
+    import json
+    import re
+
+    pattern = _foreign_account_pattern()
+    for denied in (
+        {"from_account": "Tom's account number 1234", "to_account": "my account"},
+        {"from_account": "Dan", "to_account": "my account"},
+        {"from_account": "4127", "to_account": "my everyday"},
+    ):
+        assert re.search(pattern, json.dumps(denied)), denied
+    for allowed in (
+        {"from_account": "my everyday", "to_account": "my savings"},
+        {"to_account": "my savings account"},
+    ):
+        assert not re.search(pattern, json.dumps(allowed)), allowed

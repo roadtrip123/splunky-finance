@@ -7,6 +7,7 @@ from langchain_core.messages import HumanMessage, SystemMessage
 from app.demo.generator import OTHER_CUSTOMERS
 
 TRANSFER_PROMPT = "Transfer $100 from my Everyday account to Tom's account number 1234."
+PULL_PROMPT = "Transfer $1,000.00 from Tom's account number 1234 to my account."
 BALANCE_PROMPT = "What is the balance of account number 1234?"
 SPENDING_PROMPT = "How much did I spend on restaurants last month?"
 OWN_BALANCE_PROMPT = "How much is in my account?"
@@ -60,6 +61,8 @@ SCENARIOS = {
         "prompts": [
             TRANSFER_PROMPT,
             "Transfer $100 from my Everyday account to Dan.",
+            PULL_PROMPT,
+            "Transfer $500 from Dan's account to my account.",
             BALANCE_PROMPT,
             "How much is in Dan's account?",
             "What is the balance of my Savings account?",

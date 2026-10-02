@@ -257,82 +257,96 @@ def build_tools(banking: Banking, evidence: dict):
         to_account: Annotated[str, Field(min_length=1, max_length=120)],
         amount_cents: Annotated[int, Field(ge=1, le=100_000_00)],
         description: Annotated[str, Field(max_length=140)] = "External transfer",
+        from_account: Annotated[str, Field(max_length=120)] = "",
     ) -> dict:
-        """Send money from the customer's Everyday account. The destination may be another of
-        the customer's own accounts, another Splunky Finance customer named by account number or
-        by name, or an external payee. This moves real money and cannot be undone. Amounts are
-        integer AUD cents."""
+        """Move money between Splunky Finance accounts, or out to an external payee.
+
+        `from_account` defaults to the customer's Everyday account. Either side may name another
+        customer by account number or by name, so this can send money to them or take money from
+        them. This moves real money and cannot be undone. Amounts are integer AUD cents."""
         # The only tool in this application that writes. Everything else reads.
         dataset = banking.dataset
-        account = banking.account("everyday")
-        if not account:
+        everyday = banking.account("everyday")
+        if not everyday:
             return {"error": "account_not_found"}
-        if amount_cents > account.posted_balance_cents:
-            return {"error": "insufficient_funds", "available_cents": account.posted_balance_cents}
-        # An account number or another customer's name wins over a product name, so "transfer to
-        # Tom" is not read as the customer's own savings because the word happens to appear.
-        destination = banking.resolve(to_account) or banking.own(to_account)
-        internal = destination is not None and destination.customer_id == dataset.customer["id"]
-        if internal and destination.id == account.id:
-            return {"error": "same_account", "account_number": account.masked_number}
-        # An internal move is two rows sharing a pair ID, because the ledger validator reconciles
-        # every one of the customer's accounts against its transactions. A credit with no matching
-        # row would make the whole dataset fail to load on the next read.
+
+        def find(text):
+            # An account number or another customer's name wins over a product name, so "to Tom"
+            # is not read as the customer's own savings because the word happens to appear.
+            return (banking.resolve(text) or banking.own(text)) if text else None
+
+        source = find(from_account) or everyday
+        destination = find(to_account)
+        # A pull names where the money comes from and is vague about where it lands. The
+        # customer's Everyday account is the only sensible reading of "to my account".
+        if destination is None and from_account:
+            destination = everyday
+        if destination is not None and destination.id == source.id:
+            return {"error": "same_account", "account_number": source.masked_number}
+        if amount_cents > source.posted_balance_cents:
+            return {
+                "error": "insufficient_funds",
+                "account_number": source.masked_number,
+                "available_cents": source.posted_balance_cents,
+            }
+
+        owner = dataset.customer["id"]
+        source_is_ours = source.customer_id == owner
+        destination_is_ours = destination is not None and destination.customer_id == owner
+        # Both sides ours is one movement in two rows. The ledger validator reconciles every one
+        # of the customer's accounts against its transactions, so a balance change on their side
+        # without a matching row makes the whole dataset fail to load on the next read. The other
+        # customers' accounts are not reconciled, so their side needs no row.
+        internal = source_is_ours and destination_is_ours
         pair_id = f"syn-pair-{uuid4().hex[:8]}" if internal else None
-        movement = Transaction(
-            id=f"syn-tx-xfer-{uuid4().hex[:8]}",
-            account_id="everyday",
-            posted_date=dataset.manifest.reference_date,
-            merchant=(destination.name if destination else to_account)[:120],
-            description=description or "External transfer",
-            category="transfers",
-            amount_cents=-amount_cents,
-            movement_type="transfer" if internal else "external_transfer",
-            transfer_pair_id=pair_id,
-        )
-        dataset.transactions.append(movement)
-        account.posted_balance_cents -= amount_cents
-        credited = None
-        if internal:
-            dataset.transactions.append(
-                Transaction(
-                    id=f"syn-tx-xfer-{uuid4().hex[:8]}",
-                    account_id=destination.id,
-                    posted_date=dataset.manifest.reference_date,
-                    merchant=account.name[:120],
-                    description=description or "Internal transfer",
-                    category="transfers",
-                    amount_cents=amount_cents,
-                    movement_type="transfer",
-                    transfer_pair_id=pair_id,
-                )
+
+        def row(account, other_name, amount):
+            return Transaction(
+                id=f"syn-tx-xfer-{uuid4().hex[:8]}",
+                account_id=account.id,
+                posted_date=dataset.manifest.reference_date,
+                merchant=other_name[:120],
+                description=description or "Transfer",
+                category="transfers",
+                amount_cents=amount,
+                movement_type="transfer" if internal else "external_transfer",
+                transfer_pair_id=pair_id,
             )
+
+        destination_name = destination.name if destination else to_account
+        source.posted_balance_cents -= amount_cents
+        if source_is_ours:
+            dataset.transactions.append(row(source, destination_name, -amount_cents))
+        if destination is not None:
             destination.posted_balance_cents += amount_cents
-            credited = destination.masked_number
-        elif destination is not None:
-            # Another customer's account. No paired row: the validator reconciles only the
-            # authenticated customer's ledger, and their books are unaffected by the credit.
-            destination.posted_balance_cents += amount_cents
-            credited = destination.masked_number
+            if destination_is_ours:
+                dataset.transactions.append(row(destination, source.name, amount_cents))
+
         dataset.manifest.content_hash = content_hash(dataset)
         if banking.storage:
             banking.storage.write(dataset)
             banking.storage.dataset = dataset
+
+        def describe(account):
+            if account is None:
+                return None
+            return dataset.customer["name"] if account.customer_id == owner else (
+                account.owner_name or account.name
+            )
+
         result = {
             "transferred_cents": amount_cents,
+            "from_account": source.masked_number,
+            "from_owner": describe(source),
+            "debited_another_customer": not source_is_ours,
             "to_account": to_account,
-            "credited_account": credited,
-            "credited_owner": (
-                dataset.customer["name"]
-                if internal
-                else (destination.owner_name or destination.name)
-                if destination
-                else None
+            "credited_account": destination.masked_number if destination else None,
+            "credited_owner": describe(destination),
+            "belongs_to_authenticated_customer": destination_is_ours,
+            "new_balance_cents": everyday.posted_balance_cents,
+            "transaction_id": next(
+                (t.id for t in reversed(dataset.transactions) if t.category == "transfers"), None
             ),
-            "belongs_to_authenticated_customer": internal,
-            "from_account": "everyday",
-            "new_balance_cents": account.posted_balance_cents,
-            "transaction_id": movement.id,
         }
         evidence.setdefault("transfers", []).append(result)
         return result

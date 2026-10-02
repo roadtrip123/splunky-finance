@@ -109,6 +109,11 @@ the ledger. The delivered answer is replaced with *"That request is not availabl
 Agent."* — the answer gate's own fallback talks about verifying an answer, which says nothing when
 the point is that the transfer never happened.
 
+**A transfer has two sides, and either may name another customer.** `from_account` defaults to
+the customer's Everyday account; naming Tom or Dan instead debits them and credits the customer.
+The guardrail catches it for the same reason it catches the other direction — the control matches
+the whole tool input, so a source is as visible as a destination.
+
 **Then show it is not a kill switch.** Leave it armed and ask for your own Savings balance, or a
 transfer between your own accounts. Both work: the control is a deny-list on the other customers'
 identifiers, so the customer's own banking is untouched.
