@@ -66,6 +66,10 @@ You should get **$754.19** across **8** purchases. A trace should appear in your
 
 ---
 
+> **How does any of this reach Galileo?** [docs/instrumentation.md](instrumentation.md) is the
+> twenty-line version: one logger per turn, spans buffered in memory, one request at the end.
+> Worth reading before you build the judges, because it explains what they are reading.
+
 ## Step 3 — Build the evaluators
 
 Your traces are arriving but nothing is scoring them. That is what you build now.

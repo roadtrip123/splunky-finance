@@ -142,7 +142,7 @@ For a workshop, [docs/workshop.md](docs/workshop.md) provisions one isolated sta
 
 Known defects are tracked as [issues](https://github.com/roadtrip123/splunky-finance/issues), released states in [CHANGELOG.md](CHANGELOG.md), and planned work in [TODO.md](TODO.md).
 
-See [docs/scenario-flows.md](docs/scenario-flows.md) for what happens inside each scenario span by span, [DEMO-SCRIPT.md](DEMO-SCRIPT.md) for presentation steps, [docs/evaluators.md](docs/evaluators.md) for which Galileo metrics to enable and why, and [docs/architecture.md](docs/architecture.md) for data and security contracts. This private repository has no license grant pending the owner's license choice.
+See [docs/instrumentation.md](docs/instrumentation.md) for how traces reach Galileo in twenty lines, [docs/scenario-flows.md](docs/scenario-flows.md) for what happens inside each scenario span by span, [DEMO-SCRIPT.md](DEMO-SCRIPT.md) for presentation steps, [docs/evaluators.md](docs/evaluators.md) for which Galileo metrics to enable and why, and [docs/architecture.md](docs/architecture.md) for data and security contracts. This private repository has no license grant pending the owner's license choice.
 
 ## Private LAN deployment
 

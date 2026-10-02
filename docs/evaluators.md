@@ -46,6 +46,9 @@ Then confirm in the tenant console that every metric is enabled on the log strea
 
 ## What the application does so evaluation works
 
+[docs/instrumentation.md](instrumentation.md) has the short version with runnable code; this
+section is why each choice exists.
+
 Four deliberate choices in the logging, each one the result of a metric scoring wrongly without it:
 
 - **A retriever span.** Policy lookup was a plain tool, so the RAG evaluators had no input and
