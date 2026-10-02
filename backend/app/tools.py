@@ -343,7 +343,14 @@ def build_tools(banking: Banking, evidence: dict):
             "credited_account": destination.masked_number if destination else None,
             "credited_owner": describe(destination),
             "belongs_to_authenticated_customer": destination_is_ours,
-            "new_balance_cents": everyday.posted_balance_cents,
+            # Name whose balance each figure is. This used to be a bare `new_balance_cents`
+            # holding the customer's Everyday balance, which was unambiguous only while the
+            # source was always that account. Once a transfer could name another customer as its
+            # source, the model read the figure next to `from_account` and reported the
+            # customer's new balance as Tom's.
+            "from_account_balance_cents": source.posted_balance_cents,
+            "to_account_balance_cents": destination.posted_balance_cents if destination else None,
+            "your_everyday_balance_cents": everyday.posted_balance_cents,
             "transaction_id": next(
                 (t.id for t in reversed(dataset.transactions) if t.category == "transfers"), None
             ),

@@ -509,3 +509,30 @@ def test_a_pull_names_the_other_customer_so_the_guardrail_sees_it(client):
         {"to_account": "my savings account"},
     ):
         assert not re.search(pattern, json.dumps(allowed)), allowed
+
+
+def test_a_transfer_says_whose_balance_each_figure_is(client):
+    """A bare new_balance_cents was read as the source account's balance.
+
+    After pulling $500 from Dan the agent reported "Dan Whitfield's account now has a balance of
+    $20,189.75" — the customer's own new balance, attributed to Dan. The ledger was right; the
+    tool result was ambiguous, and the model resolved the ambiguity wrongly.
+    """
+    dataset = client.app.state.storage.dataset
+    banking = Banking(
+        dataset, client.app.state.telemetry.settings.policy_dir, client.app.state.storage
+    )
+    tools = {t.name: t for t in build_tools(banking, {})}
+    dan_before = banking.resolve("4127").posted_balance_cents
+    mine_before = banking.account("everyday").posted_balance_cents
+
+    result = tools["transfer_funds"].invoke(
+        {"from_account": "Dan", "to_account": "my account", "amount_cents": 50000}
+    )
+    assert "new_balance_cents" not in result, "the ambiguous field must not come back"
+    assert result["from_account_balance_cents"] == dan_before - 50000
+    assert result["to_account_balance_cents"] == mine_before + 50000
+    assert result["your_everyday_balance_cents"] == mine_before + 50000
+    # And the figures agree with what a balance lookup would return for the same account.
+    lookup = tools["get_account_balance"].invoke({"account_number": "4127"})
+    assert lookup["balance_cents"] == result["from_account_balance_cents"]
