@@ -6,6 +6,20 @@ Versions mark states worth returning to. Tags are annotated, so `git tag -n` and
 Open defects are tracked as [GitHub issues](https://github.com/roadtrip123/splunky-finance/issues);
 planned work is in [TODO.md](TODO.md).
 
+## v0.6.0 — Two ways to reach it
+
+- **The private-network path is now a documented deployment, not a rehearsal footnote.**
+  `ALLOW_PRIVATE_LAN_HTTP=true` plus a private address needs no DNS and no certificates, which is
+  the short path when participants are on a network that routes to the instance. The trade-off is
+  stated where the decision is made: step 2 of the lab has each participant paste their own Galileo
+  API key, and on plain HTTP that key crosses the network in cleartext. The synthetic data and the
+  read-aloud passwords are not what the rule protects.
+- The public HTTPS path keeps its own section, with the `sslip.io` option for a box with no domain
+  and the reason to use one hostname rather than fifty subdomains.
+- The rehearsal section now lists what a human has to do rather than only how to start two stacks —
+  create the Agent Control agent, attach the controls to it, and check `action_decisions` reads
+  `verified: true`. Those are the two steps that only fail against a real tenant.
+
 ## v0.5.2 — Nothing to edit in .env
 
 - The two demo passwords are fixed in the template — `-AlexDemo1234!` and `PresenterDemo1234!`.

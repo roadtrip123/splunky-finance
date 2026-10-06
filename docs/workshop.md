@@ -39,20 +39,50 @@ python3 scripts/setup_env.py
 
 The session secret is generated per box and never shared, because it signs cookies.
 
-## TLS is required, not optional
+## Choose how participants reach it
 
-`config.py` rejects a plain-HTTP origin on anything but localhost and RFC1918 addresses:
+This decides the provisioning command, so settle it first. `config.py` accepts a plain-HTTP origin
+only for localhost and RFC1918 addresses:
 
 ```python
 if not local and origin.scheme == "http" and not (self.allow_private_lan_http and private_lan):
     raise ValueError("Remote exposure requires HTTPS or explicit private LAN HTTP opt-in")
 ```
 
-So fifty stacks behind a public EC2 address over HTTP will refuse to start. `workshop.py` checks this before provisioning and stops rather than leaving you with fifty dead containers.
+`workshop.py` checks the same rule before provisioning, so a doomed run stops rather than leaving
+fifty dead containers.
 
-Put a TLS proxy in front and give each participant a subdomain. `scripts/Caddyfile.workshop` has the configuration. Subdomains rather than paths for two reasons: `APP_ORIGIN` must have an empty path, so `https://demo.example.com/p07` is rejected; and cookies ignore ports but respect hostnames, so port-only separation means anyone visiting two instances shares one cookie jar.
+### A. Private network, plain HTTP — no DNS, no certificates
 
-## Provision
+The short path when participants are on a network that routes to the instance: a corporate LAN, a
+VPN, or the same VPC. **Test it from one participant's machine before building fifty**, because
+reachability is the whole assumption.
+
+```bash
+echo 'ALLOW_PRIVATE_LAN_HTTP=true' >> .env
+PRIVATE_IP=$(hostname -I | awk '{print $1}')
+
+python3 scripts/workshop.py up --count 50 --host "$PRIVATE_IP"
+```
+
+Participant 7 is then `http://<private-ip>:3107`. Omit `--origin-template`: the default
+`http://HOST:PORT` is what you want, and `SESSION_COOKIE_SECURE` is set to match automatically.
+Open the port range in the security group from wherever participants sit.
+
+**What you are accepting.** Step 2 of the lab has each participant paste their own Galileo API key
+into the portal, and on plain HTTP that key crosses the network in cleartext. The synthetic banking
+data does not matter and the demo passwords are read aloud anyway — the keys are the reason the rule
+exists. On a trusted internal network for ninety minutes that is usually a fair trade; over the
+public internet it is not.
+
+Cookies ignore ports, so anyone visiting two instances shares one cookie jar. Each participant uses
+one port and is unaffected, but you will be logged out as you move between instances helping
+people. Use a separate browser profile for that.
+
+### B. Public address, HTTPS — a domain and a proxy
+
+Required when participants come over the internet. Point a wildcard record at the instance, run a
+TLS proxy, and give each participant a subdomain:
 
 ```bash
 python3 scripts/workshop.py up --count 50 \
@@ -61,9 +91,35 @@ python3 scripts/workshop.py up --count 50 \
   --bind 127.0.0.1
 ```
 
-`--bind 127.0.0.1` keeps the stacks off the public interface so the proxy is the only listener. The origin template sets each stack's `APP_ORIGIN`, matched exactly on every mutating request — get it wrong and every login fails with a CSRF error rather than anything that names the real problem. `SESSION_COOKIE_SECURE` is set automatically to match the scheme.
+`--bind 127.0.0.1` keeps the stacks off the public interface so the proxy is the only listener.
+`scripts/Caddyfile.workshop` has the configuration and the loop that generates fifty blocks.
 
-For a private-LAN rehearsal, omit `--origin-template` and pass a `10.x` address as `--host`.
+Subdomains rather than paths or ports: `APP_ORIGIN` must have an empty path, so
+`https://demo.example.com/p07` is rejected, and separate hostnames give each participant their own
+cookie jar.
+
+**No domain available?** `sslip.io` resolves any IP-shaped hostname to that IP with no setup —
+`3.227.0.230.sslip.io` works immediately, and a proxy can obtain a real certificate for it. Use one
+hostname and a port per participant rather than fifty subdomains: Let's Encrypt counts certificates
+per registered domain, and that domain is shared with everyone else using the service.
+
+## Provision
+
+Take the command from the section above for whichever access path you chose. Either way, rehearse
+with two stacks before building fifty:
+
+```bash
+python3 scripts/workshop.py up --count 2 --host <host> --base-port 3200
+python3 scripts/workshop.py list
+```
+
+Then open one, sign in, and walk it through [docs/workshop-lab.md](workshop-lab.md) end to end —
+including creating the Agent Control agent, which is the step most likely to catch participants.
+`python3 scripts/workshop.py down --count 2 --purge` clears it.
+
+`APP_ORIGIN` is matched exactly on every mutating request, so an origin that does not match what
+the browser sends fails every login with a CSRF error rather than anything naming the real problem.
+That is the one value worth checking twice.
 
 The script builds the images once, then starts each stack in turn with a two-second gap, because fifty Next.js and uvicorn processes starting simultaneously is the one real CPU spike in the whole exercise. First run on a fresh box spends a few minutes building; after that `--skip-build` starts everything immediately.
 
@@ -140,15 +196,20 @@ Generated env files live in `workshop/` with mode 0600, and the directory is git
 
 ## Rehearse before the day
 
-Provision two stacks on a private address and work one all the way through:
+The two-stack run under **Provision** is the rehearsal. What matters is that a human follows
+[docs/workshop-lab.md](workshop-lab.md) rather than that the containers start:
 
-```bash
-python3 scripts/workshop.py up --count 2 --host 10.0.0.5 --base-port 3200
-```
+1. Create an agent in the Agent Control console, then the two controls, then **attach** them to it.
+   Binding to a stream is not attaching to an agent, and a control that is bound but not attached
+   never evaluates — the gate fails closed and the guardrail looks like it worked.
+2. Add a model endpoint and connect Galileo from the portal.
+3. Build the four evaluators by hand.
+4. Run every scenario, including both transfer directions and the guardrail.
+5. Read `action_decisions` and confirm it says `verified: true`, not `unavailable`.
 
-Then on one of them: connect a model endpoint, connect Galileo, press **Set up my project**, run the four scenarios and the guardrail transfer. That exercises the whole participant path, including the parts that only fail against a real tenant — metric enablement on a new log stream, and control binding.
-
-`python3 scripts/workshop.py down --count 2 --purge` clears it.
+Steps 1 and 5 are the ones that only fail against a real tenant, and they are the reason to do this
+at all. **Set up my project** does steps 1–3 in one click but is hidden unless `DEMO_SETUP_BUTTON`
+is set, because doing it for participants skips the lab.
 
 ## Things that bite
 
