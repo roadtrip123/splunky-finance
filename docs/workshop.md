@@ -39,12 +39,12 @@ python3 scripts/setup_env.py
 
 The session secret is generated per box and never shared, because it signs cookies.
 
-## When the image build cannot reach PyPI or npm
+## When containers cannot reach the internet
 
-Two different network problems produce a failed dependency download, and they need opposite fixes.
+Two different network problems break outbound HTTPS from a container, and they need opposite fixes.
 Read the certificate name in the error before doing anything.
 
-### The name in the certificate is unrelated to the host being fetched
+### The certificate names a host you did not ask for
 
 ```
 × Failed to download `langgraph==1.2.11`
@@ -52,49 +52,54 @@ Read the certificate name in the error before doing anything.
       certificate is only valid for DnsName("*.lab.example")
 ```
 
-Nothing is wrong with trust here. The connection is being *redirected* to a different server, which
-answers with its own default certificate. Adding certificates cannot help, because the name will
-never match. The usual cause is a network that redirects container IPv4 egress while leaving the
-host alone -- often because the host reaches the internet over IPv6 and Docker's bridge network has
-no IPv6 route.
+Nothing is wrong with trust. The connection is being *redirected* to a different server, which answers
+with its own default certificate. Adding certificates cannot help, because the name will never match.
 
-Confirm it by running the same request on each network. The bridge one fails, the host one does not:
+The giveaway is that the host succeeds where containers fail. Look for a blanket redirect in the nat
+table:
 
 ```bash
-PROBE="import urllib.request;print(urllib.request.urlopen('https://pypi.org/simple/',timeout=15).status)"
-docker run --rm                python:3.12-slim python -c "$PROBE"   # fails
-docker run --rm --network host python:3.12-slim python -c "$PROBE"   # succeeds
+sudo iptables-save -t nat | grep -iE 'REDIRECT|DNAT'
 ```
 
-If that is what you see, build on the host's network:
+A rule like this one is the cause:
+
+```
+-A PREROUTING -p tcp -m tcp --dport 443 -j REDIRECT --to-ports 8443
+```
+
+PREROUTING only sees packets *arriving on an interface*. Traffic the host originates goes through
+OUTPUT and never meets the rule, so the host is unaffected. Container traffic arrives on a bridge,
+hits PREROUTING, and is sent to whatever listens on 8443 locally. Shared lab environments do this to
+front their own web UI, and container egress is collateral damage.
+
+Exempt Docker's bridges and leave the rule intact for the public interface. `br+` matches every
+`br-*` bridge Compose creates, so it covers stacks that do not exist yet:
 
 ```bash
-echo 'BUILD_NETWORK=host' >> .env
-python3 scripts/workshop.py up --count 2 --host <host> --base-port 3200
+for IFACE in docker0 br+; do sudo iptables -t nat -C PREROUTING -i $IFACE -p tcp --dport 443 -j RETURN 2>/dev/null || sudo iptables -t nat -I PREROUTING 1 -i $IFACE -p tcp --dport 443 -j RETURN; done
 ```
 
-`BUILD_NETWORK` only affects the build. Containers still run on their own network, so stacks stay
-isolated from each other and ports still map per participant.
-
-Host networking during a build needs the `network.host` entitlement, which BuildKit normally grants
-for the default builder. If it refuses, use the classic builder for the build only:
+That command is safe to re-run; `-C` checks before inserting. **The rules do not survive a reboot**,
+so run it again if the box restarts, and check egress from a running stack rather than from the host:
 
 ```bash
-DOCKER_BUILDKIT=0 docker compose -p sf-build --env-file .env build
-python3 scripts/workshop.py up --count 2 --host <host> --base-port 3200 --skip-build
+docker exec sf-p01-backend-1 python -c "import urllib.request;print(urllib.request.urlopen('https://api.openai.com/v1/models',timeout=10).status)"
 ```
 
-Containers that run with the default bridge still have to reach the model endpoint and the
-observability backend at runtime. Check that before the day:
+`HTTP Error 401` is a pass — the request arrived and was rejected for having no key. A certificate
+error means egress is still redirected.
+
+If you cannot change the host's firewall, `BUILD_NETWORK=host` in `.env` gets the *build* through by
+putting it on the host's network stack, where PREROUTING does not apply:
 
 ```bash
-docker run --rm python:3.12-slim python -c \
-  "import urllib.request;print(urllib.request.urlopen('https://api.openai.com/v1/models',timeout=10).status)"
+sed -i '/^BUILD_NETWORK=/d' .env && echo 'BUILD_NETWORK=host' >> .env
 ```
 
-A 401 is a pass -- the request arrived and was rejected for having no key. A certificate error means
-runtime egress is redirected too, and the stacks need `network_mode: host` or a working IPv6 route
-on the Docker bridge.
+It fixes only the build. Running stacks still use their own networks, so the model endpoint and the
+observability backend stay unreachable until the firewall is dealt with.
+
 
 ### The certificate is for the right host but issued by a CA the build does not trust
 

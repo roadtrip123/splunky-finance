@@ -8,11 +8,15 @@ planned work is in [TODO.md](TODO.md).
 
 ## Unreleased
 
-- **`BUILD_NETWORK` lets the image build use the host's network.** On a network that redirects
-  container egress, a dependency download fails with a certificate "only valid for" some unrelated
-  name while the same URL works from the host — a redirect, not an interception. Trusted CAs cannot
-  fix a name mismatch; building on the host's network can. Only the build is affected, so stacks
-  still run isolated with per-participant ports.
+- **Documented why containers lose outbound HTTPS on a shared lab host, and how to tell it apart from
+  a proxy.** A blanket `nat PREROUTING ... --dport 443 -j REDIRECT` hijacks every packet *arriving on
+  an interface*, so the host is unaffected while every container is redirected to a local server that
+  answers with an unrelated certificate. The fix is a `RETURN` for Docker's bridges, not a trusted CA:
+  a name mismatch is not a trust failure, and no certificate makes the name match.
+- **`BUILD_NETWORK` lets the image build use the host's network** as a fallback where the firewall
+  cannot be changed. The build then originates from the host and misses PREROUTING. It defaults to
+  `default`, so nothing changes on a normal network, and it fixes the build only — running stacks
+  still need egress.
 - The build-network section of `docs/workshop.md` replaces "Behind a TLS-intercepting proxy", which
   showed a name-mismatch error and then prescribed the fix for an issuer error. The two failures now
   appear separately with the test that tells them apart, and `backend/ca/README.md` says plainly
