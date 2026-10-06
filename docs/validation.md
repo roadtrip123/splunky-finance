@@ -476,7 +476,7 @@ TracesIngestRequest(traces=..., session_id=..., session_external_id=..., experim
 
 Setting the baggage to the conversation id makes both sides agree. Verified against the tenant: a turn with conversation id `diag-single-001` produced exactly one session row, named `My Bank Agent`, where every previous run produced a pair.
 
-This also means the duplicate was specific to Observability Cloud. Splunk AO standalone flushes through an ingest request like Galileo and would never have shown it.
+**Correction to an earlier claim here:** this was said to be specific to Observability Cloud, on the assumption that standalone flushes through an ingest request like Galileo. It does not. `build_standalone_exporter` returns an `OTLPSpanExporter` just as `build_o11y_exporter` does — the two differ only in endpoint and auth header. Both Splunk AO deployments are OTLP, so every OTLP consequence applies to both: the duplicate session, the dropped trace output, the masking, and the unresolved stream id. The real split is Galileo's ingest API against Splunk AO's OTLP, not one AO mode against the other.
 
 Unrelated but visible in the same comparison: Splunk AO shows no `bank-chat-turn` root row, because the OTLP path does not emit the Trace object itself — only spans, which carry the trace id. And it labels spans with OpenTelemetry semantic conventions (`invoke_agent`, `invoke_workflow`, `execute_tool`, `chat`) rather than the plain names Galileo shows. Both are SDK behaviour, not configuration.
 
