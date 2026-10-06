@@ -8,8 +8,13 @@ WORKDIR /app/backend
 # this container does not. UV_NATIVE_TLS makes uv read the platform store rather than its own
 # bundled roots, so update-ca-certificates is enough to make it work.
 COPY backend/ca/ /usr/local/share/ca-certificates/
-RUN update-ca-certificates
-ENV UV_NATIVE_TLS=1
+# Report what was added, because a silent no-op here looks identical to a proxy that is not
+# trusted, and the next failure is thirty lines further down in uv's output.
+RUN update-ca-certificates --verbose 2>&1 | tail -2
+# Point uv at the regenerated bundle explicitly. update-ca-certificates only hash-links the first
+# certificate of a multi-certificate file, so relying on the directory lookup is not enough when
+# the file copied in is a whole host trust store.
+ENV UV_NATIVE_TLS=1 SSL_CERT_FILE=/etc/ssl/certs/ca-certificates.crt
 COPY backend/pyproject.toml backend/uv.lock ./
 RUN uv sync --frozen --no-dev
 COPY --chown=bank:bank backend/app ./app

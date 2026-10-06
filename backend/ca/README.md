@@ -12,14 +12,21 @@ invalid peer certificate: certificate not valid for name "files.pythonhosted.org
 certificate is only valid for DnsName("*.example.internal")
 ```
 
-On the build host:
+First check whether the host trusts the proxy at all:
+
+```bash
+curl -sI https://files.pythonhosted.org/ | head -1
+```
+
+**If that succeeds**, the host's store has the CA and copying it is the quickest fix:
 
 ```bash
 cp /etc/ssl/certs/ca-certificates.crt backend/ca/host-bundle.crt
 ```
 
-That copies the host's whole trust store, the proxy's CA included, and is the quickest fix. To add
-only the proxy's own certificate instead:
+**If it fails with a certificate error**, the host does not trust the proxy either — `git` and `apt`
+were reaching their hosts without interception. Take the certificate the proxy actually presents,
+which works either way because `s_client` does not verify before printing:
 
 ```bash
 openssl s_client -connect files.pythonhosted.org:443 -showcerts </dev/null 2>/dev/null \

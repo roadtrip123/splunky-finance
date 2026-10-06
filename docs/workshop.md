@@ -50,13 +50,20 @@ connection and the build container does not trust the CA doing it:
       certificate is only valid for DnsName("*.example.internal")
 ```
 
-The host trusts that CA already — which is why `git clone` and `apt-get` worked — but the container
-has its own trust store. Give it the host's:
+Capture the certificate the proxy presents and put it where the build will trust it. This works
+whether or not the host itself trusts that CA, because `s_client` prints the chain without
+verifying it:
 
 ```bash
-cp /etc/ssl/certs/ca-certificates.crt backend/ca/host-bundle.crt
+openssl s_client -connect files.pythonhosted.org:443 -showcerts </dev/null 2>/dev/null \
+  | awk '/BEGIN CERT/,/END CERT/' > backend/ca/proxy.crt
+
 python3 scripts/workshop.py up --count 2 --host <host> --base-port 3200
 ```
+
+Copying the host's own store — `cp /etc/ssl/certs/ca-certificates.crt backend/ca/host-bundle.crt` —
+also works, but only if the host trusts the proxy. `curl -sI https://files.pythonhosted.org/` says
+whether it does.
 
 Anything in `backend/ca/` is installed and trusted during the build, and the directory is gitignored
 so a site's certificates stay on that site's box. `backend/ca/README.md` has the narrower option if
