@@ -86,8 +86,13 @@ def participant_origin(template, host, port, index):
     return f"http://{host}:{port}"
 
 
-def participant_env(base, index, host, port, bind, mode, origin):
-    """Base settings plus the ones that must be unique, written newest-wins."""
+def participant_env(base, index, host, port, bind, mode, origin, existing=None):
+    """Base settings plus the ones that must be unique, written newest-wins.
+
+    A session secret already generated for this participant is kept. Rotating it on an update
+    invalidates every signed cookie, so re-provisioning to deploy a new version would log the
+    whole room out for no reason.
+    """
     values = dict(base)
     for key in GENERATED:
         values.pop(key, None)
@@ -100,7 +105,7 @@ def participant_env(base, index, host, port, bind, mode, origin):
         # value here fails every login with a CSRF error rather than anything more obvious.
         APP_ORIGIN=origin,
         SESSION_COOKIE_SECURE="true" if origin.startswith("https://") else "false",
-        SESSION_SECRET=secrets.token_urlsafe(48),
+        SESSION_SECRET=(existing or {}).get("SESSION_SECRET") or secrets.token_urlsafe(48),
         DEMO_MODE=mode,
     )
     header = f"# Splunky Finance workshop participant {index:02d}. Generated; do not edit by hand.\n"
@@ -163,7 +168,11 @@ def command_up(args):
         project = PROJECT.format(n=index)
         env_file = ENV_DIR / f".env.p{index:02d}"
         origin = participant_origin(args.origin_template, args.host, port, index)
-        write_env(env_file, participant_env(base, index, args.host, port, args.bind, args.mode, origin))
+        existing = read_env(env_file) if env_file.exists() else {}
+        write_env(
+            env_file,
+            participant_env(base, index, args.host, port, args.bind, args.mode, origin, existing),
+        )
         code = compose(project, env_file, "up", "-d", "--no-build", dry_run=args.dry_run)
         (started if code == 0 else failed).append((index, port))
         print(f"  p{index:02d}  {origin}  {'ok' if code == 0 else 'FAILED'}")

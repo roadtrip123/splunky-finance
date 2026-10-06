@@ -74,6 +74,39 @@ Useful flags:
 | `--origin-template` | Per-participant origin, e.g. `https://p{n:02d}.demo.example.com` |
 | `--skip-build` | Images already built |
 
+## Deploy a new version
+
+```bash
+cd splunky-finance
+git fetch --tags
+git checkout v0.6.0
+git describe --tags                      # confirm before touching the stacks
+
+python3 scripts/workshop.py up --count 50 \
+  --host demo.example.com \
+  --origin-template 'https://p{n:02d}.demo.example.com' \
+  --bind 127.0.0.1
+```
+
+Re-running `up` with the same arguments is the update: it rebuilds the images and recreates every
+container whose image changed. No `down` first — stopping them only lengthens the outage.
+
+What survives, because it lives in each participant's `runtime-data` volume rather than in the
+image: their Galileo credentials, model endpoints and active backend, their dataset, and any
+transfers they made. A dataset whose shape changed is migrated on startup from the same seed, so
+the figures on their lab sheet do not move.
+
+What does not: conversations, which are in-memory by design. Participants carry on with a fresh
+one.
+
+Their **login sessions do** survive, because a session secret already generated for a participant
+is reused rather than rotated. That was not true at first — every re-provision issued a new secret
+and logged the whole room out.
+
+Budget a few minutes: the image build is once, then the stacks restart at `--stagger` seconds
+apart. For a mid-workshop update, say so before you start rather than letting fifty people watch a
+restart.
+
 ## Manage
 
 ```bash

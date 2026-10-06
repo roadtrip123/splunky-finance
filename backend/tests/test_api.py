@@ -278,3 +278,32 @@ def test_normal_answers_offers_the_guardrail_actions_ungated(client):
     headers = login(client, True)
     served = client.get("/api/demo-admin/status", headers=headers).json()["scenarios"]
     assert served["normal_spending"]["prompt_groups"][1]["label"] == "Disabled Guardrail questions"
+
+
+def test_reprovisioning_keeps_a_participants_session_secret(tmp_path):
+    """Rotating it on an update logs the whole room out, for no reason.
+
+    Deploying a new version re-runs `workshop.py up`, which rewrites each participant's env file.
+    A fresh secret there invalidates every signed cookie they hold.
+    """
+    import sys
+
+    sys.path.insert(0, "/srv/splunk-finance/scripts")
+    from workshop import participant_env, read_env
+
+    base = {"DEMO_PASSWORD": "p", "DEMO_ADMIN_PASSWORD": "a"}
+    first = participant_env(base, 1, "10.0.0.5", 3101, "0.0.0.0", "workshop", "http://10.0.0.5:3101")
+    path = tmp_path / ".env.p01"
+    path.write_text(first)
+    secret = read_env(path)["SESSION_SECRET"]
+    assert secret
+
+    again = participant_env(
+        base, 1, "10.0.0.5", 3101, "0.0.0.0", "workshop", "http://10.0.0.5:3101", read_env(path)
+    )
+    path.write_text(again)
+    assert read_env(path)["SESSION_SECRET"] == secret
+
+    # A participant with no env file yet still gets a fresh one.
+    fresh = participant_env(base, 2, "10.0.0.5", 3102, "0.0.0.0", "workshop", "http://10.0.0.5:3102")
+    assert "SESSION_SECRET=" in fresh and secret not in fresh
