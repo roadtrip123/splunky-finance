@@ -491,3 +491,25 @@ A transfer answer stated the customer's new balance as Dan's — wrong by $15,88
 Pointing it at all three keys was not enough on its own: the mis-stated number *was* in the evidence, under the other account, and the judge rationalised that — 1 of 3 runs caught it, then 1 of 3 again on a second wording. It now has to identify which account or person a figure is attributed to before comparing, and is told that `from_account_balance_cents` is the balance of `from_account` and never of `to_account`.
 
 Verified on `gpt-4.1-mini`, three runs each: mis-attributed balance false 3/3, correct balance true 3/3, correct spending answer true 3/3, wrong total false 3/3. Published as version 8.
+
+## The guardrail returns a verified deny
+
+Three causes stacked, none of them a tenant permission, so the message drafted for Galileo support was unnecessary.
+
+**The runtime token was on the wrong header.** The gateway said so once the body was read: `"Missing Authorization header."`, `"hint": "Present a Bearer runtime token."`, with `x-agent-control-runtime-token` and `galileo-api-key` sent and no `Authorization`. The SDK's default runtime-token header is `Authorization`, resolved param → env → default, and `.env` carried `AGENT_CONTROL_RUNTIME_TOKEN_HEADER=X-Agent-Control-Runtime-Token` — copied from `~/healthcare-assistant`, where it is needed because a Splunk gateway injects its own `Authorization` and would clobber the token. On the Galileo gateway it moves the token off the only header that route reads. The setting is now per backend and blank for Galileo, and `Protection` omits the argument when blank because the SDK rejects an empty header name.
+
+Note the token exchange was never the problem: `_runtime_authorization` returned a valid JWT throughout.
+
+**The agent did not exist.** With auth fixed the route answered 404 `Agent 'my-bank-agent' not found`. Listing the tenant's 55 agents confirmed it: `my-bank-agent` was never registered, and none of the registered agents held these controls.
+
+**Binding to a log stream is not attaching to an agent.** The runtime route looks the agent up by name, and the controls were bound to the log stream only — which is why the console looked correctly configured while every call failed. `configure_galileo.py` now calls `add_agent_control` for each control after binding.
+
+Verified end to end against `my-agent-liam`, an agent that exists in the tenant:
+
+```json
+{"decision": "deny", "source": "galileo-agent-control", "verified": true, "confidence": 1.0,
+ "controls": [{"id": 887, "name": "splunky-transfer-deny-clone-473f81c853dd4e04", "action": "deny",
+               "result": {"matched": true, "message": "Pattern '…1234…' found"}}]}
+```
+
+A real control, matching, denying, with its reason. Agents cannot be created from the SDK, so the agent named in `AGENT_CONTROL_AGENT_NAME` has to exist in the Agent Control console first; `my-bank-agent` does not, and the default now points at one that does.

@@ -36,7 +36,12 @@ class Settings(BaseSettings):
     agent_control_url: str = ""
     agent_control_agent_name: str = "my-bank-agent"
     agent_control_api_key_header: str = "Galileo-API-Key"
-    agent_control_runtime_token_header: str = "X-Agent-Control-Runtime-Token"
+    # Blank means the SDK default, which is a Bearer token on Authorization -- what the Galileo
+    # gateway requires. Splunk AO Observability Cloud needs a dedicated header instead, because a
+    # gateway there injects its own Authorization and would clobber the runtime token. Setting the
+    # Splunk value for Galileo sends the JWT off Authorization entirely and the route answers
+    # "Missing Authorization header" with a 401.
+    agent_control_runtime_token_header: str = ""
     galileo_protection_enabled: bool = False
     # Which observability SDK is active. One at a time: two backends would leave Agent Control
     # without an adjudicator, and two tenants disagreeing on one tool call has no good answer.

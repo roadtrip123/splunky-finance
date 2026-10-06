@@ -89,7 +89,13 @@ class Protection:
             api_key=s.galileo_api_key.get_secret_value(),
             api_key_header=s.agent_control_api_key_header,
             runtime_auth_mode="jwt",
-            runtime_token_header=s.agent_control_runtime_token_header,
+            # Omitted when blank: the SDK rejects an empty header name, and its own default is a
+            # Bearer token on Authorization, which is what the Galileo gateway requires.
+            **(
+                {"runtime_token_header": s.agent_control_runtime_token_header}
+                if s.agent_control_runtime_token_header
+                else {}
+            ),
         ) as client:
             response = await asyncio.wait_for(
                 client.post_runtime_evaluation(

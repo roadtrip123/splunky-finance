@@ -574,6 +574,12 @@ class Telemetry:
 
     # Agent Control sits behind the same gateway as each backend's API, so it authenticates with
     # that deployment's own credential on the header the gateway expects.
+    # Where the short-lived runtime token rides. Empty means Authorization as a Bearer token.
+    AGENT_CONTROL_RUNTIME_TOKEN_HEADERS: ClassVar[dict] = {
+        "galileo": "",
+        "standalone": "",
+        "o11y": "X-Agent-Control-Runtime-Token",
+    }
     AGENT_CONTROL_HEADERS: ClassVar[dict] = {
         "galileo": "Galileo-API-Key",
         "o11y": "X-SF-Token",
@@ -590,11 +596,15 @@ class Telemetry:
         if self.backend_name() != "splunk_ao":
             if not self._header_is_explicit:
                 s.agent_control_api_key_header = self.AGENT_CONTROL_HEADERS["galileo"]
+            s.agent_control_runtime_token_header = self.AGENT_CONTROL_RUNTIME_TOKEN_HEADERS["galileo"]
             s.agent_control_url = self._galileo_agent_control_url
             return
         mode = self.splunk_ao_mode()
         if not self._header_is_explicit:
             s.agent_control_api_key_header = self.AGENT_CONTROL_HEADERS.get(mode or "standalone")
+        s.agent_control_runtime_token_header = self.AGENT_CONTROL_RUNTIME_TOKEN_HEADERS.get(
+            mode or "standalone", ""
+        )
         # Each backend has its own gateway. Sharing one field meant a Splunk AO turn kept the
         # Galileo Agent Control URL and sent an X-SF-Token to the Galileo gateway.
         if s.splunk_ao_agent_control_url:

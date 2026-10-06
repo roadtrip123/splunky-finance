@@ -105,6 +105,7 @@ async def main():
         metrics=list(JUDGES) + BUILTIN_METRICS,
     )
     from agent_control import AgentControlClient
+    from agent_control import add_agent_control
     from agent_control.controls import (
         clone_and_bind_control,
         create_control,
@@ -118,7 +119,10 @@ async def main():
         api_key=s.galileo_api_key.get_secret_value(),
         api_key_header=s.agent_control_api_key_header,
         runtime_auth_mode="jwt",
-        runtime_token_header=s.agent_control_runtime_token_header,
+        # Omitted when blank: the SDK rejects an empty header name and defaults to a Bearer
+        # token on Authorization, which is what the Galileo gateway requires.
+        **({"runtime_token_header": s.agent_control_runtime_token_header}
+           if s.agent_control_runtime_token_header else {}),
     ) as client:
         for name, definition in CONTROLS.items():
             existing = (await list_controls(client, name=name, limit=25)).get("controls") or []
@@ -158,6 +162,27 @@ async def main():
                 enabled=True,
             )
             print(f"{name}: bind requested for {s.galileo_log_stream}. Confirm it in the console.")
+        # Binding a control to a log stream is not the same as attaching it to an agent. The
+        # runtime route looks the agent up by name, and answered 404 "Agent not found" until this
+        # ran -- so the gate failed closed on every call while the controls looked correctly bound
+        # in the console.
+        for name, definition in CONTROLS.items():
+            existing = (await list_controls(client, name=name, limit=25)).get("controls") or []
+            original = next((c for c in existing if not c.get("cloned_from_control_id")), None)
+            identifier = original and (original.get("control_id") or original.get("id"))
+            if not identifier:
+                continue
+            try:
+                await add_agent_control(
+                    agent_name=s.agent_control_agent_name,
+                    control_id=int(identifier),
+                    server_url=s.agent_control_url,
+                    api_key=s.galileo_api_key.get_secret_value(),
+                    api_key_header=s.agent_control_api_key_header,
+                )
+                print(f"{name}: attached to agent {s.agent_control_agent_name}.")
+            except Exception as error:  # noqa: BLE001 - report without exposing credential headers
+                print(f"{name}: could not attach to agent: {type(error).__name__}")
     print(
         "Metric setup requested. Verify sampling, metric scores, and control binding in the tenant console."
     )
