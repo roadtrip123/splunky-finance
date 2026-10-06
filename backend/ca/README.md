@@ -2,17 +2,27 @@
 
 Empty by default, and empty is correct on a normal network.
 
-Put PEM files here when the build runs behind a TLS-intercepting proxy — a corporate network that
+Put PEM files here when the build runs behind a genuine TLS-intercepting proxy — a network that
 substitutes its own certificate for every HTTPS connection. The host usually trusts that CA already,
 which is why `git` and `apt` work, but the build container has its own trust store and does not, so
-`uv sync` fails with:
+`uv sync` fails with an **issuer** error:
 
 ```
-invalid peer certificate: certificate not valid for name "files.pythonhosted.org";
-certificate is only valid for DnsName("*.example.internal")
+invalid peer certificate: UnknownIssuer
 ```
 
-First check whether the host trusts the proxy at all:
+This directory does not fix a **name** error:
+
+```
+certificate not valid for name "files.pythonhosted.org";
+certificate is only valid for DnsName("*.lab.example")
+```
+
+That is a different problem — the connection is being redirected to another server, not intercepted,
+and no amount of trusted CAs makes the name match. See `docs/workshop.md`, "When the image build
+cannot reach PyPI or npm", which covers it with `BUILD_NETWORK=host`.
+
+For a real issuer error, check whether the host trusts the proxy:
 
 ```bash
 curl -sI https://files.pythonhosted.org/ | head -1
@@ -24,9 +34,8 @@ curl -sI https://files.pythonhosted.org/ | head -1
 cp /etc/ssl/certs/ca-certificates.crt backend/ca/host-bundle.crt
 ```
 
-**If it fails with a certificate error**, the host does not trust the proxy either — `git` and `apt`
-were reaching their hosts without interception. Take the certificate the proxy actually presents,
-which works either way because `s_client` does not verify before printing:
+**If it fails with a certificate error**, take the certificate the proxy actually presents, which
+works either way because `s_client` does not verify before printing:
 
 ```bash
 openssl s_client -connect files.pythonhosted.org:443 -showcerts </dev/null 2>/dev/null \

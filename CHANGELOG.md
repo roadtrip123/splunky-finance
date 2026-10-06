@@ -6,6 +6,18 @@ Versions mark states worth returning to. Tags are annotated, so `git tag -n` and
 Open defects are tracked as [GitHub issues](https://github.com/roadtrip123/splunky-finance/issues);
 planned work is in [TODO.md](TODO.md).
 
+## Unreleased
+
+- **`BUILD_NETWORK` lets the image build use the host's network.** On a network that redirects
+  container egress, a dependency download fails with a certificate "only valid for" some unrelated
+  name while the same URL works from the host — a redirect, not an interception. Trusted CAs cannot
+  fix a name mismatch; building on the host's network can. Only the build is affected, so stacks
+  still run isolated with per-participant ports.
+- The build-network section of `docs/workshop.md` replaces "Behind a TLS-intercepting proxy", which
+  showed a name-mismatch error and then prescribed the fix for an issuer error. The two failures now
+  appear separately with the test that tells them apart, and `backend/ca/README.md` says plainly
+  which one it does not fix.
+
 ## v0.6.0 — Two ways to reach it
 
 - **The private-network path is now a documented deployment, not a rehearsal footnote.**

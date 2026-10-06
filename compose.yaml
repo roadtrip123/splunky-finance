@@ -5,6 +5,7 @@ services:
     build:
       context: .
       dockerfile: frontend/Dockerfile
+      network: ${BUILD_NETWORK:-default}
     ports:
       - "${FRONTEND_BIND_ADDRESS:-127.0.0.1}:${FRONTEND_PORT:-3000}:3000"
     environment:
@@ -23,6 +24,7 @@ services:
     build:
       context: .
       dockerfile: backend/Dockerfile
+      network: ${BUILD_NETWORK:-default}
     env_file: .env
     environment:
       DATA_DIR: /app/runtime

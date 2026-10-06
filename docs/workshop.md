@@ -39,20 +39,73 @@ python3 scripts/setup_env.py
 
 The session secret is generated per box and never shared, because it signs cookies.
 
-## Behind a TLS-intercepting proxy
+## When the image build cannot reach PyPI or npm
 
-If the image build fails like this, the network substitutes its own certificate for every HTTPS
-connection and the build container does not trust the CA doing it:
+Two different network problems produce a failed dependency download, and they need opposite fixes.
+Read the certificate name in the error before doing anything.
+
+### The name in the certificate is unrelated to the host being fetched
 
 ```
 × Failed to download `langgraph==1.2.11`
   ╰─▶ invalid peer certificate: certificate not valid for name "files.pythonhosted.org";
-      certificate is only valid for DnsName("*.example.internal")
+      certificate is only valid for DnsName("*.lab.example")
 ```
 
-Capture the certificate the proxy presents and put it where the build will trust it. This works
-whether or not the host itself trusts that CA, because `s_client` prints the chain without
-verifying it:
+Nothing is wrong with trust here. The connection is being *redirected* to a different server, which
+answers with its own default certificate. Adding certificates cannot help, because the name will
+never match. The usual cause is a network that redirects container IPv4 egress while leaving the
+host alone -- often because the host reaches the internet over IPv6 and Docker's bridge network has
+no IPv6 route.
+
+Confirm it by running the same request on each network. The bridge one fails, the host one does not:
+
+```bash
+PROBE="import urllib.request;print(urllib.request.urlopen('https://pypi.org/simple/',timeout=15).status)"
+docker run --rm                python:3.12-slim python -c "$PROBE"   # fails
+docker run --rm --network host python:3.12-slim python -c "$PROBE"   # succeeds
+```
+
+If that is what you see, build on the host's network:
+
+```bash
+echo 'BUILD_NETWORK=host' >> .env
+python3 scripts/workshop.py up --count 2 --host <host> --base-port 3200
+```
+
+`BUILD_NETWORK` only affects the build. Containers still run on their own network, so stacks stay
+isolated from each other and ports still map per participant.
+
+Host networking during a build needs the `network.host` entitlement, which BuildKit normally grants
+for the default builder. If it refuses, use the classic builder for the build only:
+
+```bash
+DOCKER_BUILDKIT=0 docker compose -p sf-build --env-file .env build
+python3 scripts/workshop.py up --count 2 --host <host> --base-port 3200 --skip-build
+```
+
+Containers that run with the default bridge still have to reach the model endpoint and the
+observability backend at runtime. Check that before the day:
+
+```bash
+docker run --rm python:3.12-slim python -c \
+  "import urllib.request;print(urllib.request.urlopen('https://api.openai.com/v1/models',timeout=10).status)"
+```
+
+A 401 is a pass -- the request arrived and was rejected for having no key. A certificate error means
+runtime egress is redirected too, and the stacks need `network_mode: host` or a working IPv6 route
+on the Docker bridge.
+
+### The certificate is for the right host but issued by a CA the build does not trust
+
+```
+× Failed to download `langgraph==1.2.11`
+  ╰─▶ invalid peer certificate: UnknownIssuer
+```
+
+This one is a real TLS-intercepting proxy, and trusting its CA is the fix. Capture the chain the
+proxy presents -- `s_client` prints it without verifying, so this works whether or not the host
+trusts it either:
 
 ```bash
 openssl s_client -connect files.pythonhosted.org:443 -showcerts </dev/null 2>/dev/null \
@@ -61,13 +114,12 @@ openssl s_client -connect files.pythonhosted.org:443 -showcerts </dev/null 2>/de
 python3 scripts/workshop.py up --count 2 --host <host> --base-port 3200
 ```
 
-Copying the host's own store — `cp /etc/ssl/certs/ca-certificates.crt backend/ca/host-bundle.crt` —
+Copying the host's own store -- `cp /etc/ssl/certs/ca-certificates.crt backend/ca/host-bundle.crt` --
 also works, but only if the host trusts the proxy. `curl -sI https://files.pythonhosted.org/` says
 whether it does.
 
 Anything in `backend/ca/` is installed and trusted during the build, and the directory is gitignored
-so a site's certificates stay on that site's box. `backend/ca/README.md` has the narrower option if
-you would rather add only the proxy's own certificate.
+so a site's certificates stay on that site's box.
 
 ## Choose how participants reach it
 
