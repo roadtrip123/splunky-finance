@@ -199,6 +199,21 @@ Wrong Customer is the interesting one. Its answer greets you as Dan Whitfield an
 
 Evaluators are detective controls. They tell you afterwards, which is fine for a wrong number and useless for money that has already left. Now build something preventive.
 
+### First, create your agent
+
+Agent Control looks up an **agent by name** when the application asks for a verdict. If no agent of
+that name exists it answers 404, the application fails closed, and the action is blocked anyway —
+so the guardrail *looks* like it works while no control has evaluated anything. This catches
+everyone, so do it first.
+
+In the Agent Control console, create an agent named after yourself, for example
+`splunky-<your-initials>`. Then set that same name in your instance: it is the
+`AGENT_CONTROL_AGENT_NAME` your presenter configured, and they will tell you how to change it.
+
+An agent cannot be created from the SDK, so this step is console-only.
+
+### Then the controls
+
 Two actions need gating, so you create **two** controls. Both have the same shape and differ only in the tool they name:
 
 - `splunky-transfer-deny-<initials>` on `transfer_funds` — moving money
@@ -244,7 +259,10 @@ Create the first as:
 
 Then create the second identically, with `"step_names": ["get_account_balance"]`.
 
-**Bind both to your log stream** and confirm the bindings in the console.
+**Bind both to your log stream**, then **attach both to your agent**. These are two different
+things: binding scopes a control to a stream, attaching makes it visible to the runtime lookup by
+agent name. A control that is bound but not attached never evaluates, and the symptom is a block
+with `decision: "unavailable"` rather than an error.
 
 ### Try it
 

@@ -24,8 +24,10 @@ Ports are `base + N`, so participant 7 is `3107` with the default base of 3100.
 sudo apt-get update && sudo apt-get install -y docker.io docker-compose-v2 git
 sudo usermod -aG docker $USER && newgrp docker
 
-git clone https://github.com/roadtrip123/splunky-finance.git
+# Pin to a released version. The default branch moves; a workshop should not.
+git clone --branch v0.5.0 https://github.com/roadtrip123/splunky-finance.git
 cd splunky-finance
+git describe --tags          # expect v0.5.0
 python3 scripts/setup_env.py
 ```
 
@@ -122,6 +124,13 @@ python3 scripts/check_endpoint.py --base-url <url> --model <model> --api-key <ke
 ```
 
 Pass the key without any `Bearer ` prefix; the client adds it. A provider config that hands you a full header value such as `"Bearer tv-pat-..."` needs the prefix stripped, or you get a doubled header and a 401.
+
+**Every participant needs an Agent in Agent Control, and it cannot be created from the SDK.** The
+runtime evaluation route looks the agent up by name, and returns 404 if it does not exist — at
+which point the application fails closed. The guardrail then blocks correctly and reports
+`decision: "unavailable"`, which looks like success and is not. Each participant creates an agent
+in the Agent Control console and uses that name; the lab sheet says so, and it is worth repeating
+out loud because nothing in the app surfaces the problem.
 
 **One LLM endpoint for fifty people** is the most likely thing to spoil the session — well ahead of anything about instance sizing. Check the endpoint's rate limits against fifty concurrent turns of roughly 2,500 input tokens each, and confirm it handles tool calling properly: this agent depends entirely on well-formed tool calls, and an endpoint that is chat-compatible but weak on tools fails every scenario.
 
