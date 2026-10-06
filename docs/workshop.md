@@ -31,9 +31,13 @@ git describe --tags          # expect v0.5.0
 python3 scripts/setup_env.py
 ```
 
-`setup_env.py` writes a private `.env` with random passwords. Edit it once to set the shared LLM endpoint and credentials. Those two passwords are the ones every participant will use — they are handed out, so choose something you are comfortable saying aloud.
+`setup_env.py` writes a private `.env`. Nothing in it needs editing for a workshop:
 
-Leave the Galileo values blank. Participants supply their own from the portal.
+- the two demo passwords are the fixed shared pair, `-AlexDemo1234!` and `PresenterDemo1234!`
+- the model endpoint is configured in the presenter portal, not here
+- the Galileo values stay blank; participants supply their own
+
+The session secret is generated per box and never shared, because it signs cookies.
 
 ## TLS is required, not optional
 

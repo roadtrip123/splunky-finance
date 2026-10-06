@@ -21,7 +21,7 @@ cd splunky-finance
 python3 scripts/setup_env.py
 ```
 
-`setup_env.py` writes a private `.env` with random passwords. Edit it to select a model provider and add its key, or leave those blank and set them later from the presenter portal. Then:
+`setup_env.py` writes a private `.env`. The two demo passwords are a fixed shared pair, suitable for a demo on synthetic data and nothing else; the model endpoint and Galileo are configured from the presenter portal rather than here. Then:
 
 ```bash
 docker compose up --build -d
@@ -32,7 +32,7 @@ Open http://localhost:3000, sign in with account `12345678`, and the customer pa
 
 Running more than one stack on the same machine needs a distinct `FRONTEND_PORT` and matching `APP_ORIGIN` per stack. For a workshop, `scripts/workshop.py` generates those and provisions any number of isolated stacks in one command — see [docs/workshop.md](docs/workshop.md).
 
-The setup script generates random initial demo passwords; read them from the private `.env` and replace them before sharing access. Presenter login is at `/demo-admin` and uses its independent password. `.env` is private, ignored by Git, and created with permissions 0600. Setup never overwrites an existing file.
+The demo passwords are fixed and shared, so anyone who can reach the instance and knows them can sign in. Replace them in `.env` for anything beyond a demo on synthetic data. Presenter login is at `/demo-admin` and uses its independent password. `.env` is private, ignored by Git, and created with permissions 0600. Setup never overwrites an existing file.
 
 For a remote server, configure `APP_ORIGIN` to its exact HTTPS URL and `SESSION_COOKIE_SECURE=true`. Put a TLS reverse proxy in front of frontend port 3000. Compose binds that port to loopback by default and keeps backend internal. Use one backend process because session/run state is in memory. Dataset JSON persists in the `runtime-data` volume. Do not scale backend workers without a shared session store.
 

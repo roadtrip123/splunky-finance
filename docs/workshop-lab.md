@@ -13,8 +13,8 @@ Your instructor gives you one URL, an account number and two passwords. Everythi
 | | |
 | --- | --- |
 | Your app | `https://p<NN>.<workshop-domain>` |
-| Customer login | account `12345678`, plus the customer password |
-| Presenter portal | the same URL at `/demo-admin`, plus the presenter password |
+| Customer login | account `12345678`, password `-AlexDemo1234!` |
+| Presenter portal | the same URL at `/demo-admin`, password `PresenterDemo1234!` |
 
 Open the app, sign in to banking, then open `/demo-admin` in **another tab of the same browser profile**. The two link automatically.
 
