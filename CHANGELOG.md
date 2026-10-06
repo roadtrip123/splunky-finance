@@ -6,12 +6,45 @@ Versions mark states worth returning to. Tags are annotated, so `git tag -n` and
 Open defects are tracked as [GitHub issues](https://github.com/roadtrip123/splunky-finance/issues);
 planned work is in [TODO.md](TODO.md).
 
-## Unreleased
+## v0.5.0 — The guardrail actually decides
 
-- Splunk AO is labelled **Beta** in the portal, beside the switch that selects it and in the
-  status card. Traces and sessions arrive correctly; the custom judges, the guardrail's control
-  target and fault masking do not work there yet. The label sits where a presenter chooses the
-  backend rather than only in release notes, with one line saying what is missing and why.
+**The guardrail returns a verified deny.** Until now every armed run blocked by failing closed —
+correct, and not the same as a Galileo control voting. It now reports
+`decision: "deny", source: "galileo-agent-control", verified: true`, naming the control that
+matched and why. Three causes, none of them a tenant permission:
+
+- The runtime token rode the wrong header. The SDK defaults to a Bearer token on `Authorization`,
+  resolved param → env → default, and `.env` carried the Splunk header copied from
+  `~/healthcare-assistant`, where a gateway injects its own `Authorization`. On the Galileo
+  gateway that moves the token off the only header the route reads. Now per backend.
+- The agent named in `AGENT_CONTROL_AGENT_NAME` did not exist. Agents cannot be created from the
+  SDK, so the name must already exist in the Agent Control console.
+- Binding a control to a log stream does not attach it to an agent, and the runtime route looks
+  the agent up by name — which is why the console looked correctly configured while every call
+  failed. `configure_galileo.py` now attaches each control to the agent.
+
+**The numerical judge reads every evidence key.** It was written against `evidence.calculations`,
+where the spending tool writes, so every figure stated about a balance (`evidence.lookups`) or a
+money movement (`evidence.transfers`) went unchecked. A transfer answer reported the customer's
+balance as Dan's — wrong by $15,883.55 — and all three judges passed it.
+
+Widening the keys was not enough on its own: the mis-stated number *was* in the evidence under the
+other account, and the judge rationalised that, catching it 1 run in 3. It now has to work out
+which account a figure is attributed to before comparing. Verified three runs each: mis-attributed
+balance false 3/3, correct balance true 3/3, correct spending answer true 3/3, wrong total
+false 3/3.
+
+**Splunk AO is labelled Beta** beside the switch that selects it and in the status card, with one
+line saying what is missing and why. Traces and sessions arrive correctly; the custom judges, the
+guardrail's control target and fault masking do not work there yet.
+
+Also fixed: deriving the Splunk AO Agent Control URL overwrote `agent_control_url` and nothing
+restored it, so after one visit to Splunk AO every Galileo guardrail call went to the Splunk
+gateway. The failure diagnosis now carries the HTTP status and a hint, which is what turned that
+investigation from guesswork into two specific findings.
+
+Corrected on the record: Splunk AO standalone was said to flush through an ingest request like
+Galileo. It does not — both AO deployments are OTLP, so every OTLP consequence applies to both.
 
 ## v0.4.0 — Money moves both ways
 
