@@ -3,6 +3,13 @@ FROM python:3.12.12-slim-bookworm
 COPY --from=uv /uv /usr/local/bin/uv
 RUN groupadd --gid 10001 bank && useradd --uid 10001 --gid bank --create-home bank
 WORKDIR /app/backend
+# Any PEM dropped into backend/ca/ is trusted for the dependency download. Empty on a normal
+# network; needed behind a TLS-intercepting proxy, where the host trusts the substituted CA but
+# this container does not. UV_NATIVE_TLS makes uv read the platform store rather than its own
+# bundled roots, so update-ca-certificates is enough to make it work.
+COPY backend/ca/ /usr/local/share/ca-certificates/
+RUN update-ca-certificates
+ENV UV_NATIVE_TLS=1
 COPY backend/pyproject.toml backend/uv.lock ./
 RUN uv sync --frozen --no-dev
 COPY --chown=bank:bank backend/app ./app

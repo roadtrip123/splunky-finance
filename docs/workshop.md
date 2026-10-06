@@ -39,6 +39,29 @@ python3 scripts/setup_env.py
 
 The session secret is generated per box and never shared, because it signs cookies.
 
+## Behind a TLS-intercepting proxy
+
+If the image build fails like this, the network substitutes its own certificate for every HTTPS
+connection and the build container does not trust the CA doing it:
+
+```
+× Failed to download `langgraph==1.2.11`
+  ╰─▶ invalid peer certificate: certificate not valid for name "files.pythonhosted.org";
+      certificate is only valid for DnsName("*.example.internal")
+```
+
+The host trusts that CA already — which is why `git clone` and `apt-get` worked — but the container
+has its own trust store. Give it the host's:
+
+```bash
+cp /etc/ssl/certs/ca-certificates.crt backend/ca/host-bundle.crt
+python3 scripts/workshop.py up --count 2 --host <host> --base-port 3200
+```
+
+Anything in `backend/ca/` is installed and trusted during the build, and the directory is gitignored
+so a site's certificates stay on that site's box. `backend/ca/README.md` has the narrower option if
+you would rather add only the proxy's own certificate.
+
 ## Choose how participants reach it
 
 This decides the provisioning command, so settle it first. `config.py` accepts a plain-HTTP origin

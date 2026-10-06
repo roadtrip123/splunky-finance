@@ -17,3 +17,8 @@ dist/
 
 *.tsbuildinfo
 workshop/
+
+# Corporate proxy CAs for the image build. Public certificates, but they identify an
+# internal network and are per-site rather than part of the project.
+backend/ca/*
+!backend/ca/README.md
