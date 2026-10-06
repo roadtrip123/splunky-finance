@@ -199,6 +199,17 @@ python3 scripts/workshop.py up --count 50 \
 Participant 7 browses `https://<ip>:3107`, which the proxy forwards to `127.0.0.1:4107`.
 `scripts/Caddyfile.selfsigned` has the configuration and the loop that generates fifty blocks.
 
+Check the proxy is listening where you meant before testing in a browser, because a wrong port binds
+silently and looks identical to a closed security group:
+
+```bash
+sudo ss -ltn | grep -E ':31[0-9][0-9]'
+```
+
+Test from a participant's machine, not from the instance. A public IP is not an address on an EC2
+instance — AWS translates it — so connecting to it from the box itself hangs whether or not the
+proxy works.
+
 Participants get a certificate warning once and click through — **tell them beforehand**, or the
 first five minutes go on it. A self-signed certificate stops passive sniffing, which is the real
 risk on shared wifi; it does not prove the server's identity. For synthetic data that is a

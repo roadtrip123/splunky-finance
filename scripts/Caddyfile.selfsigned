@@ -20,13 +20,21 @@
 #      The template builds the *public* port from the participant number, because `{port}` is the
 #      stack's internal port and the two deliberately differ.
 #
-#   2. Generate one block per participant, substituting the address:
+#   2. Generate one block per participant, substituting the address. The ports are computed with
+#      arithmetic rather than by pasting digits together: `seq 1 50` yields `1`, not `01`, and
+#      "31" . "1" is port 311, which Caddy binds without complaint while nothing reaches it.
 #        IP=<public-ip>
-#        for i in $(seq -w 1 50); do
-#          printf '%s:31%s {\n  tls internal\n  reverse_proxy 127.0.0.1:41%s\n}\n' "$IP" "$i" "$i"
-#        done > /tmp/Caddyfile.workshop
+#        { printf '{\n\tauto_https disable_redirects\n}\n'
+#          for i in $(seq 1 50); do
+#            printf '%s:%d {\n\ttls internal\n\treverse_proxy 127.0.0.1:%d\n}\n' \
+#              "$IP" $((3100+i)) $((4100+i))
+#          done
+#        } | sudo tee /etc/caddy/Caddyfile >/dev/null
 #
-#   3. caddy run --config /tmp/Caddyfile.workshop
+#   3. sudo systemctl restart caddy
+#
+#      Then confirm the listeners are where you meant them to be, before trusting a browser test:
+#        sudo ss -ltn | grep -E ':(31[0-9][0-9])'
 #
 #   4. Open 3101-3150 in the security group. Port 80 is not needed: a local CA issues the
 #      certificate, so there is no HTTP challenge.
