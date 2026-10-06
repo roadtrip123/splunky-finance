@@ -31,6 +31,27 @@ class Protection:
             details["diagnosis"] = diagnosis
         return details
 
+    @staticmethod
+    def _failure(exc):
+        """Why the request did not complete, with the HTTP status when there was one.
+
+        The exception type alone said only that something went wrong. A rejected credential, a
+        wrong gateway and a missing route are all `HTTPStatusError`, and they need different
+        fixes. The status code is read off the response; the body is not, because it can carry
+        credential headers back.
+        """
+        diagnosis = {"cause": "request_failed", "error": type(exc).__name__}
+        response = getattr(exc, "response", None)
+        status = getattr(response, "status_code", None)
+        if status:
+            diagnosis["http_status"] = int(status)
+            diagnosis["hint"] = {
+                401: "credentials rejected by the Agent Control gateway",
+                403: "credentials accepted but the request was refused",
+                404: "no such route at this Agent Control URL",
+            }.get(int(status), "the gateway returned an error")
+        return diagnosis
+
     def _configured(self, logger):
         s = self.settings
         return bool(
@@ -189,9 +210,7 @@ class Protection:
             return False, self._unavailable("No control evaluated this action", exc.diagnosis)
         except Exception as exc:  # noqa: BLE001 - sanitize credential-bearing SDK errors
             self.status = "failed"
-            return False, self._unavailable(
-                "Protection request failed", {"cause": "request_failed", "error": type(exc).__name__}
-            )
+            return False, self._unavailable("Protection request failed", self._failure(exc))
 
     async def check(self, candidate, prompt, evidence, logger, enabled):
         if not enabled:
@@ -219,6 +238,4 @@ class Protection:
             return FALLBACK, self._unavailable("No control evaluated this answer", exc.diagnosis)
         except Exception as exc:  # noqa: BLE001 - sanitize credential-bearing SDK errors
             self.status = "failed"
-            return FALLBACK, self._unavailable(
-                "Protection request failed", {"cause": "request_failed", "error": type(exc).__name__}
-            )
+            return FALLBACK, self._unavailable("Protection request failed", self._failure(exc))

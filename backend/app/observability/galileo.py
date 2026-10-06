@@ -24,6 +24,10 @@ class Telemetry:
         # silently overwrites a deliberate one.
         default_header = type(settings).model_fields["agent_control_api_key_header"].default
         self._header_is_explicit = settings.agent_control_api_key_header != default_header
+        # The Galileo gateway, remembered before anything derives a Splunk AO one. Deriving used to
+        # overwrite this field and switching back never restored it, so a Galileo turn kept calling
+        # app.<realm>.signalfx.com with a Galileo key and the gate failed closed on every request.
+        self._galileo_agent_control_url = settings.agent_control_url
         self.toggle_path = Path(settings.data_dir) / "galileo-settings.json"
         try:
             saved = json.loads(self.toggle_path.read_text())
@@ -586,6 +590,7 @@ class Telemetry:
         if self.backend_name() != "splunk_ao":
             if not self._header_is_explicit:
                 s.agent_control_api_key_header = self.AGENT_CONTROL_HEADERS["galileo"]
+            s.agent_control_url = self._galileo_agent_control_url
             return
         mode = self.splunk_ao_mode()
         if not self._header_is_explicit:

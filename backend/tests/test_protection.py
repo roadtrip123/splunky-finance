@@ -130,3 +130,21 @@ async def test_action_gate_logs_a_control_span_from_dict_arguments():
     controls = [s for s in every(captured[-1].spans) if "control" in str(getattr(s, "type", "")).lower()]
     assert [s.name for s in controls] == ["splunky-transfer-deny"]
     assert details.get("control_telemetry") != "span_rejected"
+
+
+def test_a_failed_request_records_the_http_status():
+    """A rejected credential, a wrong gateway and a missing route are all HTTPStatusError."""
+    from app.observability.protection import Protection
+
+    class Response:
+        status_code = 401
+
+    class Failure(Exception):
+        response = Response()
+
+    diagnosis = Protection._failure(Failure())
+    assert diagnosis["cause"] == "request_failed"
+    assert diagnosis["http_status"] == 401
+    assert "credentials rejected" in diagnosis["hint"]
+    # No response at all still names the exception, as before.
+    assert Protection._failure(RuntimeError("x")) == {"cause": "request_failed", "error": "RuntimeError"}

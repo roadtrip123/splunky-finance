@@ -925,3 +925,27 @@ def test_splunk_ao_is_flagged_as_beta(settings):
     assert flags == {GALILEO: False, SPLUNK_AO: True}
     # The display name stays clean, so status messages do not read "Splunk AO - Beta rejected…".
     assert all("Beta" not in b["name"] for b in view["backends"])
+
+
+def test_switching_back_to_galileo_restores_its_agent_control_gateway(settings):
+    """Deriving the Splunk AO gateway must not leak into a Galileo turn.
+
+    It used to overwrite agent_control_url and nothing restored it, so after one visit to Splunk AO
+    every Galileo guardrail call went to app.<realm>.signalfx.com with a Galileo key. The gate
+    failed closed on every request — decision "unavailable", cause "request_failed" — which looks
+    exactly like a control that was never bound.
+    """
+    from app.observability.galileo import Telemetry
+
+    settings.agent_control_url = "https://agent-control.multitenant.galileocloud.io"
+    telemetry = Telemetry(settings)
+
+    telemetry._persist(active_backend="splunk_ao")
+    settings.splunk_ao_realm, settings.splunk_ao_o11y_token = "au0", SecretStr("t")
+    telemetry.configure_environment()
+    assert settings.agent_control_url == "https://app.au0.signalfx.com/ao/agent-control"
+
+    telemetry._persist(active_backend="galileo")
+    telemetry.configure_environment()
+    assert settings.agent_control_url == "https://agent-control.multitenant.galileocloud.io"
+    assert settings.agent_control_api_key_header == "Galileo-API-Key"
