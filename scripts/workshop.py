@@ -120,11 +120,14 @@ def write_env(path, text):
         stream.write(text)
 
 
-def compose(project, env_file, *arguments, dry_run=False):
+def compose(project, env_file, *arguments, dry_run=False, stream=False):
     command = ["docker", "compose", "-p", project, "--env-file", str(env_file), *arguments]
     if dry_run:
         print("   " + " ".join(command))
         return 0
+    if stream:
+        # Let the caller see everything. Used for the build, where the reason matters.
+        return subprocess.run(command, cwd=ROOT, check=False).returncode
     result = subprocess.run(command, cwd=ROOT, capture_output=True, text=True, check=False)
     if result.returncode:
         sys.stderr.write(f"{project}: {result.stderr.strip().splitlines()[-1:] or ['failed']}\n")
@@ -157,8 +160,10 @@ def command_up(args):
     # rebuild identical source fifty times.
     if not args.skip_build:
         print("Building images once (first run on a fresh box takes a few minutes)...")
-        if compose("sf-build", base_path, "build", dry_run=args.dry_run):
-            raise SystemExit("Image build failed; fix that before provisioning")
+        # Streamed, not captured. A build failure is usually environmental -- disk, network, a
+        # registry that is unreachable -- and the last line of stderr never says which.
+        if compose("sf-build", base_path, "build", dry_run=args.dry_run, stream=True):
+            raise SystemExit("Image build failed; the output above says why")
         print("Images ready\n")
 
     print(f"Provisioning {args.count} participants from {args.base_env}\n")
