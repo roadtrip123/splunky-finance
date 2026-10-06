@@ -74,6 +74,7 @@ type Status = {
       active: boolean;
       configured: boolean;
       mode: "" | "o11y" | "standalone";
+      beta: boolean;
     }[];
   };
   endpoints: {
@@ -211,9 +212,11 @@ export default function Admin() {
   const activeId = status?.observability.active ?? "galileo";
   const activeBackend = status?.observability.backends.find((b) => b.active) ?? {
     id: "galileo" as const, name: "Galileo", stream_label: "log stream", active: true,
-    configured: false, mode: "" as const,
+    configured: false, mode: "" as const, beta: false,
   };
   const streamLabel = activeBackend.stream_label.replace(/^./, (c) => c.toUpperCase());
+  // Support that is not finished is labelled where it is chosen, not only in the release notes.
+  const backendName = (b: { name: string; beta: boolean }) => `${b.name}${b.beta ? " - Beta" : ""}`;
   // Splunk AO's two deployments are mutually exclusive and need different credentials. Show one
   // set, chosen here, rather than nine fields where six are wrong for whichever you are using.
   const [aoMode, setAoMode] = useState<"o11y" | "standalone">("o11y");
@@ -363,7 +366,7 @@ export default function Admin() {
                         ? status.galileo.connection
                         : "disabled"}
                     </h3>
-                    <p>{activeBackend.name}</p>
+                    <p>{backendName(activeBackend)}</p>
                     <button
                       className="button outline small"
                       disabled={
@@ -547,7 +550,7 @@ export default function Admin() {
                           })
                         }
                       >
-                        {b.name}
+                        {backendName(b)}
                         {b.configured ? "" : " ·  not configured"}
                       </button>
                     ))}
@@ -772,7 +775,7 @@ export default function Admin() {
                             })
                           }
                         >
-                          {b.name}
+                          {backendName(b)}
                           {b.configured ? "" : " (not configured)"}
                         </button>
                       ))}
@@ -799,13 +802,21 @@ export default function Admin() {
                     )}
                     {activeId === "splunk_ao" && (
                       <p className="muted">
+                        <strong>Beta.</strong> Traces and sessions arrive correctly. The custom
+                        judges, the guardrail&rsquo;s control target and fault masking do not yet
+                        work on this backend, because its OTLP transport exports spans rather than
+                        the finished trace. Galileo is unaffected.{" "}
+                      </p>
+                    )}
+                    {activeId === "splunk_ao" && (
+                      <p className="muted">
                         {aoMode === "o11y"
                           ? "Splunk Observability Cloud. Two fields: the realm and an access token. The console, API and trace ingest endpoints are all derived from the realm, which is why they are not asked for."
                           : "A self-hosted Agent Observability deployment. Two fields: an API key and the console URL you log in at."}
                       </p>
                     )}
                     <p>
-                      <strong>{activeBackend.name}</strong>
+                      <strong>{backendName(activeBackend)}</strong>
                       {" · "}
                       {keySummary}
                       {" · "}

@@ -22,6 +22,11 @@ BACKENDS = (GALILEO, SPLUNK_AO)
 STREAM_LABEL = {GALILEO: "log stream", SPLUNK_AO: "agent stream"}
 # What to call each backend on screen and in a status message.
 DISPLAY_NAME = {GALILEO: "Galileo", SPLUNK_AO: "Splunk AO"}
+# Backends whose support is not finished. Traces arrive, but the OTLP transport drops the trace
+# output the custom judges read, cannot carry an Agent Control stream target, and exports spans
+# before a fault can be masked out of them. The portal says so rather than letting a presenter
+# discover it live. See issues #1, #2 and #3.
+BETA = frozenset({SPLUNK_AO})
 
 
 @dataclass(frozen=True)

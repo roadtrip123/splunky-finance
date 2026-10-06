@@ -148,6 +148,12 @@ active one so "connected" is never ambiguous about where.
 Switching resets the conversation, as a model switch does, so one tenant's session never contains
 the other's turns. A backend with no credentials saved is shown but disabled.
 
+Splunk AO is marked **Beta**, and the reason is worth knowing before you switch to it in front of
+anyone: traces and sessions arrive correctly, but the three custom judges, the guardrail's control
+target and the fault masking do not work on that backend yet. Its OTLP transport exports spans
+rather than the finished trace, which is what all three depend on. So switch to it to show the
+same agent appearing in both products — not to run the evaluation or guardrail parts of the demo.
+
 Two differences to expect, neither a fault. Splunk AO shows no `bank-chat-turn` root row, because
 the OTLP transport exports spans rather than the trace object. And it labels spans with
 OpenTelemetry semantic conventions — `invoke_agent`, `execute_tool`, `chat` — where Galileo uses

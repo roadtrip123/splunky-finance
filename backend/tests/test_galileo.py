@@ -912,3 +912,16 @@ def test_an_unset_agent_control_header_still_follows_the_backend(settings):
     settings.splunk_ao_realm, settings.splunk_ao_o11y_token = "au0", SecretStr("t")
     telemetry.configure_environment()
     assert settings.agent_control_api_key_header == "X-SF-Token"
+
+
+def test_splunk_ao_is_flagged_as_beta(settings):
+    """Unfinished support is labelled where a presenter chooses it, not only in release notes."""
+    from app.observability.galileo import Telemetry
+    from app.observability.sdk import BETA, GALILEO, SPLUNK_AO
+
+    assert BETA == {SPLUNK_AO}, "Galileo must never be flagged beta"
+    view = Telemetry(settings).backends_view()
+    flags = {b["id"]: b["beta"] for b in view["backends"]}
+    assert flags == {GALILEO: False, SPLUNK_AO: True}
+    # The display name stays clean, so status messages do not read "Splunk AO - Beta rejected…".
+    assert all("Beta" not in b["name"] for b in view["backends"])

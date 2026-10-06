@@ -6,6 +6,13 @@ Versions mark states worth returning to. Tags are annotated, so `git tag -n` and
 Open defects are tracked as [GitHub issues](https://github.com/roadtrip123/splunky-finance/issues);
 planned work is in [TODO.md](TODO.md).
 
+## Unreleased
+
+- Splunk AO is labelled **Beta** in the portal, beside the switch that selects it and in the
+  status card. Traces and sessions arrive correctly; the custom judges, the guardrail's control
+  target and fault masking do not work there yet. The label sits where a presenter chooses the
+  backend rather than only in release notes, with one line saying what is missing and why.
+
 ## v0.4.0 — Money moves both ways
 
 - A transfer may name another customer as its **source**, not only its destination.

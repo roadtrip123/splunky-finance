@@ -363,7 +363,7 @@ class Telemetry:
 
     def backends_view(self):
         """What the portal shows: every backend, which is active, and whether it can authenticate."""
-        from app.observability.sdk import BACKENDS, DISPLAY_NAME, STREAM_LABEL
+        from app.observability.sdk import BACKENDS, BETA, DISPLAY_NAME, STREAM_LABEL
 
         active = self.backend_name()
         return {
@@ -376,6 +376,7 @@ class Telemetry:
                     "active": name == active,
                     "configured": self._credentials_for(name),
                     "mode": self.splunk_ao_mode() if name == "splunk_ao" else "",
+                    "beta": name in BETA,
                 }
                 for name in BACKENDS
             ],
