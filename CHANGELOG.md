@@ -6,6 +6,17 @@ Versions mark states worth returning to. Tags are annotated, so `git tag -n` and
 Open defects are tracked as [GitHub issues](https://github.com/roadtrip123/splunky-finance/issues);
 planned work is in [TODO.md](TODO.md).
 
+## v0.6.2 — Say what this is not
+
+- **A disclaimer, in the two places someone browsing the repository will see it.** A banner at the top
+  of the README and a standalone [DISCLAIMER.md](DISCLAIMER.md): not a Cisco, Splunk or Galileo
+  product, not affiliated with or supported by any of them, and not to be run in a production
+  environment. It names the specific trade-offs that make it unsuitable — published shared passwords,
+  plain HTTP as a supported path, pasted API keys stored for convenience, no authorisation model,
+  audit trail or backups — so "demo only" is a statement with reasons rather than a slogan.
+- Version pins in the deployment instructions move to v0.6.2, since the documented path deploys a tag
+  and anything meant to reach a box has to be in one.
+
 ## v0.6.1 — What a hostile network does to a workshop
 
 Deploying on a managed lab host turned up three environment failures, each of which looks like one of

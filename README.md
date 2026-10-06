@@ -2,6 +2,21 @@
 
 Fictional Australian banking demonstration: a responsive Next.js website, deterministic JSON accounts and transactions, a tool-backed LangChain assistant, and a separate presenter workspace for Galileo evaluation and Agent Control protection. All accounts, policies, and transactions are synthetic. No banking actions execute.
 
+> ### ⚠️ Demonstration only — not for production
+>
+> **Not a Cisco product, not a Splunk product, not a Galileo product.** This is an independent
+> demonstration, not affiliated with, endorsed by, or supported by Cisco, Splunk, Galileo, or any
+> other company named here. Those names identify the third-party services it integrates with and
+> nothing more.
+>
+> **Do not run this in a production environment.** It ships shared published passwords, supports
+> plain HTTP, stores pasted API keys for convenience rather than safety, and has no authorisation
+> model, audit trail or backups. Those are deliberate choices for a demo and a workshop, and they
+> would be defects anywhere else.
+>
+> "Splunky Finance" is a fictional bank. Nothing touches real money, real customers or real data.
+> See [DISCLAIMER.md](DISCLAIMER.md).
+
 ## Current validation
 
 Production frontend build and desktop/mobile browser journeys passed. Backend tests cover ledger integrity, date arithmetic, session isolation, CSRF, controlled faults, and the pre-execution transfer gate including that a blocked transfer leaves balances untouched. Browser tests use an explicit offline model that invokes real banking tools; they do not validate paid model APIs or fabricate Galileo scores.
