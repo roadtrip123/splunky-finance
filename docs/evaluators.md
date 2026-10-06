@@ -263,6 +263,17 @@ span appears in the trace. `Protection.check_action` posts a `pre`-stage `Evalua
 **fails closed**: anything that is not a genuine decision carrying evaluated controls blocks the
 action. The customer sees `"That request is not available from My Bank Agent."`
 
+### Two things the guardrail is not
+
+**It is opt-in per run.** `check_action` returns `{"decision": "disabled"}` when the scenario is
+not armed, and the tool runs freely. That is deliberate — the demo shows the transfer executing,
+then blocks it — but it means the guardrail is a demo toggle rather than an always-on control.
+Worth saying out loud rather than letting a room assume otherwise.
+
+**`GATED_TOOLS` is a hardcoded allowlist of two.** Add a money-moving tool and forget the tuple
+and it is ungated, silently. Deny-by-default — gating everything not on a read-only list — is the
+safer shape for anything that ships.
+
 ### Telling a real deny from a fail-closed block
 
 They look identical in the chat. `action_decisions` in the presenter evidence tells them apart:
