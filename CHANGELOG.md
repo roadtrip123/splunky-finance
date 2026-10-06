@@ -6,6 +6,23 @@ Versions mark states worth returning to. Tags are annotated, so `git tag -n` and
 Open defects are tracked as [GitHub issues](https://github.com/roadtrip123/splunky-finance/issues);
 planned work is in [TODO.md](TODO.md).
 
+## v0.5.1 — Workshop corrections
+
+Two fixes a workshop needs, found while preparing one. Nothing else changes.
+
+- **The lab sheet never told participants to create an Agent in Agent Control.** The runtime route
+  looks the agent up by name and answers 404 when it does not exist, at which point the
+  application fails closed: the action is blocked, the guardrail looks like it worked, and no
+  control evaluated anything. Every participant would have hit it and drawn the wrong conclusion.
+  The lab now creates the agent first, and says that binding a control to a stream and attaching
+  it to an agent are two different things.
+- **A participant's session secret is kept across a re-provision.** `workshop.py up` rewrote each
+  env file with a fresh `SESSION_SECRET`, so deploying a new version logged the whole room out.
+
+Also documents the update itself — re-run `up` with the same arguments, no `down` first — and what
+survives because it lives in the `runtime-data` volume rather than the image: Galileo credentials,
+model endpoints, dataset and transfers.
+
 ## v0.5.0 — The guardrail actually decides
 
 **The guardrail returns a verified deny.** Until now every armed run blocked by failing closed —
