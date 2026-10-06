@@ -1120,6 +1120,13 @@ td small {
   font-weight: 400;
   opacity: 0.66;
 }
+/* A second group of questions inside one scenario, separated so the heading reads as a break
+   rather than another list item. */
+.prompt-group {
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line, rgba(128, 138, 157, 0.28));
+}
 .scenario-question {
   display: flex;
   align-items: baseline;

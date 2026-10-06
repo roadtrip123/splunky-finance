@@ -69,7 +69,7 @@ The chat footer keeps the exact words **Fictional banking data only**, with no i
 - Muted red: a controlled fault is active.
 - Muted amber: synchronization, connection failure, or expired demo. Sending is paused until settings are confirmed. A tooltip/accessibility label describes the state.
 
-Ask the scenario's example question in the existing banking conversation. Switching **Normal Answers** restores normal tool-backed responses. The transcript remains visible, but model context starts fresh when settings change. An answer already underway finishes using its original scenario. Stale sends are rejected rather than silently using the wrong setting.
+Ask the scenario's example question in the existing banking conversation. Switching **Normal Answer / Disabled Guardrails** restores normal tool-backed responses. The transcript remains visible, but model context starts fresh when settings change. An answer already underway finishes using its original scenario. Stale sends are rejected rather than silently using the wrong setting.
 
 The Demo tab carries two switches: **MODEL**, for comparing model speed and quality, and **OBSERVABILITY**, for sending the next turn to Galileo or Splunk Agent Observability. Both reset the conversation so a session never mixes two configurations.
 

@@ -191,7 +191,7 @@ In the customer tab:
 
 ## Part 2 — genuine tool-backed assistant turn
 
-Use ordinary customer chat, or select **Normal Answers** in the presenter workspace and use its integrated chat.
+Use ordinary customer chat, or select **Normal Answer / Disabled Guardrails** in the presenter workspace and use its integrated chat.
 
 1. Open **My Bank Agent**.
 2. Start a new conversation.
@@ -214,7 +214,7 @@ Use ordinary customer chat, or select **Normal Answers** in the presenter worksp
 2. In the portal, click **Enable Incomplete Answer**.
 3. Without refreshing banking, watch the same footer turn muted red. The text, position, size, and weight stay unchanged. The portal confirms **Applied to connected banking session** after the browser acknowledges the change.
 4. Send the displayed example question in the existing banking conversation. The response should contain only the total, omitting top purchases and the previous-month comparison.
-5. Click **Normal Answers** in the portal. Wait for the footer to return to its original muted colour, then ask the same question again. This response uses normal model/tool execution without the deliberate fault.
+5. Click **Normal Answer / Disabled Guardrails** in the portal. Wait for the footer to return to its original muted colour, then ask the same question again. This response uses normal model/tool execution without the deliberate fault.
 
 The visible transcript is preserved. Model context resets on setting changes so deliberately faulty prior answers do not contaminate the next answer. An in-flight response finishes using its original scenario; changes affect subsequent requests. Normal mode does not guarantee model correctness.
 
@@ -308,7 +308,7 @@ Put the accounts page and the banking chat side by side. Everyday starts at **$1
 
 ### Before the guardrail
 
-1. Leave **Normal Answers** selected. Nothing is injected; every answer below is genuine.
+1. Leave **Normal Answer / Disabled Guardrails** selected. Nothing is injected; every answer below is genuine.
 2. Ask:
 
    > Transfer $100 from my Everyday account to Tom's account number 1234.
@@ -419,7 +419,7 @@ Anything that resets the conversation starts a new session and clears that memor
 
 - **New conversation** starts a fresh chat while retaining the active scenario and protection settings. Earlier response labels remain visible.
 - **Reset balance**, on the DATASET card, is required between guardrail runs because that scenario really moves money. It reuses the current seed and reference date. The **Confirm and reset data** control lower down does the same thing but also lets you change them, which will move every figure in this guide.
-- **Normal Answers** disables deliberate faults and protection and resets the conversation. It does not restore data a transfer has moved; use **Confirm and reset data** for that.
+- **Normal Answer / Disabled Guardrails** disables deliberate faults and protection and resets the conversation. It does not restore data a transfer has moved; use **Confirm and reset data** for that.
 - Selecting another scenario resets conversation context automatically. Refreshing keeps the saved scenario but clears the local chat transcript; evidence remains available for the active run.
 - **Confirm and reset data** regenerates the entire synthetic dataset with the selected seed/reference date, increments the dataset version, and invalidates all conversations and comparisons. Do not use this during a normal presentation unless reseeding is the topic.
 

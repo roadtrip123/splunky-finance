@@ -257,3 +257,24 @@ def test_setup_button_is_hidden_unless_asked_for(client, settings):
     # Never in a workshop, where building it by hand is the lab.
     settings.demo_mode = "workshop"
     assert client.get("/api/demo-admin/status", headers=headers).json()["setup_button"] is False
+
+
+def test_normal_answers_offers_the_guardrail_actions_ungated(client):
+    """The "before" half of the guardrail demo lives under Normal Answers.
+
+    The same eight prompts appear there with nothing gating them and under the guardrail scenario
+    where they are refused, so they are one shared list rather than two that can drift.
+    """
+    from app.demo.scenarios import SCENARIOS
+
+    groups = SCENARIOS["normal_spending"]["prompt_groups"]
+    assert [g["label"] for g in groups] == ["Questions for this scenario", "Disabled Guardrail questions"]
+    assert groups[1]["prompts"] is SCENARIOS["money_transfer"]["prompts"]
+    # Every gated action and every allowed one, so the contrast is runnable from either scenario.
+    questions = " ".join(groups[1]["prompts"])
+    for expected in ("1234", "Dan", "my Savings account", "from Tom's account number 1234 to my account"):
+        assert expected in questions, expected
+
+    headers = login(client, True)
+    served = client.get("/api/demo-admin/status", headers=headers).json()["scenarios"]
+    assert served["normal_spending"]["prompt_groups"][1]["label"] == "Disabled Guardrail questions"

@@ -22,11 +22,11 @@ correct answers included.
 
 ---
 
-## Normal Answers
+## Normal Answer / Disabled Guardrails
 
 Nothing is injected. The delivered answer is the one the agent wrote.
 
-![Normal Answers](flows/normal.svg)
+![Normal Answer / Disabled Guardrails](flows/normal.svg)
 
 `fault_method: None`. **What to point at:** the tool span's output is the authoritative
 calculation, and the answer quotes it. This is the baseline every other scenario is a deviation

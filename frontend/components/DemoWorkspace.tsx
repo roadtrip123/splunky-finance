@@ -3,12 +3,13 @@ import { useEffect, useRef, useState } from "react";
 import { api, mutate } from "@/lib/api";
 
 type Run = { id: string; scenario: string; protection: boolean; revision: number };
-type Scenario = { prompt: string; prompts?: string[]; protection_applicable: boolean };
+type PromptGroup = { label: string; prompts: string[] };
+type Scenario = { prompt: string; prompts?: string[]; prompt_groups?: PromptGroup[]; protection_applicable: boolean };
 type Status = { banking_connection: { state: string; session: string | null }; run: Run | null; scenarios: Record<string, Scenario>; protection_status: string; demo_mode: "presenter" | "workshop"; galileo: { enabled: boolean; connection: string } };
 type Answer = { answer: string; conversation_id: string; scenario: string; protection_enabled: boolean; protection_decision: { decision?: string }; };
 type Entry = { question: string; result: Answer };
 const descriptions: Record<string, [string, string]> = {
-  normal_spending: ["Normal Answers", "Answers use the banking tools without a deliberate fault."],
+  normal_spending: ["Normal Answer / Disabled Guardrails", "Answers use the banking tools without a deliberate fault, and no action is gated — every guardrail question executes for real."],
   incomplete_answer: ["Incomplete Answer", "Deliberately omits important details from the answer to your question."],
   incorrect_total: ["Incorrect Total", "Introduces a wrong amount or numerical claim related to your question."],
   wrong_customer: ["Wrong Customer", "Answers as if you were Dan Whitfield, a real other customer, and discloses his real balance."],
@@ -113,7 +114,7 @@ export default function DemoWorkspace({ onEvidence }: { onEvidence: () => Promis
           className={`button ${run.scenario === key ? "" : "outline"}`}
           aria-pressed={run.scenario === key} disabled={busy}
           onClick={() => select(key, status!.scenarios[key].protection_applicable)}>
-          {key === "normal_spending" ? "Normal Answers" : `Enable ${label(key)}`}
+          {key === "normal_spending" ? label(key) : `Enable ${label(key)}`}
         </button>)}
       </div>
       <p className="notice" aria-live="polite"><strong>Scenario: {label(run.scenario)}</strong> · Applied to your next demo message</p>
@@ -123,11 +124,25 @@ export default function DemoWorkspace({ onEvidence }: { onEvidence: () => Promis
       )}
       <h3>Demo chat</h3>
       <p>No customer login or session linking is needed.</p>
-      <div className="prompt-box"><strong>Questions for this scenario — or ask your own</strong>
-        {(scenario?.prompts?.length ? scenario.prompts : [scenario?.prompt ?? ""]).map((q, i) => (
-          <div key={i} className="scenario-question">
-            <p>{q}</p>
-            <button className="button small" disabled={busy} onClick={() => send(q)}>Run</button>
+      <div className="prompt-box">
+        {/* A scenario may group its questions. Normal Answers uses that to offer every guardrail
+            action with nothing gating it, which is the "before" half of the guardrail demo. */}
+        {(scenario?.prompt_groups?.length
+          ? scenario.prompt_groups
+          : [{
+              label: "Questions for this scenario",
+              prompts: scenario?.prompts?.length ? scenario.prompts : [scenario?.prompt ?? ""],
+            }]
+        ).map((group, g) => (
+          <div key={group.label} className={g ? "prompt-group" : undefined}>
+            <strong>{group.label}</strong>
+            {g === 0 && <span className="muted"> — or ask your own</span>}
+            {group.prompts.map((q, i) => (
+              <div key={i} className="scenario-question">
+                <p>{q}</p>
+                <button className="button small" disabled={busy} onClick={() => send(q)}>Run</button>
+              </div>
+            ))}
           </div>
         ))}
       </div>

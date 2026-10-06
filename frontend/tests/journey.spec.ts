@@ -118,7 +118,7 @@ async function verifyLiveSwitch(admin: import("@playwright/test").Page, bank: im
   await bank.getByLabel('Ask My Bank Agent', { exact: true }).fill(completePrompt);
   await bank.getByRole('button', { name: 'Send message', exact: true }).click();
   await expect(bank.locator('.message.assistant').last()).toContainText('Your spending is recorded.');
-  await admin.getByRole('button', { name: 'Normal Answers', exact: true }).click();
+  await admin.getByRole('button', { name: 'Normal Answer / Disabled Guardrails', exact: true }).click();
   await expect(footer).toHaveClass(/demo-footer-normal/);
   await bank.getByLabel('Ask My Bank Agent', { exact: true }).fill(completePrompt);
   await bank.getByRole('button', { name: 'Send message', exact: true }).click();
