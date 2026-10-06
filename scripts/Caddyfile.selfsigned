@@ -24,7 +24,7 @@
 #      arithmetic rather than by pasting digits together: `seq 1 50` yields `1`, not `01`, and
 #      "31" . "1" is port 311, which Caddy binds without complaint while nothing reaches it.
 #        IP=<public-ip>
-#        { printf '{\n\tauto_https disable_redirects\n}\n'
+#        { printf '{\n\tauto_https disable_redirects\n\tdefault_sni %s\n\tskip_install_trust\n}\n' "$IP"
 #          for i in $(seq 1 50); do
 #            printf '%s:%d {\n\ttls internal\n\treverse_proxy 127.0.0.1:%d\n}\n' \
 #              "$IP" $((3100+i)) $((4100+i))
@@ -36,8 +36,19 @@
 #      Then confirm the listeners are where you meant them to be, before trusting a browser test:
 #        sudo ss -ltn | grep -E ':(31[0-9][0-9])'
 #
-#   4. Open 3101-3150 in the security group. Port 80 is not needed: a local CA issues the
-#      certificate, so there is no HTTP challenge.
+#   4. Open 3101-3150 inbound in the security group. Port 80 is not needed: a local CA issues the
+#      certificate, so there is no HTTP challenge. 4101-4150 stay closed -- the stacks bind to
+#      loopback and only the proxy should be public.
+#
+#      Confirm from somewhere outside the network before building fifty stacks, because every test
+#      run on the box itself passes whether or not the perimeter allows the port. An EC2 instance
+#      cannot reach its own public IP either, so a local curl to it hangs regardless:
+#        timeout 6 bash -c 'cat < /dev/null > /dev/tcp/<public-ip>/3101' && echo open || echo blocked
+#
+#      A timeout means packets are dropped -- a security group or network ACL. A refusal means they
+#      arrive and nothing is listening. Some managed lab environments expose one port only, in which
+#      case a port per participant cannot work at all and the deployment has to go through whatever
+#      proxy already owns that port.
 #
 # Participants see a certificate warning the first time and click through. Tell them in advance,
 # or the first five minutes are spent on it.
@@ -45,6 +56,15 @@
 {
 	# No ACME account is involved; a local CA signs everything.
 	auto_https disable_redirects
+	# Required, not optional, when the site address is a bare IP. TLS forbids sending SNI for an IP
+	# address, so browsers and curl send no server name at all; Caddy then has nothing to select a
+	# certificate by and aborts the handshake with an "internal error" alert. The symptom is a site
+	# that logs "certificate obtained successfully", binds the port, and still refuses every
+	# connection. Substitute the real address here as well as in each site block.
+	default_sni 203.0.113.10
+	# The local CA cannot be added to the host's trust store from an unprivileged service account, and
+	# the attempt logs a sudo failure on every start. Participants get the warning regardless.
+	skip_install_trust
 }
 
 # Example for one participant. Generate the rest with the loop above.

@@ -6,21 +6,34 @@ Versions mark states worth returning to. Tags are annotated, so `git tag -n` and
 Open defects are tracked as [GitHub issues](https://github.com/roadtrip123/splunky-finance/issues);
 planned work is in [TODO.md](TODO.md).
 
-## Unreleased
+## v0.6.1 — What a hostile network does to a workshop
 
-- **Documented why containers lose outbound HTTPS on a shared lab host, and how to tell it apart from
-  a proxy.** A blanket `nat PREROUTING ... --dport 443 -j REDIRECT` hijacks every packet *arriving on
-  an interface*, so the host is unaffected while every container is redirected to a local server that
-  answers with an unrelated certificate. The fix is a `RETURN` for Docker's bridges, not a trusted CA:
-  a name mismatch is not a trust failure, and no certificate makes the name match.
-- **`BUILD_NETWORK` lets the image build use the host's network** as a fallback where the firewall
-  cannot be changed. The build then originates from the host and misses PREROUTING. It defaults to
-  `default`, so nothing changes on a normal network, and it fixes the build only — running stacks
-  still need egress.
-- The build-network section of `docs/workshop.md` replaces "Behind a TLS-intercepting proxy", which
-  showed a name-mismatch error and then prescribed the fix for an issuer error. The two failures now
-  appear separately with the test that tells them apart, and `backend/ca/README.md` says plainly
-  which one it does not fix.
+Deploying on a managed lab host turned up three environment failures, each of which looks like one of
+the others. All three are now documented with the check that tells them apart.
+
+- **Container egress can be hijacked by the host.** A blanket `nat PREROUTING ... --dport 443 -j
+  REDIRECT` catches every packet *arriving on an interface*, so the host is unaffected while every
+  container is redirected to a local server answering with an unrelated certificate. Both the
+  dependency download and the running backend's model endpoint fail. The fix is a `RETURN` for
+  Docker's bridges, not a trusted CA — a name mismatch is not a trust failure, and no certificate
+  makes the name match. It does not survive a reboot.
+- **`BUILD_NETWORK`** puts the image build on the host's network as a fallback where the firewall
+  cannot be changed, since the build's packets then originate from the host and miss PREROUTING. It
+  defaults to `default` and fixes the build only.
+- **TLS on a bare IP requires `default_sni`.** TLS forbids sending SNI for an IP address, so browsers
+  and curl send no server name and the proxy has nothing to select a certificate by. It logs
+  `certificate obtained successfully`, binds the port, and aborts every handshake with an internal
+  error. `scripts/Caddyfile.selfsigned` now carries it, with `skip_install_trust` to stop the local CA
+  install failing noisily on every start.
+- **The proxy's ports are computed arithmetically.** The old loop concatenated digits, so without
+  `seq -w` the first participant got port 311 — bound successfully, reachable by nobody.
+- **Reachability has to be checked from outside the network, before building fifty stacks.** Every
+  test run on the instance passes regardless, and an EC2 instance cannot reach its own public IP at
+  all. A dropped packet means a security group; a refusal means nothing is listening. Some lab
+  environments publish one port, and a port per participant cannot work there.
+- The CA-trust section of `docs/workshop.md` is rewritten. It previously showed a name-mismatch error
+  and prescribed the fix for an issuer error; the two now appear separately, and
+  `backend/ca/README.md` says plainly which one it does not fix.
 
 ## v0.6.0 — Two ways to reach it
 

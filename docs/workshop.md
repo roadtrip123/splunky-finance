@@ -199,16 +199,32 @@ python3 scripts/workshop.py up --count 50 \
 Participant 7 browses `https://<ip>:3107`, which the proxy forwards to `127.0.0.1:4107`.
 `scripts/Caddyfile.selfsigned` has the configuration and the loop that generates fifty blocks.
 
-Check the proxy is listening where you meant before testing in a browser, because a wrong port binds
-silently and looks identical to a closed security group:
+TLS on a bare IP needs `default_sni` in the proxy's global options, and it is not optional. TLS
+forbids sending SNI for an IP address, so browsers and curl send no server name; without a default
+the proxy has nothing to select a certificate by and aborts every handshake with an internal error.
+It logs `certificate obtained successfully`, binds the port, and still serves nobody.
+
+Three checks, in this order, because each one looks like the next when it fails:
 
 ```bash
 sudo ss -ltn | grep -E ':31[0-9][0-9]'
+curl -sk -o /dev/null -w '%{http_code}\n' --connect-to <ip>:3101:127.0.0.1:3101 https://<ip>:3101/
 ```
 
-Test from a participant's machine, not from the instance. A public IP is not an address on an EC2
-instance — AWS translates it — so connecting to it from the box itself hangs whether or not the
-proxy works.
+```bash
+# From a machine outside the network. Not from the instance: an EC2 instance cannot reach its own
+# public IP, so this hangs there whether or not the port is open.
+timeout 6 bash -c 'cat < /dev/null > /dev/tcp/<ip>/3101' && echo open || echo blocked
+```
+
+`--connect-to` rather than `--resolve`, because curl ignores `--resolve` when the host is already an
+IP literal and quietly tries the real address instead.
+
+A timeout on the third check means packets are dropped — a security group or network ACL. A refusal
+means they arrive and nothing listens. **Run it before building fifty stacks.** Some managed lab
+environments publish a single port, and a port per participant cannot work there at all; the
+deployment has to go through whichever proxy already owns that port, which means hostnames rather
+than ports.
 
 Participants get a certificate warning once and click through — **tell them beforehand**, or the
 first five minutes go on it. A self-signed certificate stops passive sniffing, which is the real
@@ -329,6 +345,21 @@ at all. **Set up my project** does steps 1–3 in one click but is hidden unless
 is set, because doing it for participants skips the lab.
 
 ## Things that bite
+
+**Check from outside the network before building fifty stacks.** A managed lab environment may
+publish a single port and drop everything else. Every test run on the box itself passes either way,
+so this is the one check that cannot be done from the instance. The self-signed section above has
+the command.
+
+**A shared host may hijack container egress.** A blanket `nat PREROUTING ... --dport 443 -j REDIRECT`
+leaves the host working while every container's outbound HTTPS lands on a local server — the
+dependency download and the model endpoint both fail with a certificate for an unrelated name. The
+"When containers cannot reach the internet" section has the diagnosis and the fix, and **the fix does
+not survive a reboot**:
+
+```bash
+for IFACE in docker0 br+; do sudo iptables -t nat -C PREROUTING -i $IFACE -p tcp --dport 443 -j RETURN 2>/dev/null || sudo iptables -t nat -I PREROUTING 1 -i $IFACE -p tcp --dport 443 -j RETURN; done
+```
 
 **Cookies ignore ports.** `host:3101` and `host:3102` share a cookie jar. Each participant using one port is unaffected, but moving between instances to help people will log you out repeatedly. Use a separate browser profile, or put a reverse proxy with subdomains in front if you have DNS.
 
