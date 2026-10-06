@@ -31,6 +31,9 @@ the others. All three are now documented with the check that tells them apart.
   test run on the instance passes regardless, and an EC2 instance cannot reach its own public IP at
   all. A dropped packet means a security group; a refusal means nothing is listening. Some lab
   environments publish one port, and a port per participant cannot work there.
+- The bootstrap section now opens with the reachability check, pins `v0.6.1`, and includes installing
+  Caddy — along with the warning that the package starts `caddy.service` immediately, so it owns
+  `/etc/caddy/Caddyfile` and port 2019 and must be driven with `systemctl` rather than `caddy run`.
 - The CA-trust section of `docs/workshop.md` is rewritten. It previously showed a name-mismatch error
   and prescribed the fix for an issuer error; the two now appear separately, and
   `backend/ca/README.md` says plainly which one it does not fix.

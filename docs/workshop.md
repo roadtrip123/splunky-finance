@@ -20,15 +20,37 @@ Ports are `base + N`, so participant 7 is `3107` with the default base of 3100.
 
 ## Bootstrap on a fresh box
 
+**Before anything else, prove the network will let participants in.** Pick the port range you intend
+to use and test it from a machine outside, not from the box. This costs a minute and decides whether
+the rest of the plan is viable at all — a managed lab environment may publish a single port:
+
+```bash
+timeout 6 bash -c 'cat < /dev/null > /dev/tcp/<public-ip>/3101' && echo open || echo blocked
+```
+
+Then install and clone:
+
 ```bash
 sudo apt-get update && sudo apt-get install -y docker.io docker-compose-v2 git
 sudo usermod -aG docker $USER && newgrp docker
 
 # Pin to a released version. The default branch moves; a workshop should not.
-git clone --branch v0.5.0 https://github.com/roadtrip123/splunky-finance.git
+git clone --branch v0.6.1 https://github.com/roadtrip123/splunky-finance.git
 cd splunky-finance
-git describe --tags          # expect v0.5.0
+git describe --tags          # expect v0.6.1
 python3 scripts/setup_env.py
+```
+
+Terminating TLS on the box as well needs Caddy. Installing it from the official repository starts
+`caddy.service` immediately, which means it owns `/etc/caddy/Caddyfile` and port 2019 — edit that file
+and `systemctl restart caddy` rather than running `caddy run` by hand, or the second instance fails to
+bind the admin port:
+
+```bash
+sudo apt-get install -y debian-keyring debian-archive-keyring apt-transport-https curl
+curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' | sudo gpg --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg
+curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' | sudo tee /etc/apt/sources.list.d/caddy-stable.list >/dev/null
+sudo apt-get update && sudo apt-get install -y caddy
 ```
 
 `setup_env.py` writes a private `.env`. Nothing in it needs editing for a workshop:
@@ -272,7 +294,7 @@ Useful flags:
 ```bash
 cd splunky-finance
 git fetch --tags
-git checkout v0.6.0
+git checkout v0.6.1
 git describe --tags                      # confirm before touching the stacks
 
 python3 scripts/workshop.py up --count 50 \
