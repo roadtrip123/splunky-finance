@@ -98,10 +98,29 @@ Subdomains rather than paths or ports: `APP_ORIGIN` must have an empty path, so
 `https://demo.example.com/p07` is rejected, and separate hostnames give each participant their own
 cookie jar.
 
-**No domain available?** `sslip.io` resolves any IP-shaped hostname to that IP with no setup —
-`3.227.0.230.sslip.io` works immediately, and a proxy can obtain a real certificate for it. Use one
-hostname and a port per participant rather than fifty subdomains: Let's Encrypt counts certificates
-per registered domain, and that domain is shared with everyone else using the service.
+**No domain, and you do not want one.** Terminate TLS on the bare IP with a self-signed
+certificate. The application only checks the *scheme* of `APP_ORIGIN`, so HTTPS on a public address
+is accepted whether or not a public CA signed the certificate — no code change, no DNS, no ACME.
+
+```bash
+IP=<public-ip>
+python3 scripts/workshop.py up --count 50 \
+  --host "$IP" --base-port 4100 --bind 127.0.0.1 \
+  --origin-template "https://$IP:31{n:02d}"
+```
+
+Participant 7 browses `https://<ip>:3107`, which the proxy forwards to `127.0.0.1:4107`.
+`scripts/Caddyfile.selfsigned` has the configuration and the loop that generates fifty blocks.
+
+Participants get a certificate warning once and click through — **tell them beforehand**, or the
+first five minutes go on it. A self-signed certificate stops passive sniffing, which is the real
+risk on shared wifi; it does not prove the server's identity. For synthetic data that is a
+reasonable place to stop.
+
+`sslip.io` is the other option if you would rather have a publicly trusted certificate without
+owning a domain: it resolves any IP-shaped hostname, so a proxy can complete an ACME challenge for
+`<ip>.sslip.io`. Use one hostname and a port per participant rather than fifty subdomains, because
+Let's Encrypt counts certificates per registered domain and that one is shared.
 
 ## Provision
 

@@ -1,0 +1,46 @@
+# HTTPS on a bare public IP with no DNS and no public certificate authority.
+#
+# The application only checks the *scheme* of APP_ORIGIN, so an HTTPS origin is accepted on a
+# public address whether or not a public CA signed the certificate. `tls internal` makes Caddy
+# issue one from its own local CA: browsers warn once per host:port and the participant proceeds,
+# and from then on the traffic is encrypted. That matters because each participant pastes their own
+# Galileo API key into the portal.
+#
+# What this protects against and what it does not: a self-signed certificate stops passive
+# sniffing, which is the realistic risk on shared wifi. It does not prove the server's identity, so
+# an attacker already positioned to intercept could still substitute their own. For a workshop on
+# synthetic data that is a reasonable place to stop.
+#
+#   1. Stacks listen on loopback, Caddy is the only public listener:
+#        python3 scripts/workshop.py up --count 50 \
+#          --host <public-ip> --base-port 4100 --bind 127.0.0.1 \
+#          --origin-template 'https://<public-ip>:31{n:02d}'
+#
+#      Participant 7 browses https://<public-ip>:3107, which Caddy proxies to 127.0.0.1:4107.
+#      The template builds the *public* port from the participant number, because `{port}` is the
+#      stack's internal port and the two deliberately differ.
+#
+#   2. Generate one block per participant, substituting the address:
+#        IP=<public-ip>
+#        for i in $(seq -w 1 50); do
+#          printf '%s:31%s {\n  tls internal\n  reverse_proxy 127.0.0.1:41%s\n}\n' "$IP" "$i" "$i"
+#        done > /tmp/Caddyfile.workshop
+#
+#   3. caddy run --config /tmp/Caddyfile.workshop
+#
+#   4. Open 3101-3150 in the security group. Port 80 is not needed: a local CA issues the
+#      certificate, so there is no HTTP challenge.
+#
+# Participants see a certificate warning the first time and click through. Tell them in advance,
+# or the first five minutes are spent on it.
+
+{
+	# No ACME account is involved; a local CA signs everything.
+	auto_https disable_redirects
+}
+
+# Example for one participant. Generate the rest with the loop above.
+203.0.113.10:3101 {
+	tls internal
+	reverse_proxy 127.0.0.1:4101
+}
