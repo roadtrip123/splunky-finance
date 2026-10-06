@@ -6,6 +6,32 @@ Versions mark states worth returning to. Tags are annotated, so `git tag -n` and
 Open defects are tracked as [GitHub issues](https://github.com/roadtrip123/splunky-finance/issues);
 planned work is in [TODO.md](TODO.md).
 
+## v0.4.0 — Money moves both ways
+
+- A transfer may name another customer as its **source**, not only its destination.
+  `transfer_funds` takes `from_account`, defaulting to the customer's Everyday account, so the
+  agent will take $1,000 out of Tom's account as readily as it will send money to him. Sending to
+  the wrong person is a mistake; taking from someone who never authorised it is theft, and it is
+  the same tool call.
+- The guardrail needed no change for it. The control matches the whole tool input, so a source is
+  as visible as a destination — confirmed for both account numbers and both names, while
+  own-account transfers still pass.
+- **Normal Answer / Disabled Guardrails** now offers every guardrail action with nothing gating
+  it, as a second labelled group of questions. That is the "before" half of the guardrail demo,
+  runnable without switching scenario. The eight prompts are one shared list, so the ungated and
+  gated sets cannot drift apart.
+- [docs/instrumentation.md](docs/instrumentation.md) explains how a turn reaches Galileo in the
+  twenty lines that matter, with code that runs as written. Written for the workshop.
+
+Fixed: a transfer returned a bare `new_balance_cents`, unambiguous only while the source was
+always the customer's own account. After a pull the agent reported the customer's new balance as
+Dan's — wrong by $15,883.55, with the ledger correct throughout. Every figure is now named.
+
+That one is worth reading [issue #8](https://github.com/roadtrip123/splunky-finance/issues/8)
+about: no evaluator caught it, because the numerical judge compares against
+`evidence.calculations` and a transfer writes to `evidence.transfers`. All three judges passed the
+answer. It was found by a human asking the obvious follow-up question.
+
 ## v0.3.0 — Splunk Agent Observability
 
 Galileo remains the default and is unchanged in behaviour.
