@@ -115,6 +115,14 @@ omissions and that the other two keep the rule.
 
 ## Reading the scores
 
+**The numerical judge reads every evidence key, not just one.** It was written against
+`evidence.calculations`, which is where the spending tool writes. Balances land in
+`evidence.lookups` and money movements in `evidence.transfers`, so any figure stated about a
+balance or a transfer went unchecked — a wrong balance after a transfer passed all three judges.
+It now checks all three, and because the failure was a real number attributed to the wrong
+account, it is told to identify which account a figure is attributed to before comparing, and
+that `from_account_balance_cents` belongs to `from_account` and not to `to_account`.
+
 **A judge fails only on a contradiction it can point to.** An answer with its total removed is not a wrong total and not a wrong customer; it is an incomplete answer. Each judge returns true when its subject is simply absent, so every scenario lights exactly one judge. Wrong Customer is the sharpest case: its candidate quotes Dan Whitfield's real account and real balance, so the figures are correct and the question is answered. Only `SplunkyRightCustomer` rejects it. A metric that went red there would be grading outside its remit. If you edit a judge prompt or settings, the change only reaches the tenant with `--apply --refresh-judges`, which publishes a new version of each judge and makes it the default. Versioning rather than delete-and-recreate: deletion is refused for anyone but a metric's original creator, and versioning keeps the scoring history.
 
 **The question travels in the trace output JSON, not only the trace input.** `SplunkyAnswerWholeQuestion` is the only judge that needs the question rather than the evidence, and it was the only one scoring a genuinely incomplete answer as complete — on every model, with the candidate verified incomplete beforehand. Reproducing the judge on `gpt-4.1-mini` settled it: given the question it returned false 6/6; given only the output payload it returned true 6/6, reasoning about an "implied question" it had reconstructed from the answer. The trace input is set correctly and read back correctly from the tenant, so a trace-level custom judge is simply not reliably given it. The record now carries a `question` field and the judge is told to read that field and never an implied question.

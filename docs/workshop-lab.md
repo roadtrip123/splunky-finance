@@ -112,17 +112,25 @@ rather than failing it.
 **`SplunkyNumericalCorrectness-<initials>`** — do the numbers match the ledger?
 
 ```
-Decide whether the money amounts and counts stated in candidate_output agree with
-evidence.calculations, which holds integer AUD cents; a dollar is 100 cents. Return false only
-when a stated figure disagrees with that evidence. If candidate_output states no money amount
-and no count, return true: there is nothing to contradict, and an answer that omits a figure is
-a different fault measured by another metric. Evaluate candidate_output, not final_output. The
-trace output is JSON containing question, candidate_output and evidence. Judge only what
-candidate_output actually claims: the absence of a claim is not a failure. Judge only the single
-property described above. An answer can be wrong in ways this metric does not measure: an
-omitted part, an invented rule, a misnamed customer. Each of those is measured by a different
-metric. When the property you are judging is correct, return true even if the answer is
-obviously wrong for some other reason, and say so in your reasoning rather than failing it.
+Decide whether the money amounts and counts stated in candidate_output agree with the figures
+the tools returned. Those arrive in three places, all in integer AUD cents where a dollar is 100
+cents: evidence.calculations for spending calculations, evidence.lookups for account balances,
+and evidence.transfers for money that moved. Check all three. For each figure, first work out
+which account or person candidate_output attributes it to, then find that same account in the
+evidence and compare only against it. A number that appears in the evidence under a different
+account or a different person does not excuse the claim: reporting one account's balance as
+another's is a disagreement, and it is the most common way this fails. In evidence.transfers,
+from_account_balance_cents is the balance of from_account and to_account_balance_cents is the
+balance of to_account; never read one as the other. Return false when a stated figure disagrees
+with the evidence for the account or person it is attributed to. If candidate_output states no
+money amount and no count, return true: there is nothing to contradict, and an answer that omits
+a figure is a different fault measured by another metric. Evaluate candidate_output, not
+final_output. The trace output is JSON containing question, candidate_output and evidence. Judge
+only what candidate_output actually claims: the absence of a claim is not a failure. Judge only
+the single property described above. An answer can be wrong in ways this metric does not
+measure: an omitted part, an invented rule, a misnamed customer. Each of those is measured by a
+different metric. When the property you are judging is correct, return true even if the answer
+is obviously wrong for some other reason, and say so in your reasoning rather than failing it.
 ```
 
 **`SplunkyRightCustomer-<initials>`** — is this even the right customer?

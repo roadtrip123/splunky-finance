@@ -949,3 +949,21 @@ def test_switching_back_to_galileo_restores_its_agent_control_gateway(settings):
     telemetry.configure_environment()
     assert settings.agent_control_url == "https://agent-control.multitenant.galileocloud.io"
     assert settings.agent_control_api_key_header == "Galileo-API-Key"
+
+
+def test_the_numerical_judge_reads_every_evidence_key():
+    """It read only evidence.calculations, so figures about a balance or a transfer went unchecked.
+
+    A wrong balance after a transfer passed all three judges, because the numbers it should have
+    been compared against live in evidence.transfers.
+    """
+    from app.observability.setup_definitions import judge_prompt
+
+    prompt = judge_prompt("SplunkyNumericalCorrectness")
+    for key in ("evidence.calculations", "evidence.lookups", "evidence.transfers"):
+        assert key in prompt, key
+    # The failure was a real number attributed to the wrong account, so attribution is explicit.
+    assert "attributes it to" in prompt
+    assert "never read one as the other" in prompt
+    # And the rule that keeps it quiet when there is nothing to contradict must survive.
+    assert "states no money amount and no count, return true" in prompt

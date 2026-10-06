@@ -481,3 +481,13 @@ Setting the baggage to the conversation id makes both sides agree. Verified agai
 Unrelated but visible in the same comparison: Splunk AO shows no `bank-chat-turn` root row, because the OTLP path does not emit the Trace object itself — only spans, which carry the trace id. And it labels spans with OpenTelemetry semantic conventions (`invoke_agent`, `invoke_workflow`, `execute_tool`, `chat`) rather than the plain names Galileo shows. Both are SDK behaviour, not configuration.
 
 Backend suite: 90 passed.
+
+## The numerical judge was reading one evidence key of three
+
+A transfer answer stated the customer's new balance as Dan's — wrong by $15,883.55 — and all three judges passed it. The ledger was correct; a balance lookup straight afterwards returned Dan's real figure.
+
+`SplunkyNumericalCorrectness` was written against `evidence.calculations`, where `calculate_spending` writes. `get_account_balance` writes to `evidence.lookups` and `transfer_funds` to `evidence.transfers`, so every figure stated about a balance or a money movement was unchecked. Two of the five scenarios' questions are about exactly those.
+
+Pointing it at all three keys was not enough on its own: the mis-stated number *was* in the evidence, under the other account, and the judge rationalised that — 1 of 3 runs caught it, then 1 of 3 again on a second wording. It now has to identify which account or person a figure is attributed to before comparing, and is told that `from_account_balance_cents` is the balance of `from_account` and never of `to_account`.
+
+Verified on `gpt-4.1-mini`, three runs each: mis-attributed balance false 3/3, correct balance true 3/3, correct spending answer true 3/3, wrong total false 3/3. Published as version 8.
