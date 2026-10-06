@@ -6,6 +6,17 @@ Versions mark states worth returning to. Tags are annotated, so `git tag -n` and
 Open defects are tracked as [GitHub issues](https://github.com/roadtrip123/splunky-finance/issues);
 planned work is in [TODO.md](TODO.md).
 
+## v0.5.2 — Nothing to edit in .env
+
+- The two demo passwords are fixed in the template — `-AlexDemo1234!` and `PresenterDemo1234!`.
+  A workshop hands the same pair to everyone and a presenter reads them aloud, so a random pair
+  per box only meant editing every box. They are shared and fixed, so anyone who can reach an
+  instance and knows them can sign in: a demo on synthetic data and nothing else. The session
+  secret stays random and unshared, because it signs cookies.
+- The model endpoint is configured in the presenter portal, so the bootstrap no longer asks for it
+  in `.env`. Nothing in the generated file needs editing for a workshop.
+- The lab sheet carries both passwords directly rather than telling participants to ask.
+
 ## v0.5.1 — Workshop corrections
 
 Two fixes a workshop needs, found while preparing one. Nothing else changes.
