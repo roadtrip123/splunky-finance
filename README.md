@@ -73,6 +73,8 @@ docker compose logs --tail=100 backend frontend
 
 Open http://localhost:3000, sign in with account `12345678`, and the customer password configured in `.env`.
 
+To stand up a public instance in one command — Docker, Caddy, TLS, the self-update units and a verification pass — use `sudo ./scripts/install.sh` and see [docs/single-instance.md](docs/single-instance.md).
+
 Running more than one stack on the same machine needs a distinct `FRONTEND_PORT` and matching `APP_ORIGIN` per stack. For a workshop, `scripts/workshop.py` generates those and provisions any number of isolated stacks in one command — see [docs/workshop.md](docs/workshop.md). To give each demo or participant their own instance instead, reached on port 443 alone, see [docs/single-instance.md](docs/single-instance.md).
 
 The demo passwords are fixed and shared, so anyone who can reach the instance and knows them can sign in. Replace them in `.env` for anything beyond a demo on synthetic data. Presenter login is at `/demo-admin` and uses its independent password. `.env` is private, ignored by Git, and created with permissions 0600. Setup never overwrites an existing file.

@@ -6,6 +6,22 @@ Versions mark states worth returning to. Tags are annotated, so `git tag -n` and
 Open defects are tracked as [GitHub issues](https://github.com/roadtrip123/splunky-finance/issues);
 planned work is in [TODO.md](TODO.md).
 
+## v0.6.7 — One command
+
+- **`scripts/install.sh` installs a public single-stack instance in one command.** Docker, Caddy, the
+  configuration, the image build, the self-update units, TLS on 443, and a verification pass. Safe to
+  re-run: every step checks before acting, so a failed run is fixed and the script run again rather
+  than unpicked.
+- It stops with a reason rather than continuing on a wrong assumption — when the public IP cannot be
+  read, when something already holds the port, when a `PREROUTING` redirect means a proxy on that port
+  would bind and never receive a packet, or when containers cannot reach the internet. The last it
+  first tries to fix, by exempting Docker's bridges, since that is the usual cause.
+- It ends by naming the two things it cannot do: open the security group, and test from a machine that
+  is not this one. An EC2 instance cannot reach its own public IP, so a check from the box proves
+  nothing.
+- `docs/single-instance.md` is restructured around the script, with the by-hand sequence kept below it
+  for a box where some step has to differ.
+
 ## v0.6.6 — IMDSv2
 
 - The AMI clone snippet in `docs/single-instance.md` now does the IMDSv2 token handshake. New

@@ -37,37 +37,62 @@ one box; a single stack idles far below baseline, and launch credits cover a one
 
 ## Before you build
 
-Two checks. Both fail silently later if skipped, and both are quick.
-
-**Is 443 reachable, and is anything already using it?** From a machine outside the network:
+`scripts/install.sh` runs the on-box checks itself and stops with a reason rather than continuing on
+a wrong assumption, so the only one worth doing by hand first is the one the box cannot do:
 
 ```bash
+# From a machine outside the network, not from the instance.
 timeout 6 bash -c 'cat < /dev/null > /dev/tcp/<public-ip>/443' && echo open || echo blocked
 ```
 
-Then on the box, because a managed image may already own that port:
+`blocked` before the security group is opened is expected. `blocked` *after* means the perimeter
+does not publish the port, and a managed lab environment may publish only one — in which case check
+what already owns it, because something is answering on it:
 
 ```bash
 sudo ss -ltnp | grep ':443 ' ; sudo iptables-save -t nat | grep -- '--dport 443'
 ```
 
-A listener or a `REDIRECT`/`DNAT` rule on 443 means the platform's own proxy has it. Remove the rule
-if the box is yours to change, or fall back to a high port and the self-signed section of
-[workshop.md](workshop.md).
+A listener, or a `REDIRECT`/`DNAT` rule, means the platform's own proxy has that port. A redirect in
+`PREROUTING` catches traffic arriving on *any* interface, so a proxy of your own on 443 would bind
+successfully and never receive a packet. Either remove the rule, if the box is yours to change, or
+pass `--port <n>` and use a high port.
 
-**Can containers reach the internet?** Some hosts redirect container egress; see [When containers
-cannot reach the internet](workshop.md#when-containers-cannot-reach-the-internet). Check after Docker
-is installed, with a throwaway container rather than from the host — the host is the one place that
-always works:
+## Install
 
 ```bash
-docker run --rm python:3.12-slim python -c "import urllib.request;print(urllib.request.urlopen('https://api.openai.com/v1/models',timeout=10).status)"
+sudo apt-get update && sudo apt-get install -y git
+git clone --branch v0.6.7 https://github.com/roadtrip123/splunky-finance.git
+cd splunky-finance
+sudo ./scripts/install.sh
 ```
 
-`HTTP Error 401` is a pass: the request arrived and was rejected for having no key. A certificate error
-is the redirect, and the fix is in that section.
+That installs Docker and Caddy, reads this instance's public IP from EC2 metadata, writes the
+configuration, builds the images, installs the self-update units, terminates TLS on 443, and verifies
+the result. It is safe to re-run: every step checks before acting, so a failed run is fixed and the
+script run again rather than unpicked.
 
-## Build it
+It stops with a reason rather than continuing on a wrong assumption when the public IP cannot be
+read, when something already holds port 443, when a firewall rule redirects that port elsewhere, or
+when containers cannot reach the internet — the last of which it first tries to fix, since the cause
+is usually a redirect of container egress that Docker's bridges can be exempted from.
+
+Two things it cannot do, and says so at the end:
+
+- **Open inbound TCP 443** to the instance in its security group.
+- **Test from another machine.** An EC2 instance cannot reach its own public IP, so a check from the
+  box proves nothing about whether anyone else can connect.
+
+Then set the model endpoint in the presenter portal, not in `.env`.
+
+Options worth knowing: `--host <addr>` when metadata is unavailable or the address is not the
+instance's own, `--port <n>` where something already owns 443, `--channel branch` to follow the
+branch tip rather than releases, `--no-tls` for a box already behind a TLS proxy, and `--skip-build`
+to install without starting. `--help` lists them.
+
+## Installing by hand
+
+The script is the recommended path. This is what it does, for a box where some step has to differ.
 
 ```bash
 sudo apt-get update && sudo apt-get install -y docker.io docker-compose-v2 git
@@ -78,36 +103,25 @@ curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' | sudo gpg --d
 curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' | sudo tee /etc/apt/sources.list.d/caddy-stable.list >/dev/null
 sudo apt-get update && sudo apt-get install -y caddy
 
-git clone --branch v0.6.6 https://github.com/roadtrip123/splunky-finance.git
+git clone --branch v0.6.7 https://github.com/roadtrip123/splunky-finance.git
 cd splunky-finance
 python3 scripts/setup_env.py --origin <public-ip>
 ```
 
 `--origin` takes a bare address or a full origin and writes `APP_ORIGIN` with the matching
 `SESSION_COOKIE_SECURE`. The two are validated together — HTTPS without secure cookies, or the
-reverse, and the backend refuses to start — so deriving the flag from the scheme is one less thing to
-get wrong by hand. The origin carries no port and no path: 443 is implied, and a path is rejected.
+reverse, and the backend refuses to start.
 
 Nothing else in `.env` needs editing. `FRONTEND_BIND_ADDRESS=127.0.0.1` and `FRONTEND_PORT=3000` are
-already the defaults and should stay, because the proxy is the only thing that should be public.
+already the defaults and should stay, because the proxy is the only thing that should be public. If
+the box belongs to a workshop participant rather than a presenter, hide the troubleshooting tab and
+the project setup control with `sed -i 's|^DEMO_MODE=.*|DEMO_MODE=workshop|' .env`.
 
-If the box belongs to a workshop participant rather than a presenter, hide the troubleshooting tab and
-the project setup control:
-
-```bash
-sed -i 's|^DEMO_MODE=.*|DEMO_MODE=workshop|' .env
-```
-
-Then start it:
+Then build, install the units, and terminate TLS:
 
 ```bash
-docker compose up --build -d
-docker compose ps
-```
+sudo python3 scripts/install_service.py --build
 
-## Terminate TLS on 443
-
-```bash
 IP=<public-ip>
 printf '{\n\tauto_https disable_redirects\n\tdefault_sni %s\n\tskip_install_trust\n}\n%s:443 {\n\ttls internal\n\treverse_proxy 127.0.0.1:3000\n}\n' "$IP" "$IP" | sudo tee /etc/caddy/Caddyfile >/dev/null
 sudo caddy validate --config /etc/caddy/Caddyfile && sudo systemctl restart caddy
@@ -118,13 +132,13 @@ curl send no server name; without a default, Caddy has nothing to select a certi
 every handshake with an internal error — after logging that it obtained the certificate and bound the
 port. Nothing in the logs points at it.
 
-`validate` before restarting, so a bad config does not take the service down. The Caddy package starts
-the service on install and owns `/etc/caddy/Caddyfile` and port 2019: edit that file and use
-`systemctl`, rather than `caddy run` by hand, which fails to bind the admin port.
+The Caddy package starts the service on install and owns `/etc/caddy/Caddyfile` and port 2019: edit
+that file and use `systemctl`, rather than `caddy run` by hand, which fails to bind the admin port.
 
-Audiences see a certificate warning once and click through. **Tell them beforehand**, or the first five
-minutes go on it. A self-signed certificate stops passive sniffing, which is the real risk on shared
-wifi; it does not prove the server's identity. For synthetic data that is a reasonable place to stop.
+Audiences see a certificate warning once and click through. **Tell them beforehand**, or the first
+five minutes go on it. A self-signed certificate stops passive sniffing, which is the real risk on
+shared wifi; it does not prove the server's identity. For synthetic data that is a reasonable place
+to stop.
 
 ## Update itself on boot
 
@@ -206,7 +220,7 @@ then **tag before the workshop and switch back**.
 Either way, publishing a fix means pushing it and restarting the instances, with no AMI rebuild:
 
 ```bash
-git tag -a v0.6.6 -m "..." && git push origin v0.6.6   # then, on each box:
+git tag -a v0.6.8 -m "..." && git push origin v0.6.8   # then, on each box:
 sudo systemctl restart splunky-finance
 ```
 
