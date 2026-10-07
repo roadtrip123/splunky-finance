@@ -980,11 +980,11 @@ export default function Admin() {
                   <section className="admin-card">
                     <h2>Software updates</h2>
                     <p className="muted">
-                      Releases are published as tags on{" "}
-                      {update ? update.repo : "GitHub"}. Installing rebuilds the
-                      images and restarts the stack, so the app is briefly
-                      unavailable. Conversations are in memory and will be lost;
-                      saved credentials, endpoints and the dataset survive.
+                      Installing rebuilds the images and{" "}
+                      <strong className="warn-word">restarts</strong> the stack,
+                      so the app is unavailable for a few minutes.
+                      Conversations are in memory and will be lost; saved
+                      credentials, endpoints and the dataset survive.
                     </p>
                     <div className="update-grid">
                       <div>

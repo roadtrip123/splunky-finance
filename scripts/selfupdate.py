@@ -121,8 +121,18 @@ def resolve_target(channel, branch):
     return tag, tag
 
 
-def compose(*arguments, check=True):
-    return run("docker", "compose", *arguments, check=check, capture=False)
+def compose(*arguments, check=True, version=None):
+    """Build and start through compose.
+
+    APP_VERSION is passed as an environment variable rather than a build flag because compose.yaml
+    interpolates it into the build args; the image then knows its own release without needing `.git`,
+    which the build context excludes.
+    """
+    environment = {**os.environ, "APP_VERSION": version} if version else None
+    result = subprocess.run(
+        ["docker", "compose", *arguments], cwd=ROOT, check=False, env=environment
+    )
+    return "", result.returncode
 
 
 def start(timeout):
@@ -214,7 +224,7 @@ def main():
 
     # Build before anything is recreated. A failed build must leave the running stack alone, which is
     # the whole reason this is two steps rather than `up --build`.
-    if compose("build", check=False)[1]:
+    if compose("build", check=False, version=describe())[1]:
         log("build failed; restoring previous code and starting it")
         git("-c", "advice.detachedHead=false", "checkout", "--quiet", head_sha)
         start(args.timeout)
@@ -231,7 +241,7 @@ def main():
 
     log(f"rolling back to {describe(head_sha)}")
     git("-c", "advice.detachedHead=false", "checkout", "--quiet", head_sha)
-    if compose("build", check=False)[1] or start(args.timeout):
+    if compose("build", check=False, version=describe())[1] or start(args.timeout):
         log("rollback did not come up healthy either; this box needs a human")
         return finish(2, "broken", "neither the new release nor the rollback came up healthy")
     log(f"rolled back to {describe()}")

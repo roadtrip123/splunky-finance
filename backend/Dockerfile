@@ -21,6 +21,11 @@ COPY --chown=bank:bank backend/app ./app
 COPY --chown=bank:bank data /app/data
 RUN mkdir /app/runtime && chown bank:bank /app/runtime
 USER bank
+# The release this image was built from. `.git` is excluded from the build context, so it has to be
+# passed in; scripts/selfupdate.py does that automatically. Empty on a build that did not bother, and
+# the portal then falls back to the host's state file, or reports the version as unknown.
+ARG APP_VERSION=""
+ENV APP_VERSION=${APP_VERSION}
 ENV PATH="/app/backend/.venv/bin:$PATH" PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1
 EXPOSE 8000
 CMD ["uvicorn", "app.main:create_app", "--factory", "--host", "0.0.0.0", "--port", "8000", "--workers", "1"]

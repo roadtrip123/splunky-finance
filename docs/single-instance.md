@@ -78,7 +78,7 @@ curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' | sudo gpg --d
 curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' | sudo tee /etc/apt/sources.list.d/caddy-stable.list >/dev/null
 sudo apt-get update && sudo apt-get install -y caddy
 
-git clone --branch v0.6.4 https://github.com/roadtrip123/splunky-finance.git
+git clone --branch v0.6.5 https://github.com/roadtrip123/splunky-finance.git
 cd splunky-finance
 python3 scripts/setup_env.py --origin <public-ip>
 ```
@@ -133,13 +133,17 @@ earlier, and rebuilding the AMI for every fix is the thing this avoids. Install 
 updates itself each time it starts:
 
 ```bash
-sudo cp scripts/splunky-finance.service /etc/systemd/system/
-sudo systemctl daemon-reload && sudo systemctl enable --now splunky-finance
-journalctl -u splunky-finance -f
+sudo python3 scripts/install_service.py --build
 ```
 
-Edit `User=` and `WorkingDirectory=` in the unit if the repository is not at
-`/home/ubuntu/splunky-finance`. The user must be in the `docker` group.
+That installs all three units, substituting the repository's real path and the account that invoked
+`sudo` — the units ship with defaults for a stock Ubuntu AMI, and a box whose user or path differs
+would install them, report success and never work. It also creates `runtime/update/` owned by the uid
+the backend container runs as, which is what the portal's install button needs. `--build` then runs
+the first update in the foreground so the image build's output is visible rather than buried in the
+journal.
+
+`sudo python3 scripts/install_service.py --dry-run` prints the units it would write, without root.
 
 `systemctl start splunky-finance` updates now without rebooting, and
 `journalctl -u splunky-finance` is the record of what the last boot decided.
@@ -150,15 +154,16 @@ The Troubleshooting tab gets a **Software updates** card showing the running rel
 published one, and an **Install** button when they differ. Install two more units for it, and give the
 shared directory to the backend's user:
 
+`scripts/install_service.py` above sets this up. If the stack was already running when you installed
+the units, restart it so it picks up the new bind mount:
+
 ```bash
-mkdir -p runtime/update && sudo chown 10001:10001 runtime/update
-sudo cp scripts/splunky-finance-update.path scripts/splunky-finance-update.service /etc/systemd/system/
-sudo systemctl daemon-reload && sudo systemctl enable --now splunky-finance-update.path
-docker compose up -d   # picks up the new bind mount
+docker compose up -d
 ```
 
-`10001` is the uid the backend container runs as. Without the `chown` the card still reports versions
-but the button is absent, and it says why.
+The shared directory has to be writable by uid 10001, the uid the backend container runs as, which
+the installer handles. Without it the card still reports versions but the install button is absent,
+and it says exactly why.
 
 The container does not perform the update. It writes a request file into `runtime/update/`, a
 systemd path unit notices, and the host does the work. That boundary is deliberate: the presenter
@@ -201,7 +206,7 @@ then **tag before the workshop and switch back**.
 Either way, publishing a fix means pushing it and restarting the instances, with no AMI rebuild:
 
 ```bash
-git tag -a v0.6.5 -m "..." && git push origin v0.6.5   # then, on each box:
+git tag -a v0.6.6 -m "..." && git push origin v0.6.6   # then, on each box:
 sudo systemctl restart splunky-finance
 ```
 

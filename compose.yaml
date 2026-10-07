@@ -25,6 +25,8 @@ services:
       context: .
       dockerfile: backend/Dockerfile
       network: ${BUILD_NETWORK:-default}
+      args:
+        APP_VERSION: ${APP_VERSION:-}
     env_file: .env
     environment:
       DATA_DIR: /app/runtime

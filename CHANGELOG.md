@@ -6,6 +6,19 @@ Versions mark states worth returning to. Tags are annotated, so `git tag -n` and
 Open defects are tracked as [GitHub issues](https://github.com/roadtrip123/splunky-finance/issues);
 planned work is in [TODO.md](TODO.md).
 
+## v0.6.5 — The release an image was built from
+
+- **The image now knows its own version.** `APP_VERSION` is a build argument that
+  `scripts/selfupdate.py` fills in from the ref it checked out, so the portal reports the running
+  release on any box — not only one where the host-side updater has run. `.git` is excluded from the
+  build context, so this could not be derived inside the build.
+- **`scripts/install_service.py` installs the three systemd units**, substituting the repository's
+  real path and the account that invoked `sudo`. The units ship with defaults for a stock Ubuntu AMI,
+  and a box whose user or path differs would install them, report success and never work: a path unit
+  watching a directory that does not exist stays silent, and `systemctl status` shows only a unit that
+  has never triggered. It also creates `runtime/update/` owned by the container's uid, which is what
+  the portal's install button depends on.
+
 ## v0.6.4 — Boxes that update themselves
 
 - **`scripts/selfupdate.py` and `scripts/splunky-finance.service`: an instance updates to the newest

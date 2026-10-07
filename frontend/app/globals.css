@@ -1554,3 +1554,10 @@ pre {
   margin: 6px 0 0;
   font-size: 15px;
 }
+
+/* For a consequence buried mid-sentence that nobody should be able to skim past -- the restart in
+   the update card. Colour alone is not the signal; the weight carries it where colour is not seen. */
+.warn-word {
+  color: var(--red);
+  font-weight: 700;
+}
