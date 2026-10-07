@@ -6,6 +6,26 @@ Versions mark states worth returning to. Tags are annotated, so `git tag -n` and
 Open defects are tracked as [GitHub issues](https://github.com/roadtrip123/splunky-finance/issues);
 planned work is in [TODO.md](TODO.md).
 
+## v0.6.3 — One instance per demo
+
+- **[docs/single-instance.md](docs/single-instance.md): one stack on its own instance, reached on port
+  443 alone.** No port range to have opened, no port arithmetic, no per-participant origin template —
+  which makes it the path to pick when the network publishes a single port, as managed lab
+  environments often do. Carries measured sizing (`t3.medium`, 30 GB gp3; the build peaks near 2 GiB
+  and sets the floor, while the running stack is about 1 GiB with the host), the checks that have to
+  run before building, and a comparison with the fifty-stack path so the choice is made on what the
+  network allows rather than by accident.
+- **`setup_env.py --origin <address>`** accepts a bare address or a full origin and writes
+  `APP_ORIGIN` with the matching `SESSION_COOKIE_SECURE`. The backend validates the two together and
+  refuses to start when they disagree, so deriving the flag from the scheme removes a foot-gun that
+  presents as a container which will not boot.
+- **`setup_env.py` now updates an existing `.env` in place** when given `--origin` or
+  `--rotate-secret`, rather than refusing. An instance cloned from an AMI carries the address of the
+  box it was baked from, and this is what rewrites it: the whole of a `cloud-init` block that makes
+  clones self-configuring is now five lines, documented. Written through a temporary file so an
+  interrupted run cannot leave a half-written `.env` that takes the backend down on its next restart.
+  Without either flag the behaviour is unchanged — it still preserves what is there.
+
 ## v0.6.2 — Say what this is not
 
 - **A disclaimer, in the two places someone browsing the repository will see it.** A banner at the top

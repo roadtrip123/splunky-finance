@@ -1,0 +1,192 @@
+# One instance per demo
+
+One stack on its own instance, reached at `https://<public-ip>` on port 443. Use this for a partner
+demo, and for a workshop where each participant gets their own box rather than a port on a shared one.
+
+It is simpler than the fifty-stacks-on-one-box path in [workshop.md](workshop.md), and worth choosing
+for one reason above the others: **it needs only port 443.** No port range to have opened, no port
+arithmetic, no per-participant origin template. A perimeter that publishes one port is enough.
+
+The trade-off is fifty instances to launch and terminate instead of one. [Bake an
+AMI](#bake-an-ami-before-the-second-one) and that becomes a launch template rather than fifty
+builds.
+
+## Instance
+
+| | |
+| --- | --- |
+| Type | `t3.medium` — 2 vCPU, 4 GiB |
+| Disk | **30 GB gp3**, not the 8 GB default |
+| OS | Ubuntu 24.04 |
+| Security group | Inbound TCP 443 from wherever the audience sits. Port 80 is not needed — a local CA issues the certificate, so there is no HTTP challenge |
+
+Sizing: one stack is about 1 GiB with the host — the backend measured 181 MiB idle and roughly 400 MiB
+warm, the frontend 48 MiB. The model runs elsewhere, so the box is almost entirely IO-wait and memory
+is never the constraint at runtime.
+
+**The build sets the floor, not the running app.** `npm ci` and `next build` peak around 2 GiB, from
+494 MB of `node_modules` producing a 157 MB `.next` output. That is why 4 GiB rather than 2: a
+`t3.small` runs the stack fine and dies during the build. If you bake an AMI, the clones never build
+and `t3.small` becomes reasonable.
+
+Disk is the easy mistake. The two images are only ~700 MB, but build cache takes Docker's footprint to
+about 4 GB and Ubuntu 24.04 already uses 2.5 GB. The 8 GB default root leaves a few hundred MB.
+
+Burstable is fine here. The advice against it in [workshop.md](workshop.md) is about fifty stacks on
+one box; a single stack idles far below baseline, and launch credits cover a one-off build.
+
+## Before you build
+
+Two checks. Both fail silently later if skipped, and both are quick.
+
+**Is 443 reachable, and is anything already using it?** From a machine outside the network:
+
+```bash
+timeout 6 bash -c 'cat < /dev/null > /dev/tcp/<public-ip>/443' && echo open || echo blocked
+```
+
+Then on the box, because a managed image may already own that port:
+
+```bash
+sudo ss -ltnp | grep ':443 ' ; sudo iptables-save -t nat | grep -- '--dport 443'
+```
+
+A listener or a `REDIRECT`/`DNAT` rule on 443 means the platform's own proxy has it. Remove the rule
+if the box is yours to change, or fall back to a high port and the self-signed section of
+[workshop.md](workshop.md).
+
+**Can containers reach the internet?** Some hosts redirect container egress; see [When containers
+cannot reach the internet](workshop.md#when-containers-cannot-reach-the-internet). Check after Docker
+is installed, with a throwaway container rather than from the host — the host is the one place that
+always works:
+
+```bash
+docker run --rm python:3.12-slim python -c "import urllib.request;print(urllib.request.urlopen('https://api.openai.com/v1/models',timeout=10).status)"
+```
+
+`HTTP Error 401` is a pass: the request arrived and was rejected for having no key. A certificate error
+is the redirect, and the fix is in that section.
+
+## Build it
+
+```bash
+sudo apt-get update && sudo apt-get install -y docker.io docker-compose-v2 git
+sudo usermod -aG docker $USER && newgrp docker
+
+sudo apt-get install -y debian-keyring debian-archive-keyring apt-transport-https curl
+curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' | sudo gpg --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg
+curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' | sudo tee /etc/apt/sources.list.d/caddy-stable.list >/dev/null
+sudo apt-get update && sudo apt-get install -y caddy
+
+git clone --branch v0.6.3 https://github.com/roadtrip123/splunky-finance.git
+cd splunky-finance
+python3 scripts/setup_env.py --origin <public-ip>
+```
+
+`--origin` takes a bare address or a full origin and writes `APP_ORIGIN` with the matching
+`SESSION_COOKIE_SECURE`. The two are validated together — HTTPS without secure cookies, or the
+reverse, and the backend refuses to start — so deriving the flag from the scheme is one less thing to
+get wrong by hand. The origin carries no port and no path: 443 is implied, and a path is rejected.
+
+Nothing else in `.env` needs editing. `FRONTEND_BIND_ADDRESS=127.0.0.1` and `FRONTEND_PORT=3000` are
+already the defaults and should stay, because the proxy is the only thing that should be public.
+
+If the box belongs to a workshop participant rather than a presenter, hide the troubleshooting tab and
+the project setup control:
+
+```bash
+sed -i 's|^DEMO_MODE=.*|DEMO_MODE=workshop|' .env
+```
+
+Then start it:
+
+```bash
+docker compose up --build -d
+docker compose ps
+```
+
+## Terminate TLS on 443
+
+```bash
+IP=<public-ip>
+printf '{\n\tauto_https disable_redirects\n\tdefault_sni %s\n\tskip_install_trust\n}\n%s:443 {\n\ttls internal\n\treverse_proxy 127.0.0.1:3000\n}\n' "$IP" "$IP" | sudo tee /etc/caddy/Caddyfile >/dev/null
+sudo caddy validate --config /etc/caddy/Caddyfile && sudo systemctl restart caddy
+```
+
+`default_sni` is required, not optional. TLS forbids sending SNI for an IP address, so browsers and
+curl send no server name; without a default, Caddy has nothing to select a certificate by and aborts
+every handshake with an internal error — after logging that it obtained the certificate and bound the
+port. Nothing in the logs points at it.
+
+`validate` before restarting, so a bad config does not take the service down. The Caddy package starts
+the service on install and owns `/etc/caddy/Caddyfile` and port 2019: edit that file and use
+`systemctl`, rather than `caddy run` by hand, which fails to bind the admin port.
+
+Audiences see a certificate warning once and click through. **Tell them beforehand**, or the first five
+minutes go on it. A self-signed certificate stops passive sniffing, which is the real risk on shared
+wifi; it does not prove the server's identity. For synthetic data that is a reasonable place to stop.
+
+## Check it
+
+In this order. Each failure looks like the next one if taken out of order.
+
+```bash
+sudo ss -ltn | grep ':443 '
+curl -s  -o /dev/null -w 'stack=%{http_code}\n' http://127.0.0.1:3000/
+curl -sk -o /dev/null -w 'proxy=%{http_code}\n' --connect-to <public-ip>:443:127.0.0.1:443 https://<public-ip>/
+```
+
+`--connect-to` rather than `--resolve`: curl ignores `--resolve` when the host is already an IP literal
+and quietly tries the real address, which hangs — an EC2 instance cannot reach its own public IP,
+because AWS translates it rather than putting it on the interface. **The browser test has to come from
+somewhere else.**
+
+Last, open `https://<public-ip>` from a machine outside, accept the warning, and sign in with the
+customer number and shared password. Then walk [workshop-lab.md](workshop-lab.md) once, including
+creating the Agent Control agent — the step most likely to catch people.
+
+## Bake an AMI before the second one
+
+Instance-per-demo otherwise repeats the build, and the egress and firewall checks, on every box. Once
+one instance is verified end to end:
+
+1. Stop the containers so nothing is mid-write: `docker compose down`
+2. Create an image from the instance in the console, or `aws ec2 create-image --instance-id <id> --name splunky-finance-<version>`
+3. Launch the rest from it, through a launch template carrying the type, the 30 GB volume and the
+   security group
+
+Every clone carries the address of the box it was baked from, in `.env` and in
+`/etc/caddy/Caddyfile`. Both have to be rewritten on first boot, and the session secret should not be
+shared between boxes:
+
+```bash
+IP=$(curl -s http://169.254.169.254/latest/meta-data/public-ipv4)
+cd /home/ubuntu/splunky-finance
+python3 scripts/setup_env.py --origin "$IP" --rotate-secret
+printf '{\n\tauto_https disable_redirects\n\tdefault_sni %s\n\tskip_install_trust\n}\n%s:443 {\n\ttls internal\n\treverse_proxy 127.0.0.1:3000\n}\n' "$IP" "$IP" | tee /etc/caddy/Caddyfile >/dev/null
+systemctl restart caddy
+docker compose up -d
+```
+
+That is the whole of a `cloud-init` `runcmd` block, which makes the clones self-configuring — the IMDS
+address returns the instance's own public IP from inside it. `--rotate-secret` issues a new cookie
+signing key, so a session on one box is not valid on another.
+
+One thing it cannot cover: the container egress `iptables` rule, if that host needs one. It does not
+survive a reboot, let alone an AMI, so add it to the same block if the platform redirects container
+traffic.
+
+## Why not one instance with fifty stacks
+
+Both paths are supported. Choose by what your network allows and what you would rather operate:
+
+| | Instance per demo | Fifty stacks on one box |
+| --- | --- | --- |
+| Ports needed | 443 only | 3101–3150 inbound |
+| Infrastructure | 50 instances, a launch template, an AMI | 1 instance |
+| Cost, 4 hours | ~$8 plus a few dollars of EBS | ~$2 |
+| Blast radius | One person | Everyone |
+| Updating mid-session | Per instance | One `workshop.py up` |
+| Cookie collisions | None — separate hosts | Ports share a cookie jar; moving between stacks logs you out |
+
+The fifty-stack path is in [workshop.md](workshop.md).

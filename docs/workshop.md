@@ -4,6 +4,12 @@ One isolated Splunky Finance stack per participant, provisioned by a single scri
 
 Each participant gets their own compose project, so their dataset, sessions and Galileo configuration are separate. That separation is not cosmetic — the money-transfer scenario writes to the ledger, so on a shared instance one participant's transfer would move everyone's balance.
 
+> **Two deployment shapes.** This document puts fifty stacks on one instance, which needs a port
+> range opened inbound. [single-instance.md](single-instance.md) gives each demo or participant their
+> own instance reached on port 443 alone — pick that one if the network publishes a single port, which
+> managed lab environments often do. The sections here on container egress and on terminating TLS
+> apply to both.
+
 ## Instance
 
 | | |
@@ -35,9 +41,9 @@ sudo apt-get update && sudo apt-get install -y docker.io docker-compose-v2 git
 sudo usermod -aG docker $USER && newgrp docker
 
 # Pin to a released version. The default branch moves; a workshop should not.
-git clone --branch v0.6.2 https://github.com/roadtrip123/splunky-finance.git
+git clone --branch v0.6.3 https://github.com/roadtrip123/splunky-finance.git
 cd splunky-finance
-git describe --tags          # expect v0.6.2
+git describe --tags          # expect v0.6.3
 python3 scripts/setup_env.py
 ```
 
@@ -294,7 +300,7 @@ Useful flags:
 ```bash
 cd splunky-finance
 git fetch --tags
-git checkout v0.6.2
+git checkout v0.6.3
 git describe --tags                      # confirm before touching the stacks
 
 python3 scripts/workshop.py up --count 50 \

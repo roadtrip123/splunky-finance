@@ -36,7 +36,7 @@ cd splunky-finance
 python3 scripts/setup_env.py
 ```
 
-`setup_env.py` writes a private `.env`. The two demo passwords are a fixed shared pair, suitable for a demo on synthetic data and nothing else; the model endpoint and Galileo are configured from the presenter portal rather than here. Then:
+`setup_env.py` writes a private `.env`. The two demo passwords are a fixed shared pair, suitable for a demo on synthetic data and nothing else; the model endpoint and Galileo are configured from the presenter portal rather than here. For anything other than localhost, pass `--origin <address>` — it sets `APP_ORIGIN` and the matching `SESSION_COOKIE_SECURE`, which the backend validates together and refuses to start if they disagree. Then:
 
 ```bash
 docker compose up --build -d
@@ -45,7 +45,7 @@ docker compose logs --tail=100 backend frontend
 
 Open http://localhost:3000, sign in with account `12345678`, and the customer password configured in `.env`.
 
-Running more than one stack on the same machine needs a distinct `FRONTEND_PORT` and matching `APP_ORIGIN` per stack. For a workshop, `scripts/workshop.py` generates those and provisions any number of isolated stacks in one command — see [docs/workshop.md](docs/workshop.md).
+Running more than one stack on the same machine needs a distinct `FRONTEND_PORT` and matching `APP_ORIGIN` per stack. For a workshop, `scripts/workshop.py` generates those and provisions any number of isolated stacks in one command — see [docs/workshop.md](docs/workshop.md). To give each demo or participant their own instance instead, reached on port 443 alone, see [docs/single-instance.md](docs/single-instance.md).
 
 The demo passwords are fixed and shared, so anyone who can reach the instance and knows them can sign in. Replace them in `.env` for anything beyond a demo on synthetic data. Presenter login is at `/demo-admin` and uses its independent password. `.env` is private, ignored by Git, and created with permissions 0600. Setup never overwrites an existing file.
 
@@ -153,7 +153,7 @@ npm test
 
 Browser testing starts dedicated offline backend and production frontend processes; ensure ports 8001 and 3000 are free. Test data is stored under ignored `runtime/browser-tests`.
 
-For a workshop, [docs/workshop.md](docs/workshop.md) provisions one isolated stack per participant on a single EC2 instance with `scripts/workshop.py`, and [docs/workshop-lab.md](docs/workshop-lab.md) is the participant guide: connect the app to their own Galileo project, build the evaluators, build the guardrail.
+For a workshop there are two deployment shapes. [docs/single-instance.md](docs/single-instance.md) gives each demo or participant their own instance on port 443, which is the one to pick when the network publishes a single port. [docs/workshop.md](docs/workshop.md) provisions one isolated stack per participant on a single EC2 instance with `scripts/workshop.py`, which needs a port range opened. [docs/workshop-lab.md](docs/workshop-lab.md) is the participant guide either way: connect the app to their own Galileo project, build the evaluators, build the guardrail.
 
 Known defects are tracked as [issues](https://github.com/roadtrip123/splunky-finance/issues), released states in [CHANGELOG.md](CHANGELOG.md), and planned work in [TODO.md](TODO.md).
 
