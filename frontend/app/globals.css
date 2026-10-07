@@ -1538,3 +1538,19 @@ pre {
 .demo-pairing { padding: 0.5rem 1rem; font-size: 0.75rem; }
 .demo-pairing summary { cursor: pointer; color: var(--muted); }
 .demo-pairing input { max-width: 12rem; }
+
+/* Three readings side by side: what is running, what is published, what state the box is in.
+   Wraps to one per row on a phone rather than compressing the version strings. */
+.update-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 24px;
+  margin: 18px 0 4px;
+}
+.update-grid > div {
+  min-width: 130px;
+}
+.update-grid h3 {
+  margin: 6px 0 0;
+  font-size: 15px;
+}

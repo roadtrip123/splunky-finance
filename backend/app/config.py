@@ -73,6 +73,10 @@ class Settings(BaseSettings):
     # would skip the exercise. Set DEMO_SETUP_BUTTON=true to show it.
     demo_setup_button: bool = False
     app_origin: str = "http://localhost:3000"
+    # Shared with the host, which performs the update; the container only writes a request into it.
+    # See backend/app/update.py for why the container is not given Docker instead.
+    update_state_dir: Path = Path("/app/update")
+    update_repo: str = "roadtrip123/splunky-finance"
     data_dir: Path = Path("../runtime")
     policy_dir: Path = Path("../data/policies")
 

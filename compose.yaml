@@ -31,6 +31,9 @@ services:
       POLICY_DIR: /app/data/policies
     volumes:
       - runtime-data:/app/runtime
+      # Shared with the host so the portal can report the running release and request an update. The
+      # host performs it; the container only writes a request file. See backend/app/update.py.
+      - ${UPDATE_STATE_DIR:-./runtime/update}:/app/update
     extra_hosts:
       - "host.docker.internal:host-gateway"
     restart: unless-stopped

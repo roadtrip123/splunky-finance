@@ -21,6 +21,7 @@ from app.observability.protection import Protection
 from app.schemas import ChatInput, DatasetReset, Login, ProtectionSetting, ScenarioSetting, StrictModel
 from app.storage import Storage
 from app.tools import Banking
+from app.update import Updates
 
 
 class GalileoSetting(StrictModel):
@@ -109,6 +110,7 @@ def create_app(settings=None, model_builder=None, protection_adapter=None):
         settings, telemetry, protection, **({"model_builder": model_builder} if model_builder else {})
     )
     links = Connections(auth, chat)
+    updates = Updates(settings.update_state_dir, settings.update_repo)
     jobs = {}
 
     @asynccontextmanager
@@ -566,6 +568,26 @@ def create_app(settings=None, model_builder=None, protection_adapter=None):
     async def check_galileo(request: Request):
         session(request, "admin", True)
         return envelope(request, {"galileo": await telemetry.check_connection()})
+
+    @app.get("/api/demo-admin/update")
+    async def update_status(request: Request):
+        session(request, "admin")
+        return envelope(request, {"update": await updates.view()})
+
+    @app.post("/api/demo-admin/update/check")
+    async def update_check(request: Request):
+        session(request, "admin", True)
+        return envelope(request, {"update": await updates.view(force=True)})
+
+    @app.post("/api/demo-admin/update/install")
+    async def update_install(request: Request):
+        session(request, "admin", True)
+        try:
+            updates.request()
+        except RuntimeError as error:
+            # 409 rather than 500: the host side is not installed, which is a state, not a fault.
+            raise HTTPException(status_code=409, detail=str(error)) from error
+        return envelope(request, {"update": await updates.view()})
 
     @app.get("/api/demo-admin/status")
     async def admin_status(request: Request):

@@ -1,0 +1,36 @@
+# Update to the newest release and start the stack, once, on boot.
+#
+#   sudo cp scripts/splunky-finance.service /etc/systemd/system/
+#   sudo systemctl daemon-reload && sudo systemctl enable --now splunky-finance
+#
+# Edit User= and WorkingDirectory= if the repository is not at /home/ubuntu/splunky-finance. The user
+# must be in the docker group.
+#
+# The containers carry `restart: unless-stopped`, so Docker brings them back after a reboot on its
+# own. This unit exists to update them first, and to wait for the healthchecks so that a failure is
+# visible in `systemctl status` rather than only in the application.
+#
+#   journalctl -u splunky-finance          what happened on the last boot
+#   systemctl start splunky-finance        update now, without rebooting
+#
+# Type=oneshot with RemainAfterExit so the unit reads as active once the stack is up, rather than as
+# dead the moment the script returns.
+
+[Unit]
+Description=Splunky Finance: update to the newest release and start the stack
+Documentation=https://github.com/roadtrip123/splunky-finance/blob/build-splunky-finance/docs/single-instance.md
+After=docker.service network-online.target
+Wants=docker.service network-online.target
+Requires=docker.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+User=ubuntu
+WorkingDirectory=/home/ubuntu/splunky-finance
+ExecStart=/usr/bin/python3 scripts/selfupdate.py
+# A cold build on a small instance takes minutes; the default 90 seconds would kill it partway.
+TimeoutStartSec=1800
+
+[Install]
+WantedBy=multi-user.target

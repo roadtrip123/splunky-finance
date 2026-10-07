@@ -19,9 +19,37 @@ Fictional Australian banking demonstration: a responsive Next.js website, determ
 
 ## Current validation
 
-Production frontend build and desktop/mobile browser journeys passed. Backend tests cover ledger integrity, date arithmetic, session isolation, CSRF, controlled faults, and the pre-execution transfer gate including that a blocked transfer leaves balances untouched. Browser tests use an explicit offline model that invokes real banking tools; they do not validate paid model APIs or fabricate Galileo scores.
+101 backend tests pass. They cover ledger integrity, date arithmetic, session isolation, CSRF,
+controlled faults, and the pre-execution transfer gate including that a blocked transfer leaves
+balances untouched. The production frontend build and the desktop and mobile browser journeys pass.
+Browser tests drive an explicit offline model that invokes the real banking tools; they do not
+exercise paid model APIs and they do not fabricate Galileo scores.
 
-One live OpenAI tool-backed turn and its Galileo model/tool span export have been verified, as have the custom judges and Context Adherence against the live tenant. Ollama has been verified end to end for chat and fault injection. Anthropic is unverified. Tenant-bound Agent Control blocks the action, but a `verified: true` deny from a bound control has not yet been observed — the app fails closed, which looks identical from the chat and is distinguishable only in `action_decisions`. Docker image builds require access to the server's Docker daemon; the current user does not yet have that access.
+**Verified against live services.** OpenAI tool-backed turns and their Galileo model and tool span
+export, the three custom judges, and Context Adherence, all against a live tenant. Ollama end to end
+for chat and fault injection. Splunk Agent Observability as the switchable backend, in both the
+standalone and the o11y deployment modes.
+
+**Agent Control blocks the action and now reports `verified: true`** from a control bound to the
+stream and attached to the agent. Reaching that needed three things that each fail silently: the
+runtime token on the header the tenant expects, an Agent that exists in the console under the name
+the app sends, and the controls attached to that agent rather than only to the log stream. Until all
+three hold, the app fails closed — which looks identical from the chat and is distinguishable only in
+`action_decisions`.
+
+**Deployment verified on a hostile network.** Image builds, container egress to a live model endpoint,
+two concurrent participant stacks, and TLS on a bare IP all confirmed working on an EC2 instance whose
+host redirects container traffic. Browser access was not confirmed, because that network's perimeter
+publishes a single port — which is what [docs/single-instance.md](docs/single-instance.md) exists to
+address.
+
+**Not verified.** Anthropic as a model provider. The boot-time self-update in
+`scripts/selfupdate.py` has had every decision branch exercised, but no rollback has yet been
+observed against a genuinely broken release. And no human has followed
+[docs/workshop-lab.md](docs/workshop-lab.md) from end to end, which remains the gap most likely to
+surface during a session rather than before one.
+
+Open defects are tracked as [GitHub issues](https://github.com/roadtrip123/splunky-finance/issues).
 
 ## Install on Ubuntu
 

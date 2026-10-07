@@ -1,0 +1,17 @@
+# Install an update requested from the presenter portal. Triggered by splunky-finance-update.path,
+# never enabled on its own.
+#
+# `--consume-request` deletes the request file before acting, so the path unit cannot retrigger into
+# a loop, and does nothing at all when no request is pending.
+
+[Unit]
+Description=Install an update requested from the presenter portal
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+User=ubuntu
+WorkingDirectory=/home/ubuntu/splunky-finance
+ExecStart=/usr/bin/python3 scripts/selfupdate.py --consume-request
+TimeoutStartSec=1800

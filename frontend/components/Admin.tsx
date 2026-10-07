@@ -26,6 +26,24 @@ type Event = {
   duration_seconds: number;
   evaluation: Record<string, unknown>;
 };
+type Update = {
+  current: string;
+  latest: string | null;
+  update_available: boolean;
+  comparable: boolean;
+  control: "available" | "unavailable";
+  control_reason: string | null;
+  checked_at: number | null;
+  check_error: string | null;
+  pending: { requested_at: number; by: string } | null;
+  last_run: {
+    ref?: string;
+    result?: string;
+    message?: string;
+    updated_at?: number;
+  };
+  repo: string;
+};
 type Status = {
   provider: string;
   model: string;
@@ -149,6 +167,9 @@ export default function Admin() {
   });
   const [seed, setSeed] = useState("42");
   const [date, setDate] = useState("2026-09-15");
+  // Kept out of `status`, which polls every seven seconds: checking asks GitHub, and the answer
+  // changes when someone publishes a release, not every seven seconds.
+  const [update, setUpdate] = useState<Update | null>(null);
   async function refresh() {
     try {
       const s = await api<Status>("demo-admin/status");
@@ -194,6 +215,30 @@ export default function Admin() {
       setDate(status.dataset.reference_date);
     }
   }, [status?.dataset.dataset_version]);
+  async function loadUpdate(force = false) {
+    try {
+      const payload = force
+        ? await mutate<{ update: Update }>("demo-admin/update/check", {}, true)
+        : await api<{ update: Update }>("demo-admin/update");
+      setUpdate(payload.update);
+      return payload.update;
+    } catch (e) {
+      setError((e as Error).message);
+      return null;
+    }
+  }
+  // Checked when the tab is opened rather than on load, so a presenter who never looks at
+  // Troubleshooting never causes an outbound request.
+  useEffect(() => {
+    if (logged && tab === "tools" && status?.demo_mode !== "workshop") loadUpdate();
+  }, [logged, tab]);
+  // While an install is pending the host is working; poll until the request file clears, which is
+  // also roughly when the containers come back.
+  useEffect(() => {
+    if (!update?.pending) return;
+    const interval = setInterval(() => loadUpdate(), 5000);
+    return () => clearInterval(interval);
+  }, [update?.pending?.requested_at]);
   async function action(fn: () => Promise<unknown>) {
     setBusy(true);
     setError("");
@@ -931,6 +976,118 @@ export default function Admin() {
                   </section>
                 </div>
                 <div role="tabpanel" hidden={tab !== "tools"}>
+                  {status.demo_mode !== "workshop" && (
+                  <section className="admin-card">
+                    <h2>Software updates</h2>
+                    <p className="muted">
+                      Releases are published as tags on{" "}
+                      {update ? update.repo : "GitHub"}. Installing rebuilds the
+                      images and restarts the stack, so the app is briefly
+                      unavailable. Conversations are in memory and will be lost;
+                      saved credentials, endpoints and the dataset survive.
+                    </p>
+                    <div className="update-grid">
+                      <div>
+                        <span className="mini-label">RUNNING</span>
+                        <h3>{update ? update.current : "…"}</h3>
+                      </div>
+                      <div>
+                        <span className="mini-label">LATEST RELEASE</span>
+                        <h3>
+                          {update ? update.latest ?? "unknown" : "…"}
+                        </h3>
+                      </div>
+                      <div>
+                        <span className="mini-label">STATUS</span>
+                        <h3 aria-live="polite">
+                          <span
+                            className={
+                              update?.pending
+                                ? "badge pending"
+                                : "badge"
+                            }
+                          >
+                            {!update
+                              ? "checking"
+                              : update.pending
+                                ? "installing"
+                                : update.update_available
+                                  ? "update available"
+                                  : update.comparable
+                                    ? "up to date"
+                                    : "unknown"}
+                          </span>
+                        </h3>
+                      </div>
+                    </div>
+                    <div className="admin-actions">
+                      <button
+                        className="button outline small"
+                        disabled={busy || !!update?.pending}
+                        onClick={() => action(() => loadUpdate(true))}
+                      >
+                        Check for updates
+                      </button>
+                      {update?.update_available &&
+                        update.control === "available" && (
+                          <button
+                            className="button small"
+                            disabled={busy || !!update.pending}
+                            onClick={() => {
+                              if (
+                                !confirm(
+                                  `Install ${update.latest} and restart? The app will be unavailable for a few minutes while the images rebuild.`,
+                                )
+                              )
+                                return;
+                              action(async () => {
+                                const next = await loadUpdate();
+                                if (!next) return;
+                                const payload = await mutate<{
+                                  update: Update;
+                                }>("demo-admin/update/install", {}, true);
+                                setUpdate(payload.update);
+                                setNotice(
+                                  `Installing ${update.latest}. The stack restarts when the build finishes; this page will reconnect on its own.`,
+                                );
+                              });
+                            }}
+                          >
+                            Install {update.latest} and restart
+                          </button>
+                        )}
+                    </div>
+                    {update?.update_available &&
+                      update.control === "unavailable" && (
+                        <small>
+                          An update is available but this box cannot install it
+                          by itself: {update.control_reason}. See
+                          docs/single-instance.md, &ldquo;Update itself on
+                          boot&rdquo;.
+                        </small>
+                      )}
+                    {update?.check_error && (
+                      <small>
+                        Could not reach GitHub to check: {update.check_error}
+                      </small>
+                    )}
+                    {update && !update.comparable && !update.check_error && (
+                      <small>
+                        This box is on {update.current}, which is not a release
+                        tag, so there is nothing to compare. A box following a
+                        branch reports this.
+                      </small>
+                    )}
+                    {update?.last_run?.result && !update.pending && (
+                      <small>
+                        Last run: {update.last_run.result}
+                        {update.last_run.message
+                          ? ` — ${update.last_run.message}`
+                          : ""}
+                      </small>
+                    )}
+                  </section>
+                  )}
                   {status.demo_mode !== "workshop" && (
                   <section className="admin-card">
                     <h2>Reset synthetic data</h2>

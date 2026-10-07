@@ -6,6 +6,36 @@ Versions mark states worth returning to. Tags are annotated, so `git tag -n` and
 Open defects are tracked as [GitHub issues](https://github.com/roadtrip123/splunky-finance/issues);
 planned work is in [TODO.md](TODO.md).
 
+## v0.6.4 — Boxes that update themselves
+
+- **`scripts/selfupdate.py` and `scripts/splunky-finance.service`: an instance updates to the newest
+  release on boot.** An instance spun up for a workshop should not run whatever was baked into the AMI
+  weeks earlier, and rebuilding the AMI for every fix is what this avoids. Publishing a change becomes
+  a tag plus `systemctl restart splunky-finance`.
+- Two properties were designed for ahead of being current, because this runs unattended on the morning
+  of a workshop. **It never leaves the box worse than it started**: the build runs before anything is
+  recreated, so a failed build leaves the running stack untouched, and a stack that does not report
+  healthy within `UPDATE_TIMEOUT` is rolled back to the commit checked out on entry, rebuilt and
+  restarted. **It never blocks on the network**: a failed fetch is logged and skipped. It also refuses
+  to update a tree with modified tracked files, because somebody edited that box by hand.
+- `UPDATE_CHANNEL` defaults to `tags`, not branch HEAD. A tag is a decision someone made; a branch tip
+  is whatever was pushed last, and fifty boxes pulling it at nine in the morning is fifty boxes
+  inheriting an unfinished commit. `branch` and `off` are the other two.
+- **The presenter portal can check for and install updates.** A *Software updates* card in the
+  Troubleshooting tab reports the running release, the newest published one, and offers an install
+  button when they differ. It is presenter-only, because that tab is hidden in workshop mode and
+  participants should not be restarting their own box mid-exercise.
+- The container does not perform the update, and is not given Docker to do it with. It writes one
+  request file; a systemd path unit on the host notices and runs the update. The presenter password is
+  published in this repository and identical on every box, so a container holding the Docker socket
+  would mean anyone with that password owns the instance. The worst case here is a pull of a tag from
+  this repository.
+- **The validation section of the README is rewritten**, because it had gone stale in two ways that
+  mattered: it still said a `verified: true` deny from a bound Agent Control had not been observed,
+  and that the current user lacked Docker daemon access. It now also states what is *not* verified —
+  Anthropic as a provider, a self-update rollback against a genuinely broken release, and that no
+  human has followed the lab sheet end to end.
+
 ## v0.6.3 — One instance per demo
 
 - **[docs/single-instance.md](docs/single-instance.md): one stack on its own instance, reached on port

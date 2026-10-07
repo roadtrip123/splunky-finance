@@ -78,7 +78,7 @@ curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' | sudo gpg --d
 curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' | sudo tee /etc/apt/sources.list.d/caddy-stable.list >/dev/null
 sudo apt-get update && sudo apt-get install -y caddy
 
-git clone --branch v0.6.3 https://github.com/roadtrip123/splunky-finance.git
+git clone --branch v0.6.4 https://github.com/roadtrip123/splunky-finance.git
 cd splunky-finance
 python3 scripts/setup_env.py --origin <public-ip>
 ```
@@ -126,6 +126,85 @@ Audiences see a certificate warning once and click through. **Tell them beforeha
 minutes go on it. A self-signed certificate stops passive sniffing, which is the real risk on shared
 wifi; it does not prove the server's identity. For synthetic data that is a reasonable place to stop.
 
+## Update itself on boot
+
+An instance spun up for a workshop should not be running whatever was baked into the AMI weeks
+earlier, and rebuilding the AMI for every fix is the thing this avoids. Install the unit and the box
+updates itself each time it starts:
+
+```bash
+sudo cp scripts/splunky-finance.service /etc/systemd/system/
+sudo systemctl daemon-reload && sudo systemctl enable --now splunky-finance
+journalctl -u splunky-finance -f
+```
+
+Edit `User=` and `WorkingDirectory=` in the unit if the repository is not at
+`/home/ubuntu/splunky-finance`. The user must be in the `docker` group.
+
+`systemctl start splunky-finance` updates now without rebooting, and
+`journalctl -u splunky-finance` is the record of what the last boot decided.
+
+### Updating from the presenter portal
+
+The Troubleshooting tab gets a **Software updates** card showing the running release, the newest
+published one, and an **Install** button when they differ. Install two more units for it, and give the
+shared directory to the backend's user:
+
+```bash
+mkdir -p runtime/update && sudo chown 10001:10001 runtime/update
+sudo cp scripts/splunky-finance-update.path scripts/splunky-finance-update.service /etc/systemd/system/
+sudo systemctl daemon-reload && sudo systemctl enable --now splunky-finance-update.path
+docker compose up -d   # picks up the new bind mount
+```
+
+`10001` is the uid the backend container runs as. Without the `chown` the card still reports versions
+but the button is absent, and it says why.
+
+The container does not perform the update. It writes a request file into `runtime/update/`, a
+systemd path unit notices, and the host does the work. That boundary is deliberate: the presenter
+password is published in this repository, read aloud at workshops and identical on every box, so a
+container holding the Docker socket would mean anyone with that password owns the instance. Writing
+one file is the whole capability it has, and the worst case is a pull of a tag from this repository.
+
+The card is presenter-only — the Troubleshooting tab is hidden in workshop mode, so participants
+cannot restart their own box mid-exercise.
+
+### What it will and will not do
+
+Two properties matter more than being current, because this runs with nobody watching on the morning
+of a workshop:
+
+- **It never leaves the box worse than it started.** The build runs before anything is recreated, so a
+  build that fails leaves the running stack untouched. A stack that comes up unhealthy within
+  `UPDATE_TIMEOUT` is rolled back to the commit that was checked out on entry, rebuilt, and restarted.
+- **It never blocks on the network.** A failed fetch is logged and skipped, and the stack starts on
+  the code already present.
+
+It also refuses to update when tracked files are modified, because that means somebody edited the box
+by hand and updating would discard their work.
+
+### Which channel
+
+`UPDATE_CHANNEL` in `.env`:
+
+| | |
+| --- | --- |
+| `tags` | Newest `v*` tag. **The default** |
+| `branch` | Tip of `UPDATE_BRANCH` |
+| `off` | Start without updating |
+
+`tags` rather than branch HEAD is deliberate. A tag is a decision someone made; a branch tip is
+whatever was pushed last, and fifty boxes pulling it at nine in the morning is fifty boxes inheriting
+an unfinished commit. Use `branch` when you are iterating and want the boxes to follow along —
+then **tag before the workshop and switch back**.
+
+Either way, publishing a fix means pushing it and restarting the instances, with no AMI rebuild:
+
+```bash
+git tag -a v0.6.5 -m "..." && git push origin v0.6.5   # then, on each box:
+sudo systemctl restart splunky-finance
+```
+
 ## Check it
 
 In this order. Each failure looks like the next one if taken out of order.
@@ -162,11 +241,15 @@ shared between boxes:
 ```bash
 IP=$(curl -s http://169.254.169.254/latest/meta-data/public-ipv4)
 cd /home/ubuntu/splunky-finance
-python3 scripts/setup_env.py --origin "$IP" --rotate-secret
+sudo -u ubuntu python3 scripts/setup_env.py --origin "$IP" --rotate-secret
 printf '{\n\tauto_https disable_redirects\n\tdefault_sni %s\n\tskip_install_trust\n}\n%s:443 {\n\ttls internal\n\treverse_proxy 127.0.0.1:3000\n}\n' "$IP" "$IP" | tee /etc/caddy/Caddyfile >/dev/null
 systemctl restart caddy
-docker compose up -d
+systemctl restart splunky-finance
 ```
+
+`systemctl restart splunky-finance` rather than `docker compose up -d`, so the clone picks up any
+release published since the AMI was baked. Enable the unit before taking the snapshot and the clones
+do this on their own at every boot.
 
 That is the whole of a `cloud-init` `runcmd` block, which makes the clones self-configuring — the IMDS
 address returns the instance's own public IP from inside it. `--rotate-secret` issues a new cookie
