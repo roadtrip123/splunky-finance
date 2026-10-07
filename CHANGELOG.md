@@ -6,6 +6,13 @@ Versions mark states worth returning to. Tags are annotated, so `git tag -n` and
 Open defects are tracked as [GitHub issues](https://github.com/roadtrip123/splunky-finance/issues);
 planned work is in [TODO.md](TODO.md).
 
+## v0.6.6 — IMDSv2
+
+- The AMI clone snippet in `docs/single-instance.md` now does the IMDSv2 token handshake. New
+  instances commonly have IMDSv1 disabled, where the plain request returns nothing and
+  `setup_env.py --origin` is handed an empty string — which fails validation rather than silently
+  misconfiguring, but only after the clone has booted.
+
 ## v0.6.5 — The release an image was built from
 
 - **The image now knows its own version.** `APP_VERSION` is a build argument that

@@ -78,7 +78,7 @@ curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' | sudo gpg --d
 curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' | sudo tee /etc/apt/sources.list.d/caddy-stable.list >/dev/null
 sudo apt-get update && sudo apt-get install -y caddy
 
-git clone --branch v0.6.5 https://github.com/roadtrip123/splunky-finance.git
+git clone --branch v0.6.6 https://github.com/roadtrip123/splunky-finance.git
 cd splunky-finance
 python3 scripts/setup_env.py --origin <public-ip>
 ```
@@ -244,7 +244,8 @@ Every clone carries the address of the box it was baked from, in `.env` and in
 shared between boxes:
 
 ```bash
-IP=$(curl -s http://169.254.169.254/latest/meta-data/public-ipv4)
+TOKEN=$(curl -sX PUT http://169.254.169.254/latest/api/token -H 'X-aws-ec2-metadata-token-ttl-seconds: 60')
+IP=$(curl -s -H "X-aws-ec2-metadata-token: $TOKEN" http://169.254.169.254/latest/meta-data/public-ipv4)
 cd /home/ubuntu/splunky-finance
 sudo -u ubuntu python3 scripts/setup_env.py --origin "$IP" --rotate-secret
 printf '{\n\tauto_https disable_redirects\n\tdefault_sni %s\n\tskip_install_trust\n}\n%s:443 {\n\ttls internal\n\treverse_proxy 127.0.0.1:3000\n}\n' "$IP" "$IP" | tee /etc/caddy/Caddyfile >/dev/null
@@ -257,7 +258,9 @@ release published since the AMI was baked. Enable the unit before taking the sna
 do this on their own at every boot.
 
 That is the whole of a `cloud-init` `runcmd` block, which makes the clones self-configuring — the IMDS
-address returns the instance's own public IP from inside it. `--rotate-secret` issues a new cookie
+address returns the instance's own public IP from inside it. The token request is the IMDSv2 handshake;
+new instances commonly have IMDSv1 disabled, where the plain `curl` returns nothing and `--origin`
+would be handed an empty string. `--rotate-secret` issues a new cookie
 signing key, so a session on one box is not valid on another.
 
 One thing it cannot cover: the container egress `iptables` rule, if that host needs one. It does not

@@ -41,9 +41,9 @@ sudo apt-get update && sudo apt-get install -y docker.io docker-compose-v2 git
 sudo usermod -aG docker $USER && newgrp docker
 
 # Pin to a released version. The default branch moves; a workshop should not.
-git clone --branch v0.6.5 https://github.com/roadtrip123/splunky-finance.git
+git clone --branch v0.6.6 https://github.com/roadtrip123/splunky-finance.git
 cd splunky-finance
-git describe --tags          # expect v0.6.5
+git describe --tags          # expect v0.6.6
 python3 scripts/setup_env.py
 ```
 
@@ -300,7 +300,7 @@ Useful flags:
 ```bash
 cd splunky-finance
 git fetch --tags
-git checkout v0.6.5
+git checkout v0.6.6
 git describe --tags                      # confirm before touching the stacks
 
 python3 scripts/workshop.py up --count 50 \
