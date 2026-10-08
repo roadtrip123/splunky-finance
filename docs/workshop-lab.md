@@ -24,9 +24,11 @@ Your instructor gives you one URL, an account number and two passwords. Everythi
 Open the app, sign in to banking, then open `/demo-admin` in **another tab of the same browser profile**. The two link automatically.
 
 Banking App:
+
 <img width="1812" height="869" alt="image" src="https://github.com/user-attachments/assets/dd1a734f-248e-4e84-b11f-09c313bb8d54" />
 
 Demo-Admin:
+
 <img width="1817" height="654" alt="image" src="https://github.com/user-attachments/assets/640afc6b-f0c8-4f06-bfb7-35c5aff62de1" />
 
 
@@ -41,25 +43,44 @@ Do this first. The app cannot connect to a project that does not exist.
 In the Galileo console:
 
 1. Go to your Galileo URL and Sign-In
-  <img width="570" height="539" alt="image" src="https://github.com/user-attachments/assets/d1ae0df5-8019-4724-b04e-82b2a92c1376" />
+
+   <img width="570" height="539" alt="image" src="https://github.com/user-attachments/assets/d1ae0df5-8019-4724-b04e-82b2a92c1376" />
+
 2. Click on your username on the topright of the portal and select API Keys.
-  <img width="380" height="447" alt="image" src="https://github.com/user-attachments/assets/0080aee8-d160-45b8-93bf-537934056784" />
+
+   <img width="380" height="447" alt="image" src="https://github.com/user-attachments/assets/0080aee8-d160-45b8-93bf-537934056784" />
+
 3. Create an **API key** by clicking **+ Create new key** 
-<img width="1261" height="209" alt="image" src="https://github.com/user-attachments/assets/dc1279d8-28ae-4612-b888-4183f8fd091c" />
+
+   <img width="1261" height="209" alt="image" src="https://github.com/user-attachments/assets/dc1279d8-28ae-4612-b888-4183f8fd091c" />
+
 4. Give the key a name and click **create**
+
    <img width="524" height="386" alt="image" src="https://github.com/user-attachments/assets/50d339f0-b54c-4668-927e-05bc3d703ebd" />
+
 5. Click the **copy** button and click **Done**. (Make sure you store the key securely, as you can not get them again, unless you re-create them.)
-  <img width="432" height="221" alt="image" src="https://github.com/user-attachments/assets/354b2c5d-fef6-499e-9197-7c3ecb95cea5" />
+
+   <img width="432" height="221" alt="image" src="https://github.com/user-attachments/assets/354b2c5d-fef6-499e-9197-7c3ecb95cea5" />
+
 6. Go to **Project** on the left screen and select **View all**
-<img width="558" height="757" alt="image" src="https://github.com/user-attachments/assets/87b5f0d1-6271-471a-9c62-d75fbc026d40" />
+
+   <img width="558" height="757" alt="image" src="https://github.com/user-attachments/assets/87b5f0d1-6271-471a-9c62-d75fbc026d40" />
+
 7. Click on **Create new project**
-<img width="1366" height="140" alt="image" src="https://github.com/user-attachments/assets/db5404c3-1a47-45e4-81fc-1e129e349b23" />
+
+   <img width="1366" height="140" alt="image" src="https://github.com/user-attachments/assets/db5404c3-1a47-45e4-81fc-1e129e349b23" />
+
 8. Give it a Project Name and click **Create Project**
-<img width="358" height="164" alt="image" src="https://github.com/user-attachments/assets/3f3054ce-6781-44d7-aaa1-6722485f5f3f" />
+
+   <img width="358" height="164" alt="image" src="https://github.com/user-attachments/assets/3f3054ce-6781-44d7-aaa1-6722485f5f3f" />
+
 9. It will automatically take you to the **Agent Stream** tab for your new project. Here you will need to configure the **Agent Streams**. An **Agent Stream** will be where all the logs will be sent to. Click **Create Agent Stream**
-<img width="1266" height="287" alt="image" src="https://github.com/user-attachments/assets/ac6e9e54-654e-4023-bafd-01c77cb9316d" />
+
+   <img width="1266" height="287" alt="image" src="https://github.com/user-attachments/assets/ac6e9e54-654e-4023-bafd-01c77cb9316d" />
+
 10. Give the name of the stream as 'my-bank-agent' and click **Create Agent Stream**
-<img width="356" height="168" alt="image" src="https://github.com/user-attachments/assets/f7d30cee-5e90-40f9-894c-25472c3288ca" />
+
+    <img width="356" height="168" alt="image" src="https://github.com/user-attachments/assets/f7d30cee-5e90-40f9-894c-25472c3288ca" />
 
 Note the **console URL** and **API URL** for your tenant, and the **Agent Control URL**. Your instructor has these.
 
@@ -67,36 +88,55 @@ Note the **console URL** and **API URL** for your tenant, and the **Agent Contro
 
 ## Step 2 — Point the app at your model and your project
 
-1. Go to your demo admin portal - https://<domain>/demo-admin` and sign in
-<img width="1811" height="651" alt="image" src="https://github.com/user-attachments/assets/c471041a-8325-4b8d-b3e7-a9efd77fe678" />
+1. Go to your demo admin portal — `https://<domain>/demo-admin` — and sign in
+
+   <img width="1811" height="651" alt="image" src="https://github.com/user-attachments/assets/c471041a-8325-4b8d-b3e7-a9efd77fe678" />
 
 2.  Click **Setup**
-<img width="1520" height="723" alt="image" src="https://github.com/user-attachments/assets/cd0e18c3-91d1-44f1-98b4-a8324116071d" />
+
+    <img width="1520" height="723" alt="image" src="https://github.com/user-attachments/assets/cd0e18c3-91d1-44f1-98b4-a8324116071d" />
+
 3. Scroll down until you get to the **Connect to Splunk Agent Observability / Galileo**. Select **Galileo**. Fill out your 'Project', 'Log Stream', 'Console URL', 'API URL' and 'Agent Control URL'. (These URLs can be found with your credentials). Once filled out click **Save and Connect**
-<img width="1093" height="774" alt="image" src="https://github.com/user-attachments/assets/11c2d4b9-c9dc-4523-af63-936f4d4cce8d" />
+
+   <img width="1093" height="774" alt="image" src="https://github.com/user-attachments/assets/11c2d4b9-c9dc-4523-af63-936f4d4cce8d" />
+
 4. Once saved, scroll to the top and verify you can see it is **Connected**
-<img width="1033" height="585" alt="image" src="https://github.com/user-attachments/assets/d53322a1-8785-4f22-b566-0d26d6fe9640" />
+
+   <img width="1033" height="585" alt="image" src="https://github.com/user-attachments/assets/d53322a1-8785-4f22-b566-0d26d6fe9640" />
 
 ## Step 3 — Connect to your My-Banking-Agent to LLM
 
-1. Go to your demo admin portal - https://<domain>/demo-admin` and sign in
-<img width="1811" height="651" alt="image" src="https://github.com/user-attachments/assets/c471041a-8325-4b8d-b3e7-a9efd77fe678" />
+1. Go to your demo admin portal — `https://<domain>/demo-admin` — and sign in
+
+   <img width="1811" height="651" alt="image" src="https://github.com/user-attachments/assets/c471041a-8325-4b8d-b3e7-a9efd77fe678" />
 
 2.  Click **Setup**
-<img width="1520" height="723" alt="image" src="https://github.com/user-attachments/assets/cd0e18c3-91d1-44f1-98b4-a8324116071d" />
+
+    <img width="1520" height="723" alt="image" src="https://github.com/user-attachments/assets/cd0e18c3-91d1-44f1-98b4-a8324116071d" />
 
 3. Scroll down to the **Model endpoint** section. Enter in your 'Model Nam", select 'Provider', 'API Keys', and 'Model'. (The model is which specific model you are using). Click **Add endpoint**
-<img width="1092" height="693" alt="image" src="https://github.com/user-attachments/assets/c50566a7-c8c2-4124-b66d-06d13fc8bae5" />
+
+   <img width="1092" height="693" alt="image" src="https://github.com/user-attachments/assets/c50566a7-c8c2-4124-b66d-06d13fc8bae5" />
+
 4. It will show at the top of the page, the selected and configured model
-<img width="1096" height="662" alt="image" src="https://github.com/user-attachments/assets/4fa0a300-a1b0-4233-966d-c207a670997a" />
+
+   <img width="1096" height="662" alt="image" src="https://github.com/user-attachments/assets/4fa0a300-a1b0-4233-966d-c207a670997a" />
+
 5. To test if everyone is working correctly, go to **Demo** tab
-<img width="1054" height="541" alt="image" src="https://github.com/user-attachments/assets/c91c97eb-92be-4011-b2bf-27e0f3911bc9" />
+
+   <img width="1054" height="541" alt="image" src="https://github.com/user-attachments/assets/c91c97eb-92be-4011-b2bf-27e0f3911bc9" />
+
 6. Select **Run** next to the 'Questions for this scenario'. This will trigger an LLM call from the My Bank Agent.
-<img width="1017" height="393" alt="image" src="https://github.com/user-attachments/assets/ead70e8a-c6a6-4d39-8586-d08b9ca314cd" />
+
+   <img width="1017" height="393" alt="image" src="https://github.com/user-attachments/assets/ead70e8a-c6a6-4d39-8586-d08b9ca314cd" />
+
 7. If you scroll down, after a few seconds it will give you the answer, if it is working correctly.
-<img width="1093" height="382" alt="image" src="https://github.com/user-attachments/assets/b1d3552b-fe97-4c8a-a7ec-8efb4a2ea086" />
+
+   <img width="1093" height="382" alt="image" src="https://github.com/user-attachments/assets/b1d3552b-fe97-4c8a-a7ec-8efb4a2ea086" />
+
 6. Now go back to Galileo to make sure you can see that message. Click on your project and select your **Agent Stream**
-<img width="1414" height="373" alt="image" src="https://github.com/user-attachments/assets/bb04ea52-8af1-4186-ae83-e1f25511294a" />
+
+   <img width="1414" height="373" alt="image" src="https://github.com/user-attachments/assets/bb04ea52-8af1-4186-ae83-e1f25511294a" />
 
 8. 
 9.  
