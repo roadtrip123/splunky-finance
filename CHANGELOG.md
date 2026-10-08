@@ -28,6 +28,20 @@ reading it.
   or `/etc/rc.local`.** A rule deleted by hand comes back on the next boot, and on a box destined to
   become an AMI that means every clone starts with the port broken.
 
+## v0.6.11 — The Remove buttons were never wired up
+
+- **The API proxy did not forward `DELETE`.** Next answers 405 for any method with no export, before
+  the handler runs, so every Remove button in the portal has been inert since it was added — the
+  request never reached the backend at all. Found by reproducing it against a live deployment rather
+  than by reading the code, which read as entirely correct on both sides of the gap.
+- This is the actual reason an endpoint could not be removed. The stale-credentials defect fixed in
+  v0.6.9 was real and would have bitten next, but nothing was reaching the delete route to expose it.
+- A static guard now reads the methods the frontend asks for and asserts the proxy forwards each one.
+  It fails on the old code. Neither test suite noticed this: the backend tests call the API directly
+  and the browser tests never exercised a delete, so the proxy sat in the one gap between them.
+- An empty `DELETE` body is dropped rather than forwarded as `""`, which not every HTTP stack treats
+  as equivalent to no body.
+
 ## v0.6.10 — "Request origin rejected" now says what it expected
 
 - **Every "update now" instruction says `restart`, not `start`.** The unit is `Type=oneshot` with

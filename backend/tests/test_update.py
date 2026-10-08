@@ -2,6 +2,7 @@
 
 import asyncio
 import json
+import re
 from pathlib import Path
 
 import httpx
@@ -241,3 +242,23 @@ def test_origin_rejection_names_both_addresses(client, settings):
     message = response.json()["error"]["message"]
     assert settings.app_origin in message, "must say which origin this deployment expects"
     assert "not-the-configured-host.example" in message, "must say which origin was sent"
+
+
+def test_the_proxy_exports_every_method_the_portal_uses():
+    """Next answers 405 for a method with no export, without reaching the handler.
+
+    A missing DELETE made every Remove button in the portal inert while the code behind them read
+    as correct, and nothing in either test suite noticed. This is a cheap static guard: it reads the
+    methods the frontend actually asks for and checks the proxy forwards them.
+    """
+    root = Path(__file__).resolve().parents[2]
+    route = (root / "frontend/app/api/[...path]/route.ts").read_text()
+    exported = set(re.findall(r"proxy as ([A-Z]+)", route))
+
+    used = {"GET", "POST"}  # api() is GET; mutate() defaults to POST
+    for source in (root / "frontend").rglob("*.tsx"):
+        # The fourth argument of mutate(path, body, admin, method).
+        used |= {m.upper() for m in re.findall(r"mutate\((?:[^()]|\([^()]*\))*?,\s*\"([A-Z]+)\"\s*\)", source.read_text())}
+
+    missing = used - exported
+    assert not missing, f"the proxy does not forward {sorted(missing)}; Next will answer 405"

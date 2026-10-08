@@ -16,10 +16,13 @@ async function proxy(
     if (value) headers.set(name, value);
   }
   try {
-    const body = ["GET", "HEAD"].includes(request.method)
-      ? undefined
+    // DELETE carries no payload on any route here, and an empty body is not the same as no body
+    // to every HTTP stack, so it is dropped rather than forwarded as "".
+    const raw = ["GET", "HEAD", "DELETE"].includes(request.method)
+      ? ""
       : await request.text();
-    if (body && body.length > 16000)
+    const body = raw || undefined;
+    if (raw.length > 16000)
       return Response.json(
         { error: { message: "Request too large" } },
         { status: 413 },
@@ -54,4 +57,7 @@ async function proxy(
     );
   }
 }
-export { proxy as GET, proxy as POST, proxy as PUT };
+// Every method the application uses needs an export: Next answers 405 for anything not listed here,
+// without reaching the handler. A missing DELETE made the portal's Remove buttons inert while
+// looking entirely correct in the code behind them.
+export { proxy as GET, proxy as POST, proxy as PUT, proxy as DELETE };
