@@ -262,3 +262,58 @@ def test_the_proxy_exports_every_method_the_portal_uses():
 
     missing = used - exported
     assert not missing, f"the proxy does not forward {sorted(missing)}; Next will answer 405"
+
+
+def test_the_agent_control_agent_name_is_settable_from_the_portal(client, settings):
+    """Each participant creates their own agent, so the app cannot have one name baked in.
+
+    Sharing an agent across a workshop shares its controls: one person toggling a guardrail toggles
+    everyone's, and the exercise stops being an exercise.
+    """
+    headers = login(client, admin=True)
+    default = settings.agent_control_agent_name
+
+    saved = client.put("/api/demo-admin/galileo/connection", headers=headers,
+                       json={"agent_control_agent_name": "my-bank-agent-lp"})
+    assert saved.status_code == 200, saved.text
+    assert saved.json()["connection"]["agent_control_agent_name"] == "my-bank-agent-lp"
+    assert settings.agent_control_agent_name == "my-bank-agent-lp", "must apply without a restart"
+
+    # Blank is ignored, as for every other field, so a typo elsewhere cannot wipe it.
+    client.put("/api/demo-admin/galileo/connection", headers=headers,
+               json={"agent_control_agent_name": ""})
+    assert settings.agent_control_agent_name == "my-bank-agent-lp"
+
+    cleared = client.put("/api/demo-admin/galileo/connection", headers=headers,
+                         json={"agent_control_agent_name": "", "clear": ["agent_control_agent_name"]})
+    assert cleared.status_code == 200, cleared.text
+    assert cleared.json()["connection"]["agent_control_agent_name"] == ""
+    assert default, "the setting should still have a non-empty default in config"
+
+
+def test_the_portal_offers_the_agent_name_for_every_backend():
+    """The three backend forms each need it: the agent name is shared, the gateway URL is not."""
+    root = Path(__file__).resolve().parents[2]
+    source = (root / "frontend/components/Admin.tsx").read_text()
+    urls = len(re.findall(r'"(?:splunk_ao_)?agent_control_url", "Agent Control URL"', source))
+    names = len(re.findall(r'"agent_control_agent_name", "Agent Control agent name"', source))
+    assert urls == 3, f"expected one Agent Control URL per backend form, found {urls}"
+    assert names == urls, f"{names} agent-name fields for {urls} forms; every form needs one"
+
+
+def test_the_three_connection_field_lists_agree():
+    """A connection field lives in three places, and all three have to know about it.
+
+    CONNECTION_FIELDS drives persistence and apply, GalileoConnection validates the request, and
+    connection() is what the portal's form seeds itself from. A field missing from the second is
+    rejected with 422; missing from the third it saves correctly and shows as empty.
+    """
+    from app.main import GalileoConnection
+    from app.observability.galileo import Telemetry
+
+    schema = set(GalileoConnection.model_fields) - {"clear"}
+    missing = set(Telemetry.CONNECTION_FIELDS) - schema
+    assert not missing, f"GalileoConnection cannot accept {sorted(missing)}; requests get 422"
+
+    extra = schema - set(Telemetry.CONNECTION_FIELDS)
+    assert not extra, f"{sorted(extra)} is accepted by the schema but never persisted"

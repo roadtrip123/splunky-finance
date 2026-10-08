@@ -76,6 +76,11 @@ class Telemetry:
         "galileo_console_url",
         "galileo_api_url",
         "agent_control_url",
+        # Shared across backends like project and stream: it names an agent in whichever Agent
+        # Control console is active, and a participant who creates their own needs to say so from
+        # the portal. Without it the name came only from .env, so one deployment could serve exactly
+        # one agent -- and a workshop where everyone shares an agent shares its controls too.
+        "agent_control_agent_name",
         "splunk_ao_api_key",
         "splunk_ao_console_url",
         "splunk_ao_api_url",
@@ -132,19 +137,15 @@ class Telemetry:
         return "\u2022" * 8 + secret[-4:] if len(secret) > 8 else "\u2022" * 8
 
     def connection(self):
-        """Current connection details. The API key is only ever returned masked."""
+        """Current connection details. The API key is only ever returned masked.
+
+        Derived from CONNECTION_FIELDS rather than listed by hand. It was a hand-written dict, which
+        made three lists that had to agree -- the tuple, the request schema and this -- and a field
+        added to the tuple but not here saved correctly while the portal showed it empty, because the
+        form seeds itself from this view.
+        """
         s = self.settings
-        view = {
-            "galileo_project": s.galileo_project,
-            "galileo_log_stream": s.galileo_log_stream,
-            "galileo_console_url": s.galileo_console_url,
-            "galileo_api_url": s.galileo_api_url,
-            "agent_control_url": s.agent_control_url,
-            "splunk_ao_console_url": s.splunk_ao_console_url,
-            "splunk_ao_api_url": s.splunk_ao_api_url,
-            "splunk_ao_realm": s.splunk_ao_realm,
-            "splunk_ao_agent_control_url": s.splunk_ao_agent_control_url,
-        }
+        view = {f: getattr(s, f) for f in self.CONNECTION_FIELDS if f not in self.SECRET_FIELDS}
         # Every secret is reported the same way: whether it is set, and the last four characters.
         # No endpoint returns a key, on either backend.
         for field in self.SECRET_FIELDS:

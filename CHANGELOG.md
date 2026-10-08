@@ -37,6 +37,24 @@ reading it.
   place and restart: `sed -i 's|^DEMO_PASSWORD=.*|DEMO_PASSWORD=AlexDemo1234!|' .env`. Do this before
   taking an image, or every clone carries the old one.
 
+## v0.6.15 — Each participant points at their own agent
+
+- **The Agent Control agent name is settable from the portal.** It was read from `.env` alone, so one
+  deployment could serve exactly one agent — and participants have browser access only, by design.
+  Controls attach to an agent, so a workshop sharing one agent shares its controls: one person
+  toggling a guardrail toggles everyone's, and Step 4 stops being an exercise. The field appears in
+  all three backend forms, beside that backend's Agent Control URL. The two header settings stay out:
+  the app derives them from the active backend, and they are two more fields a participant can only
+  get wrong.
+- **A 404 from the evaluation route now names the agent it could not find.** This is the failure that
+  disguises itself as success — the app fails closed, the transfer is blocked, the customer sees the
+  refusal, and only `action_decisions` shows the deny was never real. The hint says the name must
+  match the console exactly and that agents cannot be created from the app.
+- **`connection()` is derived from `CONNECTION_FIELDS`** rather than written out by hand. A connection
+  field lives in three places — the tuple, the request schema and the view the portal's form seeds
+  from — and this one was missing from the hand-written view, so it saved correctly and showed as
+  empty. A test now asserts all three agree.
+
 ## v0.6.13 — Workspace Setup and Control
 
 - The presenter portal's heading reads **Workspace Setup and Control** rather than "Demo workspace",

@@ -61,6 +61,7 @@ class GalileoConnection(StrictModel):
     galileo_console_url: str = Field(default="", max_length=400)
     galileo_api_url: str = Field(default="", max_length=400)
     agent_control_url: str = Field(default="", max_length=400)
+    agent_control_agent_name: str = Field(default="", max_length=200)
     splunk_ao_api_key: str = Field(default="", max_length=400)
     splunk_ao_console_url: str = Field(default="", max_length=400)
     splunk_ao_api_url: str = Field(default="", max_length=400)

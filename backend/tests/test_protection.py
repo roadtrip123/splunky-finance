@@ -142,9 +142,23 @@ def test_a_failed_request_records_the_http_status():
     class Failure(Exception):
         response = Response()
 
-    diagnosis = Protection._failure(Failure())
+    # An instance rather than the class, because the 404 hint names the configured agent.
+    protection = Protection.__new__(Protection)
+    protection.settings = type("S", (), {"agent_control_agent_name": "my-bank-agent-lp"})()
+
+    diagnosis = protection._failure(Failure())
     assert diagnosis["cause"] == "request_failed"
     assert diagnosis["http_status"] == 401
     assert "credentials rejected" in diagnosis["hint"]
+
+    # A 404 here is far more often a missing agent than a missing route, and that failure disguises
+    # itself as a working guardrail: the app fails closed, the transfer is blocked, and only
+    # action_decisions shows the deny was never real. The hint has to name the agent.
+    Response.status_code = 404
+    diagnosis = protection._failure(Failure())
+    assert diagnosis["http_status"] == 404
+    assert "my-bank-agent-lp" in diagnosis["hint"]
+    assert "cannot be created from the app" in diagnosis["hint"]
+
     # No response at all still names the exception, as before.
-    assert Protection._failure(RuntimeError("x")) == {"cause": "request_failed", "error": "RuntimeError"}
+    assert protection._failure(RuntimeError("x")) == {"cause": "request_failed", "error": "RuntimeError"}

@@ -31,8 +31,7 @@ class Protection:
             details["diagnosis"] = diagnosis
         return details
 
-    @staticmethod
-    def _failure(exc):
+    def _failure(self, exc):
         """Why the request did not complete, with the HTTP status when there was one.
 
         The exception type alone said only that something went wrong. A rejected credential, a
@@ -48,7 +47,11 @@ class Protection:
             diagnosis["hint"] = {
                 401: "credentials rejected by the Agent Control gateway",
                 403: "credentials accepted but the request was refused",
-                404: "no such route at this Agent Control URL",
+                404: (
+                    f"no agent named {self.settings.agent_control_agent_name!r} in Agent Control, "
+                    "or no such route at this Agent Control URL. The name must match the console "
+                    "exactly; agents cannot be created from the app"
+                ),
             }.get(int(status), "the gateway returned an error")
         return diagnosis
 
