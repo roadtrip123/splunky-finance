@@ -145,6 +145,20 @@ Note the **console URL** and **API URL** for your tenant, and the **Agent Contro
 
 Now we are connect to configure the Galileo Evaluators.
 
+1. Click on your username in the top right and select 'Intergrations'
+
+<img width="375" height="441" alt="image" src="https://github.com/user-attachments/assets/c5c88fed-9abc-487a-ab62-36ce92b125ce" />
+
+2. Select the Integrations, you would like to use for your LLM judge  / Evaluators
+
+<img width="1488" height="788" alt="image" src="https://github.com/user-attachments/assets/2931097d-4a47-4ce2-8ebd-695e58193fb8" />
+
+
+3. Enter in your API and Organization ID (This is if you're using OpenAI) and click **Save**
+
+<img width="552" height="310" alt="image" src="https://github.com/user-attachments/assets/e0e51974-fb7a-49aa-87f5-7b9e0ccf13fc" />
+
+
 **Evaluator SplunkyAnswerWhole Question**
 1. Click on **Evaluators** on the right side menu in Galileo
 
@@ -266,11 +280,26 @@ rather than failing it.
 
 <img width="1432" height="680" alt="image" src="https://github.com/user-attachments/assets/0a871468-7745-4c03-9f05-593bcfcd791e" />
 
-
-
  
-## Step 5 — Configure Galileo Evaluators 
+## Step 5 — Configure Galileo Evaluators in My Bank Agent
 
+1. Go to Project select your project and select your **Agent Stream**
+<img width="1471" height="454" alt="image" src="https://github.com/user-attachments/assets/affecf5b-e74c-4e9e-958a-49057ebf125c" />
+
+2.  Click on **Configure Evaluators**
+<img width="1570" height="284" alt="image" src="https://github.com/user-attachments/assets/e824d99b-1ea4-465c-b00b-b6c77f26272b" />
+
+3.   Search for each of your Evaluators and enable them
+<img width="1240" height="601" alt="image" src="https://github.com/user-attachments/assets/df780b43-c42d-4276-bef9-b5b07e586589" />
+
+4.  Select **Not now** for it to Evaluate the Streams now.
+<img width="535" height="309" alt="image" src="https://github.com/user-attachments/assets/23dc25f9-aa4f-4e9e-9955-775f67d425d7" />
+ 
+
+## Step 6 — Configure Galileo Evaluators 
+Evaluators are detective controls. They tell you afterwards, which is fine for a wrong number and useless for money that has already left. Now build something preventive.
+
+1. 
 
 **Model endpoint.** Choose your provider, fill in the key and model, and press **Add endpoint**. Sharon AI and any other OpenAI-compatible service use the OpenAI protocol with their own base URL, which the preset fills in for you.
 
