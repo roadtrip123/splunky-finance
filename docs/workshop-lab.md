@@ -16,6 +16,11 @@ Your instructor gives you one URL, an account number and two passwords. Everythi
 | Customer login | account `12345678`, password `-AlexDemo1234!` |
 | Presenter portal | the same URL at `https://<domian>/demo-admin`, password `PresenterDemo1234!` |
 
+| Galileo Console URL | the same URL at `https://<domian>/demo-admin`,  |
+| Galileo API  URL | the same URL at `https://<domian>/demo-admin`,  |
+| Galileo Agent Control  URL | the same URL at `https://<domian>/demo-admin`,  |
+
+
 Open the app, sign in to banking, then open `/demo-admin` in **another tab of the same browser profile**. The two link automatically.
 
 Banking App:
