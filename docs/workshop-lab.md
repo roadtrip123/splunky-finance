@@ -294,9 +294,51 @@ rather than failing it.
 
 4.  Select **Not now** for it to Evaluate the Streams now.
 <img width="535" height="309" alt="image" src="https://github.com/user-attachments/assets/23dc25f9-aa4f-4e9e-9955-775f67d425d7" />
- 
 
-## Step 6 — Configure Galileo Evaluators 
+## Step 6 - Test Evaluators
+
+
+## Step 6 — Configure Galileo Guard Rails  
+
+**Configure Agent splunky-account-lookup-deny** 
+
+1. Click on **Controls**
+<img width="251" height="755" alt="image" src="https://github.com/user-attachments/assets/fce1089d-fb20-4ffb-978a-4e313b05b167" />
+
+2. Click **Create new control**
+<img width="1609" height="346" alt="image" src="https://github.com/user-attachments/assets/93a074e0-07e3-4c11-8287-1f7db14931ba" />
+
+3. Fill out the following fields:
+
+Control Name: splunky-account-lookup-deny-<Your initials>
+Action: Deny
+Step Name: get_account_balance
+Control Expression: regex 1
+Evaluator type: regex
+Path: input
+Pattern: ```\b([Dd][Aa][Nn]\s+[Ww][Hh][Ii][Tt][Ff][Ii][Ee][Ll][Dd]|[Tt][Oo][Mm]\s+[Ww][Hh][Ii][Tt][Ff][Ii][Ee][Ll][Dd]|1234|4127|[Dd][Aa][Nn]|[Tt][Oo][Mm])\b```
+
+<img width="1455" height="756" alt="image" src="https://github.com/user-attachments/assets/766b2c37-542c-4ea8-bbf6-aa5033f1e056" />
+
+4. Click **Save Changes**
+5. Create another **Control**
+
+Control Name: splunky-transfer-deny-<Your initials>
+Action: Deny
+Step Name: transfer_funds
+Control Expression: regex 1
+Evaluator type: regex
+Path: input
+Pattern: ```\b([Dd][Aa][Nn]\s+[Ww][Hh][Ii][Tt][Ff][Ii][Ee][Ll][Dd]|[Tt][Oo][Mm]\s+[Ww][Hh][Ii][Tt][Ff][Ii][Ee][Ll][Dd]|1234|4127|[Dd][Aa][Nn]|[Tt][Oo][Mm])\b```
+
+<img width="1454" height="761" alt="image" src="https://github.com/user-attachments/assets/0b2883bf-4754-4c88-80c6-a1f02c720ad4" />
+
+6.  Click **Save Changes**
+7.  Go back to **Project > Agent Stream > Controls**
+<img width="1122" height="289" alt="image" src="https://github.com/user-attachments/assets/66c21d71-7ae7-4ef5-af61-b41bb6b37ca6" />
+
+8.   
+
 Evaluators are detective controls. They tell you afterwards, which is fine for a wrong number and useless for money that has already left. Now build something preventive.
 
 1. 
