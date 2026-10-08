@@ -13,7 +13,7 @@ Your instructor gives you one URL, an account number and two passwords. Everythi
 | | |
 | --- | --- |
 | Your app | `https://p<NN>.<workshop-domain>` |
-| Customer login | account `12345678`, password `-AlexDemo1234!` |
+| Customer login | account `12345678`, password `AlexDemo1234!` |
 | Presenter portal | the same URL at `https://<domian>/demo-admin`, password `PresenterDemo1234!` |
 
 | Galileo Console URL | the same URL at `https://<domian>/demo-admin`,  |

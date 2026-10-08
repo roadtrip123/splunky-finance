@@ -28,6 +28,15 @@ reading it.
   or `/etc/rc.local`.** A rule deleted by hand comes back on the next boot, and on a box destined to
   become an AMI that means every clone starts with the port broken.
 
+## v0.6.14 — The customer password loses its leading dash
+
+- `DEMO_PASSWORD` is now `AlexDemo1234!`, without the leading hyphen. A password read aloud to a room
+  should not begin with a character people hear as punctuation or as part of the sentence. Still 13
+  characters, so it clears the twelve-character minimum.
+- **An existing box keeps its old password**, because `.env` is not in the repository. Change it in
+  place and restart: `sed -i 's|^DEMO_PASSWORD=.*|DEMO_PASSWORD=AlexDemo1234!|' .env`. Do this before
+  taking an image, or every clone carries the old one.
+
 ## v0.6.13 — Workspace Setup and Control
 
 - The presenter portal's heading reads **Workspace Setup and Control** rather than "Demo workspace",

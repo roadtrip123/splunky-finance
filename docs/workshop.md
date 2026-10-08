@@ -61,7 +61,7 @@ sudo apt-get update && sudo apt-get install -y caddy
 
 `setup_env.py` writes a private `.env`. Nothing in it needs editing for a workshop:
 
-- the two demo passwords are the fixed shared pair, `-AlexDemo1234!` and `PresenterDemo1234!`
+- the two demo passwords are the fixed shared pair, `AlexDemo1234!` and `PresenterDemo1234!`
 - the model endpoint is configured in the presenter portal, not here
 - the Galileo values stay blank; participants supply their own
 
