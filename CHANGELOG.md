@@ -28,6 +28,11 @@ reading it.
   or `/etc/rc.local`.** A rule deleted by hand comes back on the next boot, and on a box destined to
   become an AMI that means every clone starts with the port broken.
 
+## v0.6.13 — Workspace Setup and Control
+
+- The presenter portal's heading reads **Workspace Setup and Control** rather than "Demo workspace",
+  which says what the page is for rather than what it is.
+
 ## v0.6.12 — Radios are not text fields
 
 - **Radios and checkboxes no longer inherit text-field sizing.** The base stylesheet gives every

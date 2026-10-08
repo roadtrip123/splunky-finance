@@ -371,7 +371,7 @@ export default function Admin() {
                 OBSERVE → EVALUATE → DETECT → PROTECT
               </div>
               <h1>
-                Demo workspace<span className="green">.</span>
+                Workspace Setup and Control<span className="green">.</span>
               </h1>
               <p className="muted">
                 Actual configuration and controlled faults.
