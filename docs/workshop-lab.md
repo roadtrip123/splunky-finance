@@ -337,8 +337,17 @@ Pattern: ```\b([Dd][Aa][Nn]\s+[Ww][Hh][Ii][Tt][Ff][Ii][Ee][Ll][Dd]|[Tt][Oo][Mm]\
 7.  Go back to **Project > Agent Stream > Controls**
 <img width="1122" height="289" alt="image" src="https://github.com/user-attachments/assets/66c21d71-7ae7-4ef5-af61-b41bb6b37ca6" />
 
-8.   
+8.   **Clone and attach** both Controls which were just created
 
+<img width="1345" height="298" alt="image" src="https://github.com/user-attachments/assets/de5a87d5-69b6-4f55-82af-d99fe5af2bd4" />
+9. Once complete, you should see both Control in your Stream
+
+<img width="1540" height="330" alt="image" src="https://github.com/user-attachments/assets/b90363d9-4d97-4bae-a046-b87a40acb176" />
+
+10. Go back to Splunky Finance Admin portal and you need to make sure the "agent control" URL is in the Galileo settings.
+<img width="586" height="733" alt="image" src="https://github.com/user-attachments/assets/88ea4763-235c-4d3d-8cc2-2e1fddc2db6a" />
+
+11. 
 Evaluators are detective controls. They tell you afterwards, which is fine for a wrong number and useless for money that has already left. Now build something preventive.
 
 1. 
