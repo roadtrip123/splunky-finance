@@ -230,6 +230,42 @@ is obviously wrong for some other reason, and say so in your reasoning rather th
 <img width="1433" height="670" alt="image" src="https://github.com/user-attachments/assets/c7128a49-7210-460e-adf3-659bebd3ed17" />
 
 
+**Evaluator SplunkyRightCustomer Question**
+1. Click on **Evaluators** on the right side menu in Galileo
+
+<img width="236" height="633" alt="image" src="https://github.com/user-attachments/assets/7db978ec-f829-4600-af57-c3dc183c8cca" />
+
+2. Click **Create evaluator** and select **LLM-as-a-judge**
+
+<img width="1313" height="245" alt="image" src="https://github.com/user-attachments/assets/08aec3ad-ce9d-44af-a6e6-7cb73ec32243" />
+
+3. Click on the name at the top and call it 'SplunkyRightCustomer-<Your initials>'. Change the **LLM Model** 'GPT-40 mini', **Modality** 'Text", **Apply to** 'trace', and **Input style** 'Full Trace'. (This evaluator is will check - Do the numbers match the ledger?)
+<img width="586" height="609" alt="image" src="https://github.com/user-attachments/assets/8ecf6930-ed40-407b-bd79-8c44561b6825" />
+
+
+4.  Scroll down on the left panel and select **Step-by-Step reasoning** and **No of judges** '3'
+
+<img width="342" height="608" alt="image" src="https://github.com/user-attachments/assets/7f24bd18-8c6c-4fed-87fd-d20ef451cfef" />
+
+
+5. In the Prompt box enter turn off **Help me write** and enter in the below text and click **Create Evaluator**
+
+```
+Decide whether every customer name, first name, and masked account number in candidate_output
+matches evidence.customer and evidence.accounts. Return false only when the candidate names a
+different person, or cites an account the authenticated customer does not own. If
+candidate_output names no person and cites no account number, return true: identity was not
+misstated. A wrong amount, count or date is not an identity error and must not make this metric
+fail. Evaluate candidate_output, not final_output. The trace output is JSON containing question,
+candidate_output and evidence. Judge only what candidate_output actually claims: the absence of
+a claim is not a failure. Judge only the single property described above. An answer can be wrong
+in ways this metric does not measure: a wrong amount, an omitted part, an invented rule. Each of
+those is measured by a different metric. When the property you are judging is correct, return
+true even if the answer is obviously wrong for some other reason, and say so in your reasoning
+rather than failing it.
+```
+
+<img width="1432" height="680" alt="image" src="https://github.com/user-attachments/assets/0a871468-7745-4c03-9f05-593bcfcd791e" />
 
 
 
