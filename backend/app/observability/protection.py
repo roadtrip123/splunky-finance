@@ -44,6 +44,13 @@ class Protection:
         credential headers back.
         """
         diagnosis = {"cause": "request_failed", "error": type(exc).__name__}
+        # The path, never the full URL: a query string can carry a token, a path cannot. It says
+        # which call was refused -- the runtime token exchange or the evaluation itself -- which is
+        # the difference between a permission to request and a tenant feature to enable.
+        request = getattr(exc, "request", None)
+        path = getattr(getattr(request, "url", None), "path", None)
+        if path:
+            diagnosis["path"] = str(path)
         response = getattr(exc, "response", None)
         status = getattr(response, "status_code", None)
         if status:

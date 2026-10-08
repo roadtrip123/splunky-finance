@@ -208,6 +208,9 @@ async def test_the_last_failure_is_kept_so_a_401_is_visible_without_a_turn(setti
     assert protection.status == "failed"
     assert protection.detail["http_status"] == 401
     assert "credentials rejected" in protection.detail["hint"]
+    # Which call was refused is the difference between a missing permission and an unenabled
+    # feature, and the path says which without carrying anything secret.
+    assert protection.detail["path"] == "/evaluation"
 
 
 def test_the_runtime_auth_mode_is_configurable(settings):

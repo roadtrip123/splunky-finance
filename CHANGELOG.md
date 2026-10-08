@@ -37,6 +37,13 @@ reading it.
   place and restart: `sed -i 's|^DEMO_PASSWORD=.*|DEMO_PASSWORD=AlexDemo1234!|' .env`. Do this before
   taking an image, or every clone carries the old one.
 
+## v0.6.20 — Which request was refused
+
+- The failure diagnosis now carries the **path** of the refused request. A 401 on the runtime token
+  exchange and a 401 on the evaluation call need different things from a tenant — a permission on the
+  key, or a feature enabled — and the status code alone does not say which. The path is recorded and
+  the query string is not, because a path cannot carry a token.
+
 ## v0.6.19 — Why the gate failed, without driving a turn to find out
 
 Reaching a real gateway for the first time produced a 401 on the runtime evaluation call while
