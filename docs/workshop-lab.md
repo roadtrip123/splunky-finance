@@ -154,9 +154,40 @@ Now we are connect to configure the Galileo Evaluators.
 
 <img width="1313" height="245" alt="image" src="https://github.com/user-attachments/assets/08aec3ad-ce9d-44af-a6e6-7cb73ec32243" />
 
+3. Click on the name at the top and call it 'SplunkyAnswerWholeQuestion-<Your initials>'. Change the **LLM Model** 'GPT-40 mini', **Modality** 'Text", **Apply to** 'trace', and **Input style** 'Full Trace'. (This evaluator is will check - did the answer address the whole question?)
+<img width="1434" height="659" alt="image" src="https://github.com/user-attachments/assets/0fda7777-7102-4675-8cfa-18df79e36556" />
 
-3. 
+4.  Scroll down on the left panel and select **Step-by-Step reasoning** and **No of judges** '3'
 
+<img width="608" height="665" alt="image" src="https://github.com/user-attachments/assets/30041918-8872-41d1-a752-9d4939283ce9" />
+
+5. In the Prompt box enter turn off **Help me write** and enter in the below text and click **Create Evaluator**
+
+ ```
+Decide whether candidate_output answers every part the question asked for. The question is the
+`question` field of the trace output JSON; use that text, never an implied or reconstructed
+question, and if it is missing return true rather than guessing. Derive the required parts from
+that question; do not assume a fixed list. Return false when a part of the question is left
+unanswered. An answer that addresses every part is covered even when its content is incorrect:
+whether a stated figure is right, and whether it describes the right customer, are not this
+metric's concern. Evaluate candidate_output, not final_output. The trace output is JSON
+containing question, candidate_output and evidence. A part of the question that candidate_output
+does not address is exactly what this metric measures. An omission is a failure here, whatever
+other metrics make of it. This trace also contains the agent's own spans, and their outputs may
+include a fuller draft than the customer received. Ignore every span. Judge only the trace-level
+candidate_output. If part of the question is answered somewhere in a span but not in
+candidate_output, it was never delivered and the answer is incomplete: return false. The
+evidence and retrieved context show what was available to the agent, not what it said. A figure
+or fact present only in evidence was not communicated to the customer and does not count as an
+answered part. Judge only the single property described above. An answer can be wrong in ways
+this metric does not measure: a wrong amount, an invented rule, a misnamed customer. Each of
+those is measured by a different metric. When the property you are judging is correct, return
+true even if the answer is obviously wrong for some other reason, and say so in your reasoning
+rather than failing it.
+```
+<img width="1526" height="757" alt="image" src="https://github.com/user-attachments/assets/c430f991-5a73-48ef-8735-10d41abb19fe" />
+
+ 
 ## Step 5 — Configure Galileo Evaluators 
 
 
