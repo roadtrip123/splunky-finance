@@ -460,10 +460,12 @@ class Telemetry:
         registered was borrowed.
         """
         s = self.settings
+        # Not written back onto agent_control_agent_name. That field is the override, and writing
+        # the derived name into it made the derivation sticky: a participant who renamed their
+        # project kept registering and evaluating under the old project's agent name forever. Every
+        # reader calls settings.resolved_agent_name, which is deterministic, so there is nothing to
+        # share by assignment.
         name = self.agent_name()
-        # Written back so every reader -- the evaluation request, the control attach script, the
-        # portal -- uses one name rather than each deriving its own.
-        s.agent_control_agent_name = name
         stream_id = str(self.target.get("stream_id") or "")
         if not (s.agent_control_url and s.galileo_api_key.get_secret_value() and stream_id):
             self.agent = {

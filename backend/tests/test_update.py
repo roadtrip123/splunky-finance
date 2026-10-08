@@ -435,3 +435,37 @@ async def test_a_failed_registration_is_reported_not_raised(settings, monkeypatc
     assert state["state"] == "failed"
     assert state["error"] == "RuntimeError"
     assert "gateway refused" not in str(state), "SDK errors can carry credential headers"
+
+
+async def test_renaming_the_project_changes_the_derived_agent_name(settings, monkeypatch):
+    """The derivation was sticky, and that defeated the point of deriving it.
+
+    declare_agent wrote the derived name into the override field, so the first registration pinned
+    it. A participant who renamed their project went on registering and evaluating under the old
+    project's agent name, which is the one thing deriving it was meant to avoid.
+    """
+    import agent_control
+
+    from app.observability.galileo import Telemetry
+
+    calls = []
+    monkeypatch.setattr(agent_control, "init", lambda **kwargs: calls.append(kwargs["agent_name"]))
+    settings.agent_control_agent_name = ""
+    settings.agent_control_url = "https://gateway.test/agent-control"
+    settings.galileo_api_key = SecretStr("test-key")
+    settings.galileo_log_stream = "my-bank-agent"
+
+    settings.galileo_project = "splunky-finance"
+    telemetry = Telemetry(settings)
+    telemetry.target = {"stream_id": "stream-1"}
+    await telemetry.declare_agent()
+    assert calls == ["splunky-finance-my-bank-agent"]
+
+    # The participant renames their project in the portal; the stream resolves anew.
+    settings.galileo_project = "splunky-finance-lab"
+    telemetry.target = {"stream_id": "stream-2"}
+    await telemetry.declare_agent()
+    assert calls[-1] == "splunky-finance-lab-my-bank-agent", (
+        "the derived name must follow the project, not stay pinned to the first one"
+    )
+    assert settings.agent_control_agent_name == "", "the override field must stay untouched"

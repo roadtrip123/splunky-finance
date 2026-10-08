@@ -37,6 +37,16 @@ reading it.
   place and restart: `sed -i 's|^DEMO_PASSWORD=.*|DEMO_PASSWORD=AlexDemo1234!|' .env`. Do this before
   taking an image, or every clone carries the old one.
 
+## v0.6.22 — The derived agent name followed the project again
+
+- **`declare_agent` wrote the derived name into the override field**, which made the derivation
+  sticky: the first registration pinned it, and a participant who renamed their project went on
+  registering and evaluating under the old project's agent name. That is precisely what deriving the
+  name was meant to prevent. Every reader calls `resolved_agent_name`, which is deterministic, so
+  the write-back shared nothing and only did harm. Observed on a box whose project had been changed
+  from `splunky-finance-lab` to `splunky-finance` while the agent still read
+  `splunky-finance-lab-my-bank-agent`.
+
 ## v0.6.21 — A working guardrail no longer reports "failed"
 
 - **Protection status is tracked per stage.** There are two gates answering different questions: the
