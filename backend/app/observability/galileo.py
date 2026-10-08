@@ -81,11 +81,12 @@ class Telemetry:
         "galileo_console_url",
         "galileo_api_url",
         "agent_control_url",
-        # Shared across backends like project and stream: it names an agent in whichever Agent
-        # Control console is active, and a participant who creates their own needs to say so from
-        # the portal. Without it the name came only from .env, so one deployment could serve exactly
-        # one agent -- and a workshop where everyone shares an agent shares its controls too.
-        "agent_control_agent_name",
+        # agent_control_agent_name is deliberately absent. The application registers its own agent
+        # and derives the name, so there is nothing for a participant to set -- and a wrong value
+        # there produces a 404 that the app answers by failing closed, which from the chat is
+        # indistinguishable from a guardrail that worked. It stays an environment override for
+        # whoever deploys. Keeping it out also makes a stale saved value inert rather than
+        # authoritative.
         "splunk_ao_api_key",
         "splunk_ao_console_url",
         "splunk_ao_api_url",

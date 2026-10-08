@@ -405,8 +405,9 @@ application fails closed — the guardrail blocks correctly and reports `decisio
 which looks like success and is not. The application now registers its agent when the connection
 check resolves the stream, deriving the name from the project and stream, so a participant has
 nothing to create and nothing to type. They create the control in the console and attach it to their
-log stream, which is exactly what Galileo's documentation describes. The portal's **Agent Control
-agent name** field is an override for pointing at a specific existing agent.
+log stream, which is exactly what Galileo's documentation describes. `AGENT_CONTROL_AGENT_NAME` in
+`.env` overrides the derived name for whoever deploys the box; it is deliberately not in the portal,
+because a wrong value there produces the 404 that reads as a working guardrail.
 
 **One LLM endpoint for fifty people** is the most likely thing to spoil the session — well ahead of anything about instance sizing. Check the endpoint's rate limits against fifty concurrent turns of roughly 2,500 input tokens each, and confirm it handles tool calling properly: this agent depends entirely on well-formed tool calls, and an endpoint that is chat-compatible but weak on tools fails every scenario.
 

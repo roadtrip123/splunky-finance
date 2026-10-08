@@ -70,7 +70,6 @@ type Status = {
     galileo_console_url: string;
     galileo_api_url: string;
     agent_control_url: string;
-    agent_control_agent_name: string;
     galileo_api_key_set: boolean;
     galileo_api_key_masked: string;
     splunk_ao_console_url: string;
@@ -162,7 +161,6 @@ export default function Admin() {
     galileo_console_url: "",
     galileo_api_url: "",
     agent_control_url: "",
-    agent_control_agent_name: "",
     splunk_ao_console_url: "",
     splunk_ao_api_url: "",
     splunk_ao_realm: "",
@@ -187,7 +185,6 @@ export default function Admin() {
           galileo_console_url: s.connection.galileo_console_url,
           galileo_api_url: s.connection.galileo_api_url,
           agent_control_url: s.connection.agent_control_url,
-          agent_control_agent_name: s.connection.agent_control_agent_name,
           splunk_ao_console_url: s.connection.splunk_ao_console_url,
           splunk_ao_api_url: s.connection.splunk_ao_api_url,
           splunk_ao_realm: s.connection.splunk_ao_realm,
@@ -288,8 +285,6 @@ export default function Admin() {
               "The agent stream traces are written to, listed on the project home screen."],
             ["splunk_ao_agent_control_url", "Agent Control URL", "text", false,
               "Leave blank to derive https://app.<realm>.signalfx.com/ao/agent-control. Set it only if your org uses the observability.splunkcloud.com host. Kept separate from the Galileo one, which belongs to a different gateway."],
-            ["agent_control_agent_name", "Agent Control agent name", "text", false,
-              "The Agent you created in the Agent Control console. It is looked up by name, so it must match exactly. A name that does not exist returns 404 and the app then fails closed -- the transfer is blocked and it looks like your guardrail worked, when it never ran."],
           ]
         : [
             ["splunk_ao_api_key", "API key", "password", true,
@@ -304,8 +299,6 @@ export default function Admin() {
               "The agent stream traces are written to, listed on the project home screen."],
             ["splunk_ao_agent_control_url", "Agent Control URL", "text", false,
               "Your console's /api/agent-control path. Needed only for the guardrail."],
-            ["agent_control_agent_name", "Agent Control agent name", "text", false,
-              "The Agent you created in the Agent Control console. It is looked up by name, so it must match exactly. A name that does not exist returns 404 and the app then fails closed -- the transfer is blocked and it looks like your guardrail worked, when it never ran."],
           ]
       : [
           ["galileo_api_key", "API key", "password", true,
@@ -320,8 +313,6 @@ export default function Admin() {
             "Derived from the console URL. Only set it for a non-standard deployment."],
           ["agent_control_url", "Agent Control URL", "text", false,
             "Needed only for the guardrail. Your instructor has it."],
-          ["agent_control_agent_name", "Agent Control agent name", "text", false,
-            "The Agent you created in the Agent Control console. It is looked up by name, so it must match exactly. A name that does not exist returns 404 and the app then fails closed -- the transfer is blocked and it looks like your guardrail worked, when it never ran."],
         ];
   function secretPlaceholder(key: string) {
     const connection = status?.connection as Record<string, string | boolean> | undefined;

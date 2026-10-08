@@ -37,6 +37,19 @@ reading it.
   place and restart: `sed -i 's|^DEMO_PASSWORD=.*|DEMO_PASSWORD=AlexDemo1234!|' .env`. Do this before
   taking an image, or every clone carries the old one.
 
+## v0.6.17 — The agent name leaves the portal again
+
+- **The Agent Control agent name is no longer a portal field.** It was added one release earlier so a
+  participant could point at an agent they had created; now the application registers its own and
+  derives the name, there is nothing to point at. A field a participant can fill is a field they can
+  get wrong, and getting *this* one wrong produces the 404 the app answers by failing closed — the
+  transfer is refused and from the chat that is indistinguishable from a guardrail that worked. The
+  same reasoning already kept the two Agent Control header settings out.
+- It stays as `AGENT_CONTROL_AGENT_NAME` for whoever deploys a box.
+- Removed from `CONNECTION_FIELDS` and the request schema too, not just the form, which has a useful
+  side effect: **a value saved on a box configured before this release becomes inert** rather than
+  overriding the derivation with a name nobody registers. A test covers that case specifically.
+
 ## v0.6.16 — The application registers its own agent
 
 The guardrail's 404 was never a wrong agent name. **This application never registered an agent at

@@ -265,44 +265,56 @@ def test_the_proxy_exports_every_method_the_portal_uses():
     assert not missing, f"the proxy does not forward {sorted(missing)}; Next will answer 405"
 
 
-def test_the_agent_control_agent_name_is_settable_from_the_portal(client, settings):
-    """Each participant creates their own agent, so the app cannot have one name baked in.
+def test_the_agent_name_is_not_settable_from_the_portal(client, settings):
+    """Deliberately absent, and the reasoning belongs next to the test.
 
-    Sharing an agent across a workshop shares its controls: one person toggling a guardrail toggles
-    everyone's, and the exercise stops being an exercise.
+    The application registers its own agent and derives the name, so a participant has nothing to
+    set. A wrong value produces a 404, which the app answers by failing closed -- the transfer is
+    refused, and from the chat that is indistinguishable from a guardrail that worked. It stays an
+    environment override for whoever deploys the box.
     """
+    from app.main import GalileoConnection
+    from app.observability.galileo import Telemetry
+
+    assert "agent_control_agent_name" not in Telemetry.CONNECTION_FIELDS
+    assert "agent_control_agent_name" not in GalileoConnection.model_fields
+
     headers = login(client, admin=True)
-    # Blank by default: the application derives and registers a name, so nothing has to be set.
-    assert settings.agent_control_agent_name == ""
-    assert settings.resolved_agent_name, "a derived name must always be available"
+    rejected = client.put(
+        "/api/demo-admin/galileo/connection",
+        headers=headers,
+        json={"agent_control_agent_name": "my-bank-agent-lp"},
+    )
+    assert rejected.status_code == 422, "the portal must not be able to set it"
 
-    saved = client.put("/api/demo-admin/galileo/connection", headers=headers,
-                       json={"agent_control_agent_name": "my-bank-agent-lp"})
-    assert saved.status_code == 200, saved.text
-    assert saved.json()["connection"]["agent_control_agent_name"] == "my-bank-agent-lp"
-    assert settings.agent_control_agent_name == "my-bank-agent-lp", "must apply without a restart"
+    view = client.get("/api/demo-admin/status", headers=headers).json()["connection"]
+    assert "agent_control_agent_name" not in view, "nor report it as settable"
 
-    # Blank is ignored, as for every other field, so a typo elsewhere cannot wipe it.
-    client.put("/api/demo-admin/galileo/connection", headers=headers,
-               json={"agent_control_agent_name": ""})
-    assert settings.agent_control_agent_name == "my-bank-agent-lp"
-
-    cleared = client.put("/api/demo-admin/galileo/connection", headers=headers,
-                         json={"agent_control_agent_name": "", "clear": ["agent_control_agent_name"]})
-    assert cleared.status_code == 200, cleared.text
-    assert cleared.json()["connection"]["agent_control_agent_name"] == ""
-    # Cleared means "derive it again", never "send a blank name".
-    assert settings.resolved_agent_name
+    # The deployment-level override still works.
+    settings.agent_control_agent_name = "my-agent-liam"
+    assert settings.resolved_agent_name == "my-agent-liam"
 
 
-def test_the_portal_offers_the_agent_name_for_every_backend():
-    """The three backend forms each need it: the agent name is shared, the gateway URL is not."""
-    root = Path(__file__).resolve().parents[2]
-    source = (root / "frontend/components/Admin.tsx").read_text()
-    urls = len(re.findall(r'"(?:splunk_ao_)?agent_control_url", "Agent Control URL"', source))
-    names = len(re.findall(r'"agent_control_agent_name", "Agent Control agent name"', source))
-    assert urls == 3, f"expected one Agent Control URL per backend form, found {urls}"
-    assert names == urls, f"{names} agent-name fields for {urls} forms; every form needs one"
+def test_a_stale_saved_agent_name_is_inert(settings, tmp_path):
+    """A box configured before the field was removed must not keep overriding the derivation."""
+    import json as _json
+
+    from app.observability.galileo import Telemetry
+
+    settings.data_dir = tmp_path
+    (tmp_path / "galileo-settings.json").write_text(
+        _json.dumps({
+            "enabled": False,
+            "connection": {
+                "agent_control_agent_name": "my-bank-agent",
+                "galileo_project": "splunky-lp",
+            },
+        })
+    )
+    telemetry = Telemetry(settings)
+    assert telemetry.settings.agent_control_agent_name == "", "the stale value must not be applied"
+    assert telemetry.settings.galileo_project == "splunky-lp", "other saved fields still apply"
+
 
 
 def test_the_three_connection_field_lists_agree():
