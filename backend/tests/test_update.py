@@ -8,6 +8,7 @@ from pathlib import Path
 import httpx
 import pytest
 from fastapi.testclient import TestClient
+from pydantic import SecretStr
 
 from app.config import Settings
 from app.main import create_app
@@ -271,7 +272,9 @@ def test_the_agent_control_agent_name_is_settable_from_the_portal(client, settin
     everyone's, and the exercise stops being an exercise.
     """
     headers = login(client, admin=True)
-    default = settings.agent_control_agent_name
+    # Blank by default: the application derives and registers a name, so nothing has to be set.
+    assert settings.agent_control_agent_name == ""
+    assert settings.resolved_agent_name, "a derived name must always be available"
 
     saved = client.put("/api/demo-admin/galileo/connection", headers=headers,
                        json={"agent_control_agent_name": "my-bank-agent-lp"})
@@ -288,7 +291,8 @@ def test_the_agent_control_agent_name_is_settable_from_the_portal(client, settin
                          json={"agent_control_agent_name": "", "clear": ["agent_control_agent_name"]})
     assert cleared.status_code == 200, cleared.text
     assert cleared.json()["connection"]["agent_control_agent_name"] == ""
-    assert default, "the setting should still have a non-empty default in config"
+    # Cleared means "derive it again", never "send a blank name".
+    assert settings.resolved_agent_name
 
 
 def test_the_portal_offers_the_agent_name_for_every_backend():
@@ -317,3 +321,105 @@ def test_the_three_connection_field_lists_agree():
 
     extra = schema - set(Telemetry.CONNECTION_FIELDS)
     assert not extra, f"{sorted(extra)} is accepted by the schema but never persisted"
+
+
+# --- Agent registration -------------------------------------------------------------------------
+# The evaluation route answers 404 for an agent it has never been told about, and the app then fails
+# closed: the transfer is refused and it reads as a guardrail that worked. Registration is what makes
+# the name real, and nothing in this application called it until now.
+
+
+def test_the_agent_name_is_derived_from_project_and_stream(settings):
+    settings.agent_control_agent_name = ""
+    settings.galileo_project = "splunky-lp"
+    settings.galileo_log_stream = "my-bank-agent"
+    assert settings.resolved_agent_name == "splunky-lp-my-bank-agent"
+
+
+def test_an_explicit_name_overrides_the_derivation(settings):
+    settings.agent_control_agent_name = "my-agent-liam"
+    settings.galileo_project = "splunky-lp"
+    assert settings.resolved_agent_name == "my-agent-liam"
+
+
+def test_a_derived_name_is_always_acceptable_to_the_gateway(settings):
+    """Lowercase, [a-z0-9:_-], at least ten characters, or registration refuses it."""
+    import re as _re
+
+    for project, stream in [
+        ("Splunky Finance", "My Bank Agent"),   # spaces and capitals
+        ("a", "b"),                             # far too short
+        ("", ""),                               # nothing configured yet
+        ("proj.with.dots", "stream/slash"),     # punctuation the gateway rejects
+        ("--leading", "trailing--"),            # separators at the edges
+    ]:
+        settings.agent_control_agent_name = ""
+        settings.galileo_project, settings.galileo_log_stream = project, stream
+        name = settings.resolved_agent_name
+        assert len(name) >= 10, f"{project}/{stream} produced {name!r}"
+        assert _re.fullmatch(r"[a-z0-9:_-]+", name), f"{project}/{stream} produced {name!r}"
+
+
+async def test_registration_is_skipped_without_a_gateway_and_says_so(settings):
+    from app.observability.galileo import Telemetry
+
+    telemetry = Telemetry(settings)
+    telemetry.target = {"stream_id": "stream-1"}
+    settings.agent_control_url = ""
+    state = await telemetry.declare_agent()
+    assert state["state"] == "skipped"
+    assert "Agent Control URL" in state["reason"]
+    # The name is still settled, so the evaluation request never sends a blank one.
+    assert state["name"] == settings.resolved_agent_name
+
+
+async def test_registration_carries_the_stream_and_is_not_repeated(settings, monkeypatch):
+    import agent_control
+
+    from app.observability.galileo import Telemetry
+
+    calls = []
+    monkeypatch.setattr(agent_control, "init", lambda **kwargs: calls.append(kwargs))
+
+    settings.agent_control_url = "https://gateway.test/agent-control"
+    settings.galileo_api_key = SecretStr("test-key")
+    settings.galileo_project, settings.galileo_log_stream = "splunky-lp", "my-bank-agent"
+    telemetry = Telemetry(settings)
+    telemetry.target = {"stream_id": "stream-1"}
+
+    state = await telemetry.declare_agent()
+    assert state["state"] == "registered", state
+    assert len(calls) == 1
+    assert calls[0]["agent_name"] == "splunky-lp-my-bank-agent"
+    assert calls[0]["target_type"] == "log_stream"
+    assert calls[0]["target_id"] == "stream-1", "the target is what scopes the controls"
+
+    # Nothing changed, so no second registration.
+    await telemetry.declare_agent()
+    assert len(calls) == 1
+
+    # A new stream is a new target, and the SDK fixes target context per session.
+    telemetry.target = {"stream_id": "stream-2"}
+    await telemetry.declare_agent()
+    assert len(calls) == 2
+    assert calls[1]["target_id"] == "stream-2"
+
+
+async def test_a_failed_registration_is_reported_not_raised(settings, monkeypatch):
+    import agent_control
+
+    from app.observability.galileo import Telemetry
+
+    def explode(**kwargs):
+        raise RuntimeError("gateway refused")
+
+    monkeypatch.setattr(agent_control, "init", explode)
+    settings.agent_control_url = "https://gateway.test/agent-control"
+    settings.galileo_api_key = SecretStr("test-key")
+    telemetry = Telemetry(settings)
+    telemetry.target = {"stream_id": "stream-1"}
+
+    state = await telemetry.declare_agent()
+    assert state["state"] == "failed"
+    assert state["error"] == "RuntimeError"
+    assert "gateway refused" not in str(state), "SDK errors can carry credential headers"

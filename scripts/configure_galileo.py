@@ -166,6 +166,9 @@ async def main():
         # runtime route looks the agent up by name, and answered 404 "Agent not found" until this
         # ran -- so the gate failed closed on every call while the controls looked correctly bound
         # in the console.
+        # Derived the same way the application derives it, so the script attaches to the agent the
+        # application actually registers rather than to a blank name.
+        agent_name = Telemetry(s).agent_name()
         for name, definition in CONTROLS.items():
             existing = (await list_controls(client, name=name, limit=25)).get("controls") or []
             original = next((c for c in existing if not c.get("cloned_from_control_id")), None)
@@ -174,13 +177,13 @@ async def main():
                 continue
             try:
                 await add_agent_control(
-                    agent_name=s.agent_control_agent_name,
+                    agent_name=agent_name,
                     control_id=int(identifier),
                     server_url=s.agent_control_url,
                     api_key=s.galileo_api_key.get_secret_value(),
                     api_key_header=s.agent_control_api_key_header,
                 )
-                print(f"{name}: attached to agent {s.agent_control_agent_name}.")
+                print(f"{name}: attached to agent {agent_name}.")
             except Exception as error:  # noqa: BLE001 - report without exposing credential headers
                 print(f"{name}: could not attach to agent: {type(error).__name__}")
     print(

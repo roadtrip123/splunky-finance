@@ -1,0 +1,77 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="880" height="700" viewBox="0 0 880 700" role="img" aria-label="How Agent Control guardrails work, from setup to a blocked tool call">
+<style>text{font-family:ui-sans-serif,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif}</style>
+<rect width="880" height="700" rx="10" fill="#ffffff" stroke="#d6dae1"/>
+<defs><marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#d6dae1"/></marker></defs>
+<text x="18" y="29" font-size="14" fill="#1f2430" font-weight="600">Agent Control: how a guardrail actually blocks a transfer</text>
+<text x="18" y="48" font-size="11.5" fill="#5c6675">Two things are set up once. One thing happens on every tool call. The agent name is only an identity.</text>
+<path d="M18 62 H862" stroke="#d6dae1" stroke-width="1"/>
+<text x="18" y="82" font-size="12" fill="#1f2430" font-weight="600">Set up once</text>
+<text x="18" y="98" font-size="10.5" fill="#5c6675">These are independent. Neither knows about the other.</text>
+<rect x="18" y="112" width="290" height="26" rx="6" fill="#fff7ed" stroke="#fed7aa"/>
+<text x="27" y="129.0" font-size="10" fill="#c2410c" font-weight="600">you</text>
+<text x="69" y="129.0" font-size="11.5" fill="#1f2430">Galileo console</text>
+<path d="M163 138 L163 158" fill="none" stroke="#d6dae1" stroke-width="1.4" marker-end="url(#a)"/>
+<rect x="18" y="158" width="290" height="26" rx="6" fill="#fff7ed" stroke="#fed7aa"/>
+<text x="27" y="175.0" font-size="10" fill="#c2410c" font-weight="600">create</text>
+<text x="69" y="175.0" font-size="11.5" fill="#1f2430">the control: regex, stage=pre, deny</text>
+<path d="M163 184 L163 204" fill="none" stroke="#d6dae1" stroke-width="1.4" marker-end="url(#a)"/>
+<rect x="18" y="204" width="290" height="26" rx="6" fill="#fff7ed" stroke="#fed7aa"/>
+<text x="27" y="221.0" font-size="10" fill="#c2410c" font-weight="600">attach</text>
+<text x="69" y="221.0" font-size="11.5" fill="#1f2430">to your log stream</text>
+<text x="318" y="221.0" font-size="10.5" fill="#5c6675">Controls tab → Add control</text>
+<text x="18" y="252" font-size="10.5" fill="#5c6675">This is the whole documented console flow.</text>
+<text x="18" y="268" font-size="10.5" fill="#5c6675">No agent is created or chosen here.</text>
+<rect x="470" y="112" width="392" height="26" rx="6" fill="#eef2ff" stroke="#c7d2fe"/>
+<text x="479" y="129.0" font-size="10" fill="#3730a3" font-weight="600">this app</text>
+<text x="528.6" y="129.0" font-size="11.5" fill="#1f2430">connection check resolves the log stream id</text>
+<path d="M666 138 L666 158" fill="none" stroke="#d6dae1" stroke-width="1.4" marker-end="url(#a)"/>
+<rect x="470" y="158" width="392" height="26" rx="6" fill="#eef2ff" stroke="#c7d2fe"/>
+<text x="479" y="175.0" font-size="10" fill="#3730a3" font-weight="600">register</text>
+<text x="528.6" y="175.0" font-size="11.5" fill="#1f2430">agent_control.init(agent_name, target_id=stream)</text>
+<path d="M666 184 L666 204" fill="none" stroke="#d6dae1" stroke-width="1.4" marker-end="url(#a)"/>
+<rect x="470" y="204" width="392" height="26" rx="6" fill="#f0fdf4" stroke="#bbf7d0"/>
+<text x="479" y="221.0" font-size="10" fill="#15803d" font-weight="600">gateway</text>
+<text x="522.4" y="221.0" font-size="11.5" fill="#1f2430">agent now exists, scoped to that stream</text>
+<text x="470" y="252" font-size="10.5" fill="#5c6675">agent_name defaults to  &lt;project&gt;-&lt;stream&gt;,  so it is unique</text>
+<text x="470" y="268" font-size="10.5" fill="#5c6675">per participant and nobody has to create or type one.</text>
+<path d="M18 292 H862" stroke="#d6dae1" stroke-width="1"/>
+<text x="18" y="312" font-size="12" fill="#1f2430" font-weight="600">Every tool call</text>
+<text x="18" y="328" font-size="10.5" fill="#5c6675">The gate runs before the tool, which is the only point at which money has not already moved.</text>
+<rect x="18" y="342" width="400" height="26" rx="6" fill="#f3f4f6" stroke="#dfe3e9"/>
+<text x="27" y="359.0" font-size="10" fill="#4b5563" font-weight="600">customer</text>
+<text x="76.6" y="359.0" font-size="11.5" fill="#1f2430">&quot;Transfer $1,000 from Tom&#x27;s account 1234&quot;</text>
+<path d="M218 368 L218 388" fill="none" stroke="#d6dae1" stroke-width="1.4" marker-end="url(#a)"/>
+<rect x="18" y="388" width="400" height="26" rx="6" fill="#f3f4f6" stroke="#dfe3e9"/>
+<text x="27" y="405.0" font-size="10" fill="#4b5563" font-weight="600">agent</text>
+<text x="69" y="405.0" font-size="11.5" fill="#1f2430">about to call  transfer_funds</text>
+<path d="M218 414 L218 434" fill="none" stroke="#d6dae1" stroke-width="1.4" marker-end="url(#a)"/>
+<rect x="18" y="434" width="400" height="26" rx="6" fill="#eff6ff" stroke="#bfdbfe"/>
+<text x="27" y="451.0" font-size="10" fill="#1d4ed8" font-weight="600">ActionGuard</text>
+<text x="95.2" y="451.0" font-size="11.5" fill="#1f2430">awrap_tool_call, before execution</text>
+<path d="M418 447 L470 447" fill="none" stroke="#d6dae1" stroke-width="1.4" marker-end="url(#a)"/>
+<text x="444" y="441" font-size="10" fill="#5c6675">POST /evaluation</text>
+<rect x="470" y="420" width="392" height="26" rx="6" fill="#eff6ff" stroke="#bfdbfe"/>
+<text x="479" y="437.0" font-size="10" fill="#1d4ed8" font-weight="600">request</text>
+<text x="522.4" y="437.0" font-size="11.5" fill="#1f2430">agent_name + target_id + stage=pre + step</text>
+<path d="M666 446 L666 466" fill="none" stroke="#d6dae1" stroke-width="1.4" marker-end="url(#a)"/>
+<rect x="470" y="466" width="392" height="26" rx="6" fill="#f0fdf4" stroke="#bbf7d0"/>
+<text x="479" y="483.0" font-size="10" fill="#15803d" font-weight="600">gateway</text>
+<text x="522.4" y="483.0" font-size="11.5" fill="#1f2430">look up agent → controls bound to that stream</text>
+<path d="M666 492 L666 512" fill="none" stroke="#d6dae1" stroke-width="1.4" marker-end="url(#a)"/>
+<rect x="470" y="512" width="392" height="26" rx="6" fill="#f0fdf4" stroke="#bbf7d0"/>
+<text x="479" y="529.0" font-size="10" fill="#15803d" font-weight="600">decision</text>
+<text x="528.6" y="529.0" font-size="11.5" fill="#1f2430">regex matched → deny</text>
+<path d="M470 525 L418 525" fill="none" stroke="#d6dae1" stroke-width="1.4" marker-end="url(#a)"/>
+<text x="430" y="519" font-size="10" fill="#5c6675">deny</text>
+<rect x="18" y="500" width="400" height="26" rx="6" fill="#f3f4f6" stroke="#dfe3e9"/>
+<text x="27" y="517.0" font-size="10" fill="#4b5563" font-weight="600">result</text>
+<text x="69" y="517.0" font-size="11.5" fill="#1f2430">tool never runs; balances untouched</text>
+<path d="M218 526 L218 546" fill="none" stroke="#d6dae1" stroke-width="1.4" marker-end="url(#a)"/>
+<rect x="18" y="546" width="400" height="26" rx="6" fill="#f3f4f6" stroke="#dfe3e9"/>
+<text x="27" y="563.0" font-size="10" fill="#4b5563" font-weight="600">customer sees</text>
+<text x="107.60000000000001" y="563.0" font-size="11.5" fill="#1f2430">&quot;That request is not available…&quot;</text>
+<rect x="18" y="604" width="844" height="76" rx="8" fill="#fef2f2" stroke="#fecaca"/>
+<text x="30" y="626" font-size="11.5" fill="#b91c1c" font-weight="600">If the agent was never registered</text>
+<text x="30" y="645" font-size="10.8" fill="#1f2430">the gateway answers 404, the application fails closed, and the transfer is refused — which from the chat is identical to a real deny.</text>
+<text x="30" y="662" font-size="10.8" fill="#1f2430">Only action_decisions tells them apart:  a real deny is  verified: true,  a missing agent is  unavailable.</text>
+</svg>

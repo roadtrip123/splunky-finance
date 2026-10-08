@@ -37,6 +37,36 @@ reading it.
   place and restart: `sed -i 's|^DEMO_PASSWORD=.*|DEMO_PASSWORD=AlexDemo1234!|' .env`. Do this before
   taking an image, or every clone carries the old one.
 
+## v0.6.16 — The application registers its own agent
+
+The guardrail's 404 was never a wrong agent name. **This application never registered an agent at
+all.** `agent_control.init()` does that, via `/initAgent`, and nothing here called it — so every
+guarded call asked the gateway about a name it had never been told about. `my-agent-liam` worked only
+because something else had already registered it, and the conclusion drawn from that — that agents
+must be pre-created in a console — sent hours after a screen that does not exist.
+
+Galileo's own documentation is unambiguous: a control is created in the console and attached to a
+**log stream**, and nothing attaches it to an agent. The agent is declared by the application with
+the stream as target context, and the server returns the controls bound to that stream.
+
+- **`declare_agent()` registers on each connection check**, as soon as the stream id resolves —
+  which is the first moment the target is knowable. Re-registers when the name, gateway or stream
+  changes, because the SDK fixes target context for the session, and skips when nothing changed.
+  A failure is recorded and reported rather than raised, and the SDK's error text is not echoed
+  because it can carry credential headers.
+- **The agent name is derived from the project and stream** unless set explicitly. That is what
+  distinguishes one participant from another: the lab has everyone name their stream the same and
+  their project after themselves. So there is nothing to pre-create, nothing to type, and no
+  hundred-agent spreadsheet. `AGENT_CONTROL_AGENT_NAME` and the portal field become overrides.
+- **The derivation lives on `Settings`**, because two unrelated callers need it: `Telemetry`, which
+  registers, and `Protection`, which names the agent on every evaluation request and has no
+  telemetry. It normalises to what the gateway accepts — lowercase, `[a-z0-9:_-]`, at least ten
+  characters — since a name the gateway rejects produces the same silent 404.
+- **`docs/validation.md` carries a correction** rather than quietly losing the wrong conclusion, and
+  `docs/workshop.md` no longer tells presenters each participant must create an agent.
+- **`docs/flows/agent-control.svg`** draws the whole thing: what is set up once, what happens on
+  every tool call, and the trap where an unregistered agent reads as a working guardrail.
+
 ## v0.6.15 — Each participant points at their own agent
 
 - **The Agent Control agent name is settable from the portal.** It was read from `.env` alone, so one

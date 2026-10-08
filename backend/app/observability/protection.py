@@ -48,7 +48,7 @@ class Protection:
                 401: "credentials rejected by the Agent Control gateway",
                 403: "credentials accepted but the request was refused",
                 404: (
-                    f"no agent named {self.settings.agent_control_agent_name!r} in Agent Control, "
+                    f"no agent named {self.settings.resolved_agent_name!r} in Agent Control, "
                     "or no such route at this Agent Control URL. The name must match the console "
                     "exactly; agents cannot be created from the app"
                 ),
@@ -78,7 +78,7 @@ class Protection:
             raise ValueError("No resolved log stream")
         target_id = str(stream_id)
         request = EvaluationRequest(
-            agent_name=s.agent_control_agent_name,
+            agent_name=s.resolved_agent_name,
             target_type="log_stream",
             target_id=target_id,
             stage=stage,
@@ -121,7 +121,7 @@ class Protection:
                     "matches": len(result.matches or []),
                     "non_matches": len(result.non_matches or []),
                     "errors": [str(e)[:200] for e in (result.errors or [])],
-                    "agent_name": s.agent_control_agent_name,
+                    "agent_name": s.resolved_agent_name,
                     "target": f"log_stream/{target_id}",
                     "stage": stage,
                     "step_type": step_type,
@@ -172,7 +172,7 @@ class Protection:
                         confidence=result.confidence,
                     ),
                     control_id=str(control.control_id),
-                    agent_name=self.settings.agent_control_agent_name,
+                    agent_name=self.settings.resolved_agent_name,
                     check_stage=stage,
                     applies_to=applies_to,
                 )

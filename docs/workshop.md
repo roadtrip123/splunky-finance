@@ -399,12 +399,14 @@ python3 scripts/check_endpoint.py --base-url <url> --model <model> --api-key <ke
 
 Pass the key without any `Bearer ` prefix; the client adds it. A provider config that hands you a full header value such as `"Bearer tv-pat-..."` needs the prefix stripped, or you get a doubled header and a 401.
 
-**Every participant needs an Agent in Agent Control, and it cannot be created from the SDK.** The
-runtime evaluation route looks the agent up by name, and returns 404 if it does not exist — at
-which point the application fails closed. The guardrail then blocks correctly and reports
-`decision: "unavailable"`, which looks like success and is not. Each participant creates an agent
-in the Agent Control console and uses that name; the lab sheet says so, and it is worth repeating
-out loud because nothing in the app surfaces the problem.
+**The agent registers itself; participants do not create one.** The runtime evaluation route looks
+the agent up by name and returns 404 for one it has never been told about, at which point the
+application fails closed — the guardrail blocks correctly and reports `decision: "unavailable"`,
+which looks like success and is not. The application now registers its agent when the connection
+check resolves the stream, deriving the name from the project and stream, so a participant has
+nothing to create and nothing to type. They create the control in the console and attach it to their
+log stream, which is exactly what Galileo's documentation describes. The portal's **Agent Control
+agent name** field is an override for pointing at a specific existing agent.
 
 **One LLM endpoint for fifty people** is the most likely thing to spoil the session — well ahead of anything about instance sizing. Check the endpoint's rate limits against fifty concurrent turns of roughly 2,500 input tokens each, and confirm it handles tool calling properly: this agent depends entirely on well-formed tool calls, and an endpoint that is chat-compatible but weak on tools fails every scenario.
 

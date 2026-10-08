@@ -512,4 +512,18 @@ Verified end to end against `my-agent-liam`, an agent that exists in the tenant:
                "result": {"matched": true, "message": "Pattern '…1234…' found"}}]}
 ```
 
-A real control, matching, denying, with its reason. Agents cannot be created from the SDK, so the agent named in `AGENT_CONTROL_AGENT_NAME` has to exist in the Agent Control console first; `my-bank-agent` does not, and the default now points at one that does.
+A real control, matching, denying, with its reason.
+
+**Correction, later.** The conclusion drawn here — that agents cannot be created from the SDK and so
+the name in `AGENT_CONTROL_AGENT_NAME` must already exist in a console — was wrong, and it sent the
+next several hours after the wrong thing. `agent_control.init()` registers an agent via `/initAgent`,
+and this application never called it. The 404 was not a wrong name; it was a name the gateway had
+never been told about. `my-agent-liam` worked only because something else had already registered it.
+
+Galileo's own documentation confirms the model: a control is created in the console and attached to a
+**log stream**, and nothing attaches it to an agent. The agent is declared by the application, with
+the stream as target context, and the server returns the controls bound to that stream. So
+`add_agent_control` was belt-and-braces, and there was never a console screen to go looking for.
+
+The application now registers its agent when the connection check resolves the stream, deriving the
+name from project and stream unless one is set explicitly.

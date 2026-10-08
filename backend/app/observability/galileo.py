@@ -32,6 +32,11 @@ class Telemetry:
         # endpoint has to undo what applying it did, and "undo" means returning to this -- not
         # blanking the fields, which would discard a key the operator put in .env on purpose.
         self._endpoint_baseline = self._endpoint_settings()
+        # What was last registered with Agent Control, and the inputs it was registered for. The
+        # SDK fixes target context for the session, so a changed stream or gateway needs a fresh
+        # registration and an unchanged one does not.
+        self.agent: dict = {"state": "not_attempted"}
+        self._declared = None
         self.toggle_path = Path(settings.data_dir) / "galileo-settings.json"
         try:
             saved = json.loads(self.toggle_path.read_text())
@@ -428,6 +433,67 @@ class Telemetry:
             last_error=None,
         )
 
+    def agent_name(self):
+        """The agent this instance registers and evaluates under. See Settings for the derivation."""
+        return self.settings.resolved_agent_name
+
+    async def declare_agent(self):
+        """Register this instance's agent, so the evaluation route can find it.
+
+        The route looks the agent up by name and answers 404 for one it has never been told about.
+        The app then fails closed, which from the chat is indistinguishable from a guardrail that
+        worked -- the transfer is refused either way, and only `action_decisions` shows the deny was
+        never real. Registering is what the SDK's init() does, and nothing in this application
+        called it, which is why every guarded call failed until a name somebody else had already
+        registered was borrowed.
+        """
+        s = self.settings
+        name = self.agent_name()
+        # Written back so every reader -- the evaluation request, the control attach script, the
+        # portal -- uses one name rather than each deriving its own.
+        s.agent_control_agent_name = name
+        stream_id = str(self.target.get("stream_id") or "")
+        if not (s.agent_control_url and s.galileo_api_key.get_secret_value() and stream_id):
+            self.agent = {
+                "state": "skipped",
+                "name": name,
+                "reason": "No Agent Control URL, credentials or resolved stream",
+            }
+            return self.agent
+        signature = (name, s.agent_control_url, stream_id)
+        if self._declared == signature and self.agent.get("state") == "registered":
+            return self.agent
+
+        def register():
+            import agent_control
+
+            agent_control.init(
+                agent_name=name,
+                agent_description="Splunky Finance banking assistant",
+                server_url=s.agent_control_url,
+                api_key=s.galileo_api_key.get_secret_value(),
+                api_key_header=s.agent_control_api_key_header,
+                target_type="log_stream",
+                target_id=stream_id,
+                # Omitted when blank: the SDK rejects an empty header name and its own default
+                # differs from this one.
+                **(
+                    {"runtime_token_header": s.agent_control_runtime_token_header}
+                    if s.agent_control_runtime_token_header
+                    else {}
+                ),
+            )
+
+        try:
+            await asyncio.wait_for(asyncio.to_thread(register), 20)
+        except Exception as error:  # noqa: BLE001 - sanitize credential-bearing SDK errors
+            self._declared = None
+            self.agent = {"state": "failed", "name": name, "error": type(error).__name__}
+            return self.agent
+        self._declared = signature
+        self.agent = {"state": "registered", "name": name, "stream_id": stream_id}
+        return self.agent
+
     async def check_connection(self, force=False):
         async with self.connection_lock:
             if not self.enabled:
@@ -473,6 +539,8 @@ class Telemetry:
                     raise ValueError("Configured stream unavailable")
                 # Agent Control targets a stream by id, and on OTLP the logger cannot supply one.
                 self.target = {"project_id": project_id, "stream_id": stream_id}
+                # The target is only knowable here, and registration carries it.
+                await self.declare_agent()
                 self.status.update(
                     state="connected",
                     connection="connected",

@@ -1,3 +1,4 @@
+import re
 from datetime import date
 from ipaddress import ip_address, ip_network
 from pathlib import Path
@@ -7,6 +8,12 @@ from zoneinfo import ZoneInfo
 
 from pydantic import SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+# What the Agent Control gateway accepts as an agent name: lowercase letters, digits, ":", "_" or
+# "-", and at least ten characters. Anything else is rejected on registration.
+AGENT_NAME_DISALLOWED = re.compile(r"[^a-z0-9:_-]+")
+AGENT_NAME_MIN = 10
+AGENT_NAME_FALLBACK = "splunky-finance-agent"
 
 PRIVATE_LAN_NETWORKS = tuple(ip_network(x) for x in ("10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16"))
 
@@ -34,7 +41,9 @@ class Settings(BaseSettings):
     galileo_console_url: str = ""
     galileo_api_url: str = ""
     agent_control_url: str = ""
-    agent_control_agent_name: str = "my-bank-agent"
+    # Blank by default: the application registers its own agent, deriving the name from the
+    # project and stream. Set this only to point at a specific existing agent.
+    agent_control_agent_name: str = ""
     agent_control_api_key_header: str = "Galileo-API-Key"
     # Blank means the SDK default, which is a Bearer token on Authorization -- what the Galileo
     # gateway requires. Splunk AO Observability Cloud needs a dedicated header instead, because a
@@ -124,6 +133,25 @@ class Settings(BaseSettings):
         if self.galileo_protection_enabled and not self.galileo_enabled:
             raise ValueError("Protection requires Galileo")
         return self
+
+    @property
+    def resolved_agent_name(self):
+        """The agent name to register and to evaluate under.
+
+        `agent_control_agent_name` is an override. Blank, the name is derived from the project and
+        stream, which is what distinguishes one participant from another: the lab has everyone name
+        their stream the same and their project after themselves. Deriving it is what makes the agent
+        a non-step -- the application registers the name it then uses, so there is nothing to create
+        in advance and nothing to type.
+
+        Normalised to what the gateway accepts, because a name it rejects is refused at registration
+        and the resulting 404 is indistinguishable from a guardrail that worked.
+        """
+        candidate = (self.agent_control_agent_name or "").strip()
+        if not candidate:
+            candidate = f"{self.galileo_project}-{self.galileo_log_stream}"
+        cleaned = AGENT_NAME_DISALLOWED.sub("-", candidate.lower()).strip("-")
+        return cleaned if len(cleaned) >= AGENT_NAME_MIN else AGENT_NAME_FALLBACK
 
     @property
     def model_name(self):

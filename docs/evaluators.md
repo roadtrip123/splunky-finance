@@ -186,6 +186,22 @@ Dropping `context_adherence` as well would reach about $0.013 a turn, but every 
 
 ## Agent Control: how the guardrails are built
 
+![How a guardrail blocks a transfer](flows/agent-control.svg)
+
+Three things, and only the middle one is a decision anybody makes:
+
+| | Who does it | When |
+| --- | --- | --- |
+| The control — regex, `stage: pre`, `deny` | you, in the Galileo console | once |
+| Attaching it to your log stream | you, in the console | once |
+| Registering the agent, scoped to that stream | the application, via `agent_control.init()` | on each connection check |
+
+The agent name is an identity and nothing more. It carries no rules: every rule reaches the runtime
+through the control bound to the log stream. It only has to be *registered*, because the evaluation
+route looks it up by name and answers 404 for one it has never seen — and the application then fails
+closed, which from the chat is indistinguishable from a guardrail that worked.
+
+
 Evaluators are detective controls — they tell you afterwards, which is fine for a wrong number and
 useless for money that has left or a balance that has been read. The guardrails are preventive, and
 there are two, one per action that cannot be undone by refusing the answer afterwards:

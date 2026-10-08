@@ -109,7 +109,7 @@ async def test_action_gate_logs_a_control_span_from_dict_arguments():
             is_safe, confidence, reason = False, 1.0, "matched"
 
         protection = Protection.__new__(Protection)
-        protection.settings = type("S", (), {"agent_control_agent_name": "my-bank-agent"})()
+        protection.settings = type("S", (), {"resolved_agent_name": "my-bank-agent"})()
         details = {}
         result = Result()
         # A dict, exactly as awrap_tool_call hands it over.
@@ -144,7 +144,7 @@ def test_a_failed_request_records_the_http_status():
 
     # An instance rather than the class, because the 404 hint names the configured agent.
     protection = Protection.__new__(Protection)
-    protection.settings = type("S", (), {"agent_control_agent_name": "my-bank-agent-lp"})()
+    protection.settings = type("S", (), {"resolved_agent_name": "my-bank-agent-lp"})()
 
     diagnosis = protection._failure(Failure())
     assert diagnosis["cause"] == "request_failed"

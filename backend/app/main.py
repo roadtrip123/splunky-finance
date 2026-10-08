@@ -603,6 +603,7 @@ def create_app(settings=None, model_builder=None, protection_adapter=None):
                 "model": settings.model_name,
                 "provider_status": chat.provider_status,
                 "galileo": telemetry.status,
+                "agent": telemetry.agent,
                 "project": settings.galileo_project,
                 "log_stream": settings.galileo_log_stream,
                 "console_url": settings.galileo_console_url or None,
