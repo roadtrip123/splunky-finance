@@ -91,7 +91,7 @@ Note the **console URL** and **API URL** for your tenant, and the **Agent Contro
 <img width="1096" height="662" alt="image" src="https://github.com/user-attachments/assets/4fa0a300-a1b0-4233-966d-c207a670997a" />
 5. To test if everyone is working correctly, go to **Demo** tab
 <img width="1054" height="541" alt="image" src="https://github.com/user-attachments/assets/c91c97eb-92be-4011-b2bf-27e0f3911bc9" />
-6. Select **Run** next to the 'Questions for this scenario'. This will trigger an LLM call from the My Banking Agent.
+6. Select **Run** next to the 'Questions for this scenario'. This will trigger an LLM call from the My Bank Agent.
 <img width="1017" height="393" alt="image" src="https://github.com/user-attachments/assets/ead70e8a-c6a6-4d39-8586-d08b9ca314cd" />
 7. If you scroll down, after a few seconds it will give you the answer, if it is working correctly.
 <img width="1093" height="382" alt="image" src="https://github.com/user-attachments/assets/b1d3552b-fe97-4c8a-a7ec-8efb4a2ea086" />
