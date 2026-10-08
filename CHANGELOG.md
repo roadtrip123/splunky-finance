@@ -37,6 +37,14 @@ reading it.
   place and restart: `sed -i 's|^DEMO_PASSWORD=.*|DEMO_PASSWORD=AlexDemo1234!|' .env`. Do this before
   taking an image, or every clone carries the old one.
 
+## v0.6.23 — The gateway's own words
+
+- **A client error now carries the gateway's message**, truncated to 400 characters. It was left out
+  originally on the grounds that a response body can echo credential headers — but a 4xx from this
+  gateway is a server-authored explanation, and without it a 401 is just a number. Three rounds of
+  comparing two boxes field by field, with every measurable input identical, could have been one.
+  Captured only for 4xx, where the body explains itself; a 5xx body is noise and can be large.
+
 ## v0.6.22 — The derived agent name followed the project again
 
 - **`declare_agent` wrote the derived name into the override field**, which made the derivation

@@ -288,3 +288,69 @@ async def test_no_control_is_not_reported_as_a_failure(settings, monkeypatch):
     await protection.check("answer", "question", {}, SimpleNamespace(log_stream_id="s"), True)
     assert protection.status in {"no_control", "verified"}, protection.status
     assert protection.status != "failed", "no control applying is not a failure"
+
+
+async def test_a_client_error_carries_the_gateway_message(settings, monkeypatch):
+    """A 401 on its own is a number. The gateway's own words are what name the cause."""
+    import agent_control
+
+    from app.observability.protection import Protection
+
+    class Client:
+        def __init__(self, **kwargs):
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *args):
+            return False
+
+        async def post_runtime_evaluation(self, **kwargs):
+            request = httpx.Request("POST", "https://gateway.test/api/v1/evaluation")
+            raise httpx.HTTPStatusError(
+                "unauthorized",
+                request=request,
+                response=httpx.Response(401, request=request,
+                                        json={"detail": "agent not authorized for this log stream"}),
+            )
+
+    monkeypatch.setattr(agent_control, "AgentControlClient", Client)
+    settings.galileo_enabled = True
+    settings.galileo_api_key = SecretStr("test-key")
+    settings.agent_control_url = "https://gateway.test/agent-control"
+    protection = Protection(settings)
+    await protection.check("answer", "question", {}, SimpleNamespace(log_stream_id="s"), True)
+    assert "agent not authorized" in protection.detail["response"]
+
+
+async def test_a_server_error_body_is_not_captured(settings, monkeypatch):
+    """Only client errors explain themselves; a 5xx body is noise and may be large."""
+    import agent_control
+
+    from app.observability.protection import Protection
+
+    class Client:
+        def __init__(self, **kwargs):
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *args):
+            return False
+
+        async def post_runtime_evaluation(self, **kwargs):
+            request = httpx.Request("POST", "https://gateway.test/api/v1/evaluation")
+            raise httpx.HTTPStatusError(
+                "boom", request=request,
+                response=httpx.Response(503, request=request, text="x" * 5000))
+
+    monkeypatch.setattr(agent_control, "AgentControlClient", Client)
+    settings.galileo_enabled = True
+    settings.galileo_api_key = SecretStr("test-key")
+    settings.agent_control_url = "https://gateway.test/agent-control"
+    protection = Protection(settings)
+    await protection.check("answer", "question", {}, SimpleNamespace(log_stream_id="s"), True)
+    assert protection.detail["http_status"] == 503
+    assert "response" not in protection.detail

@@ -77,6 +77,18 @@ class Protection:
         status = getattr(response, "status_code", None)
         if status:
             diagnosis["http_status"] = int(status)
+            # The gateway's own message, truncated. Originally left out on the grounds that a body
+            # can echo credential headers -- but a 4xx from this gateway is a server-authored error,
+            # and without it a 401 is just a number. Three rounds of comparing two boxes field by
+            # field could have been one if this had been here. Only for client errors, where the body
+            # is an explanation rather than a payload.
+            if 400 <= int(status) < 500:
+                try:
+                    body = response.text
+                except Exception:  # noqa: BLE001 - a body that cannot be read is simply absent
+                    body = ""
+                if body:
+                    diagnosis["response"] = body.strip()[:400]
             diagnosis["hint"] = {
                 401: "credentials rejected by the Agent Control gateway",
                 403: "credentials accepted but the request was refused",
