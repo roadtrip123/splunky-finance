@@ -56,19 +56,21 @@ In the Galileo console:
 10. Give the name of the stream as 'my-bank-agent' and click **Create Agent Stream**
 <img width="356" height="168" alt="image" src="https://github.com/user-attachments/assets/f7d30cee-5e90-40f9-894c-25472c3288ca" />
 
-
-7.     Create an **API key** and copy it somewhere — you cannot read it again later
-8. Create a **project**. Name it after yourself, for example `splunky-<your-initials>`
-9. Inside it, create a **log stream**. `my-bank-agent` is fine
-
 Note the **console URL** and **API URL** for your tenant, and the **Agent Control URL**. Your instructor has these.
 
 ---
 
 ## Step 2 — Point the app at your model and your project
 
-In `/demo-admin`, open the **Setup** tab.
+1. Go to your demo admin portal - https://<domain>/demo-admin` and sign in
+<img width="1811" height="651" alt="image" src="https://github.com/user-attachments/assets/c471041a-8325-4b8d-b3e7-a9efd77fe678" />
 
+2.  Click **Setup**
+<img width="1520" height="723" alt="image" src="https://github.com/user-attachments/assets/cd0e18c3-91d1-44f1-98b4-a8324116071d" />
+3. Scroll down until you get to the **Connect to Splunk Agent Observability / Galileo**. Select **Galileo**. Fill out your 'Project', 'Log Stream', 'Console URL', 'API URL' and 'Agent Control URL'. (These URLs can be found with your credentials). Once filled out click **Save and Connect**
+<img width="1093" height="774" alt="image" src="https://github.com/user-attachments/assets/11c2d4b9-c9dc-4523-af63-936f4d4cce8d" />
+
+4.  
 **Model endpoint.** Choose your provider, fill in the key and model, and press **Add endpoint**. Sharon AI and any other OpenAI-compatible service use the OpenAI protocol with their own base URL, which the preset fills in for you.
 
 **Connect to Splunk Agent Observability / Galileo.** Choose where traces are sent — one backend at a time. The form then asks only for that backend's credentials, each marked required or optional with a note saying where to find it:
