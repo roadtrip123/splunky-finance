@@ -35,9 +35,25 @@ Do this first. The app cannot connect to a project that does not exist.
 
 In the Galileo console:
 
-1. Create an **API key** and copy it somewhere — you cannot read it again later
-2. Create a **project**. Name it after yourself, for example `splunky-<your-initials>`
-3. Inside it, create a **log stream**. `my-bank-agent` is fine
+1. Go to your Galileo URL and Sign-In
+  <img width="570" height="539" alt="image" src="https://github.com/user-attachments/assets/d1ae0df5-8019-4724-b04e-82b2a92c1376" />
+2. Click on your username on the topright of the portal and select API Keys.
+  <img width="380" height="447" alt="image" src="https://github.com/user-attachments/assets/0080aee8-d160-45b8-93bf-537934056784" />
+3. Create an **API key** by clicking **+ Create new key** 
+<img width="1261" height="209" alt="image" src="https://github.com/user-attachments/assets/dc1279d8-28ae-4612-b888-4183f8fd091c" />
+4. Give the key a name and click **create**
+   <img width="524" height="386" alt="image" src="https://github.com/user-attachments/assets/50d339f0-b54c-4668-927e-05bc3d703ebd" />
+5. Click the **copy** button and click **Done**. (Make sure you store the key securely, as you can not get them again, unless you re-create them.)
+  <img width="432" height="221" alt="image" src="https://github.com/user-attachments/assets/354b2c5d-fef6-499e-9197-7c3ecb95cea5" />
+6. Go to **Project** on the left screen and select **View all**
+<img width="558" height="757" alt="image" src="https://github.com/user-attachments/assets/87b5f0d1-6271-471a-9c62-d75fbc026d40" />
+
+
+
+
+7.     Create an **API key** and copy it somewhere — you cannot read it again later
+8. Create a **project**. Name it after yourself, for example `splunky-<your-initials>`
+9. Inside it, create a **log stream**. `my-bank-agent` is fine
 
 Note the **console URL** and **API URL** for your tenant, and the **Agent Control URL**. Your instructor has these.
 
