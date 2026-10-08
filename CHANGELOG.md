@@ -37,6 +37,19 @@ reading it.
   place and restart: `sed -i 's|^DEMO_PASSWORD=.*|DEMO_PASSWORD=AlexDemo1234!|' .env`. Do this before
   taking an image, or every clone carries the old one.
 
+## v0.6.24 — Two things that cost a day
+
+Both recorded where the next person will meet them, rather than left in a transcript.
+
+- **`AGENT_CONTROL_RUNTIME_AUTH_MODE=api_key` returns 401** from `/api/v1/evaluation` on Galileo's
+  multitenant gateway, while registration with the same key succeeds. `jwt` is required. The symptom
+  is the application failing closed, which reads as a working guardrail, so it survived three rounds
+  of comparing two otherwise identical boxes. `.env.example` now says so at the setting.
+- **Restarting or updating disarms the guardrail scenario.** It lives in memory, so after a restart
+  nothing is gated and the Demo tab looks identical to never having enabled it. Three test rounds
+  were spent on stale readings because of this. Step 8 of the lab sheet now warns about it where it
+  will be read.
+
 ## v0.6.23 — The gateway's own words
 
 - **A client error now carries the gateway's message**, truncated to 400 characters. It was left out

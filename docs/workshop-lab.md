@@ -431,6 +431,10 @@ not enough to create the controls: nothing is gated until the scenario is enable
 2. Confirm the status underneath reads *"Applied to connected banking session"*
 3. Ask each question below in the **banking** tab
 
+> **Restarting or updating the app disarms this.** The scenario lives in memory, so after a restart
+> nothing is gated and the Demo tab looks the same as if you had never enabled it. If a test suddenly
+> stops blocking, re-check step 2 before anything else.
+
 ### What should and should not be blocked
 
 A guardrail that refuses everything is a feature switch, not a guardrail. These two groups are the
