@@ -62,7 +62,7 @@ pass `--port <n>` and use a high port.
 
 ```bash
 sudo apt-get update && sudo apt-get install -y git
-git clone --branch v0.6.8 https://github.com/roadtrip123/splunky-finance.git
+git clone --branch v1.0.0 https://github.com/roadtrip123/splunky-finance.git
 cd splunky-finance
 sudo ./scripts/install.sh
 ```
@@ -174,7 +174,7 @@ curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' | sudo gpg --d
 curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' | sudo tee /etc/apt/sources.list.d/caddy-stable.list >/dev/null
 sudo apt-get update && sudo apt-get install -y caddy
 
-git clone --branch v0.6.8 https://github.com/roadtrip123/splunky-finance.git
+git clone --branch v1.0.0 https://github.com/roadtrip123/splunky-finance.git
 cd splunky-finance
 python3 scripts/setup_env.py --origin <public-ip>
 ```
@@ -300,7 +300,7 @@ then **tag before the workshop and switch back**.
 Either way, publishing a fix means pushing it and restarting the instances, with no AMI rebuild:
 
 ```bash
-git tag -a v0.6.8 -m "..." && git push origin v0.6.8   # then, on each box:
+git tag -a v1.0.1 -m "..." && git push origin v1.0.1   # then, on each box:
 sudo systemctl restart splunky-finance
 ```
 

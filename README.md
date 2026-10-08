@@ -42,6 +42,11 @@ validated from outside against a real trust store with no exception — so visit
 That path needs no certificate authority round trip at boot, which is what makes it the one that
 scales to many instances from one image.
 
+**The guardrail reaches a real verdict on two independent deployments.** A workstation and a public
+EC2 instance, each registering its own agent and each reporting `pre: verified` with the control
+named in the log stream — rather than the application failing closed, which refuses the transfer
+identically and is the failure this release can finally tell apart.
+
 **Deployment verified on a hostile network.** Image builds, container egress to a live model endpoint,
 two concurrent participant stacks, and TLS on a bare IP all confirmed working on an EC2 instance whose
 host redirects container traffic. Browser access was not confirmed, because that network's perimeter

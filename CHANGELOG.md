@@ -37,6 +37,41 @@ reading it.
   place and restart: `sed -i 's|^DEMO_PASSWORD=.*|DEMO_PASSWORD=AlexDemo1234!|' .env`. Do this before
   taking an image, or every clone carries the old one.
 
+## v1.0.0 — The working version
+
+The first release verified end to end against a live Galileo tenant on two independent deployments:
+a workstation and a public EC2 instance behind a publicly-trusted certificate.
+
+**What is proven, by observation rather than by test double:**
+
+- A preventive guardrail reaching a real verdict. `pre: verified` on both boxes, with the control
+  named in the log stream — not the application failing closed, which is the failure that reads as
+  success and which this release can finally distinguish.
+- The agent registering itself. `agent_control.init()` is called when the connection check resolves
+  the stream, with the name derived from project and stream, so a participant creates nothing and
+  types nothing. Observed registering under two different derived names against two tenants.
+- Traces and evaluator scores exporting to a live tenant, with the three custom judges scoring.
+- One-command install, including on a host that redirects container egress; TLS on a bare IP, on a
+  high port, and with an organisation wildcard; self-update from the host and from the portal;
+  survival of a reboot with the firewall fix intact.
+
+**What is not proven, and should be read before relying on it:**
+
+- The own-account half of the guardrail demonstration — that a customer's own transfers and balance
+  checks still work while cross-customer ones are blocked. The blocking half is verified; this half
+  is not, and it is what distinguishes a guardrail from a feature switch.
+- `scripts/check_endpoint.py` against the shared workshop endpoint. An endpoint can answer chat
+  correctly and still fail at tool calls, which every scenario depends on.
+- A human following [docs/workshop-lab.md](docs/workshop-lab.md) from end to end.
+- Anthropic as a model provider, and a self-update rollback against a genuinely broken release.
+- Splunk Agent Observability's Agent Control, which remains open as issue #2.
+
+**The deployment traps this release knows about**, each of which cost a day and each of which is now
+recorded where it will be met rather than in a changelog: a blanket `PREROUTING` redirect of port 443
+that leaves the host working and every container broken; `default_sni`, without which TLS on a bare
+IP binds the port and serves nobody; `api_key` runtime auth returning 401 where `jwt` is required; a
+restart silently disarming the guardrail scenario; and two Galileo projects one letter apart.
+
 ## v0.6.24 — Two things that cost a day
 
 Both recorded where the next person will meet them, rather than left in a transcript.
