@@ -138,8 +138,27 @@ Note the **console URL** and **API URL** for your tenant, and the **Agent Contro
 
    <img width="1414" height="373" alt="image" src="https://github.com/user-attachments/assets/bb04ea52-8af1-4186-ae83-e1f25511294a" />
 
-8. 
-9.  
+8. You should see the chat message you sent in the **Session** tab.
+
+<img width="1367" height="333" alt="image" src="https://github.com/user-attachments/assets/82147464-586d-4e95-8f6f-b8dd28fe279c" />
+
+## Step 4 — Configure Galileo Evaluators 
+
+Now we are connect to configure the Galileo Evaluators.
+
+1. Click on **Evaluators** on the right side menu in Galileo
+
+<img width="236" height="633" alt="image" src="https://github.com/user-attachments/assets/7db978ec-f829-4600-af57-c3dc183c8cca" />
+
+2. Click **Create evaluator** and select **LLM-as-a-judge**
+
+<img width="1313" height="245" alt="image" src="https://github.com/user-attachments/assets/08aec3ad-ce9d-44af-a6e6-7cb73ec32243" />
+
+
+3. 
+
+## Step 5 — Configure Galileo Evaluators 
+
 
 **Model endpoint.** Choose your provider, fill in the key and model, and press **Add endpoint**. Sharon AI and any other OpenAI-compatible service use the OpenAI protocol with their own base URL, which the preset fills in for you.
 
