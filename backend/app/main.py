@@ -608,6 +608,7 @@ def create_app(settings=None, model_builder=None, protection_adapter=None):
                 "console_url": settings.galileo_console_url or None,
                 "protection_status": protection.status,
                 "protection_detail": protection.detail,
+                "protection_stages": protection.stages,
                 "demo_mode": settings.demo_mode,
                 # Never in workshop mode, where building it by hand is the lab.
                 "setup_button": settings.demo_setup_button and settings.demo_mode != "workshop",

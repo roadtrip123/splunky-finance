@@ -62,6 +62,8 @@ type Status = {
   log_stream: string;
   console_url: string | null;
   protection_status: string;
+  protection_detail: Record<string, unknown>;
+  protection_stages: Record<string, { status: string; detail: Record<string, unknown> }>;
   demo_mode: "presenter" | "workshop";
   setup_button: boolean;
   connection: {

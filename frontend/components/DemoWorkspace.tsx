@@ -5,7 +5,7 @@ import { api, mutate } from "@/lib/api";
 type Run = { id: string; scenario: string; protection: boolean; revision: number };
 type PromptGroup = { label: string; prompts: string[] };
 type Scenario = { prompt: string; prompts?: string[]; prompt_groups?: PromptGroup[]; protection_applicable: boolean };
-type Status = { banking_connection: { state: string; session: string | null }; run: Run | null; scenarios: Record<string, Scenario>; protection_status: string; demo_mode: "presenter" | "workshop"; galileo: { enabled: boolean; connection: string } };
+type Status = { banking_connection: { state: string; session: string | null }; run: Run | null; scenarios: Record<string, Scenario>; protection_status: string; protection_stages?: Record<string, { status: string }>; demo_mode: "presenter" | "workshop"; galileo: { enabled: boolean; connection: string } };
 type Answer = { answer: string; conversation_id: string; scenario: string; protection_enabled: boolean; protection_decision: { decision?: string }; };
 type Entry = { question: string; result: Answer };
 const descriptions: Record<string, [string, string]> = {
@@ -88,7 +88,14 @@ export default function DemoWorkspace({ onEvidence }: { onEvidence: () => Promis
   }
   const run = status?.run;
   const scenario = run && status?.scenarios[run.scenario];
-  const protectionReady = status?.galileo.enabled && status.galileo.connection === "connected" && status.protection_status === "verified";
+  // A tool-scoped control is invisible to the gate that inspects answers, so the post stage
+  // reports that nothing applied. Readiness is about whether Agent Control ever reached a verdict,
+  // which is the pre stage for a preventive control.
+  const protectionReady =
+    status?.galileo.enabled &&
+    status.galileo.connection === "connected" &&
+    (status.protection_status === "verified" ||
+      status.protection_stages?.pre?.status === "verified");
   return <section className="admin-card demo-workspace" aria-label="Demo chat workspace">
     <h2>Choose what to demonstrate</h2>
     <p>These controls apply to your connected banking session and the demo chat below. Other sessions remain independent.</p>

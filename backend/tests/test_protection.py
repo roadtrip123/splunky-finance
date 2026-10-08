@@ -219,3 +219,72 @@ def test_the_runtime_auth_mode_is_configurable(settings):
     assert settings.agent_control_runtime_auth_mode == "jwt"
     settings.agent_control_runtime_auth_mode = "api_key"
     assert settings.agent_control_runtime_auth_mode == "api_key"
+
+
+async def test_a_tool_scoped_control_does_not_make_a_working_guardrail_read_as_failed(settings):
+    """The two gates answer different questions, and conflating them was actively misleading.
+
+    The pre gate decides whether a tool runs. The post gate inspects the answer. A control scoped
+    to `transfer_funds` is invisible to the post gate, which correctly reports that nothing applied
+    -- and because only the last call was kept, a box whose guardrail had just blocked a transfer
+    reported `failed`. It also drove the Demo tab to show protection as not ready.
+    """
+    from app.observability.protection import ControlNotEvaluated, Protection
+
+    protection = Protection(settings)
+    assert protection.status == "unverified"
+
+    protection._record("pre", "verified")
+    assert protection.status == "verified"
+
+    protection._record("post", "no_control", ControlNotEvaluated({"cause": "no_control_selected"}).diagnosis)
+    assert protection.status == "verified", "the post gate finding nothing must not mask a real deny"
+    assert protection.stages["pre"]["status"] == "verified"
+    assert protection.stages["post"]["status"] == "no_control"
+
+
+async def test_a_real_failure_still_wins_over_no_control(settings):
+    """A 401 is a fault and must not be hidden by another stage reporting no control."""
+    from app.observability.protection import Protection
+
+    protection = Protection(settings)
+    protection._record("post", "no_control", {"cause": "no_control_selected"})
+    assert protection.status == "no_control"
+
+    protection._record("pre", "failed", {"http_status": 401, "hint": "credentials rejected"})
+    assert protection.status == "failed"
+    assert protection.detail["http_status"] == 401
+
+
+async def test_no_control_is_not_reported_as_a_failure(settings, monkeypatch):
+    """Reaching the gateway and learning nothing applies is an outcome, not a fault."""
+    import agent_control
+
+    from app.observability.protection import Protection
+
+    class Client:
+        def __init__(self, **kwargs):
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *args):
+            return False
+
+        async def post_runtime_evaluation(self, **kwargs):
+            return httpx.Response(
+                200,
+                request=httpx.Request("POST", "https://gateway.test/evaluation"),
+                json={"is_safe": True, "confidence": 1.0, "reason": "nothing applied",
+                      "matches": [], "non_matches": []},
+            )
+
+    monkeypatch.setattr(agent_control, "AgentControlClient", Client)
+    settings.galileo_enabled = True
+    settings.galileo_api_key = SecretStr("test-key")
+    settings.agent_control_url = "https://gateway.test/agent-control"
+    protection = Protection(settings)
+    await protection.check("answer", "question", {}, SimpleNamespace(log_stream_id="s"), True)
+    assert protection.status in {"no_control", "verified"}, protection.status
+    assert protection.status != "failed", "no control applying is not a failure"

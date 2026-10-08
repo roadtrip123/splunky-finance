@@ -37,6 +37,22 @@ reading it.
   place and restart: `sed -i 's|^DEMO_PASSWORD=.*|DEMO_PASSWORD=AlexDemo1234!|' .env`. Do this before
   taking an image, or every clone carries the old one.
 
+## v0.6.21 — A working guardrail no longer reports "failed"
+
+- **Protection status is tracked per stage.** There are two gates answering different questions: the
+  pre gate decides whether a tool runs, the post gate inspects the answer. A control scoped to
+  `transfer_funds` is invisible to the post gate, which correctly reports that nothing applied — and
+  because only the last call was kept, a box that had *just blocked a transfer* reported `failed`.
+  That nearly sent a real diagnosis the wrong way.
+- **"No control applied" is no longer a failure.** It is an outcome: the gateway answered and nothing
+  was scoped to that step. `failed` is now reserved for the gate not reaching a verdict at all, which
+  is the case that matters — the application fails closed and the refusal looks like success.
+- `protection_stages` in the admin status carries each gate's own status and detail, so `pre:
+  verified, post: no_control` is legible instead of one misleading word. A genuine fault still wins:
+  a 401 on either stage reports `failed`.
+- The Demo tab's readiness check read the conflated status, so a working preventive guardrail showed
+  as not ready.
+
 ## v0.6.20 — Which request was refused
 
 - The failure diagnosis now carries the **path** of the refused request. A 401 on the runtime token

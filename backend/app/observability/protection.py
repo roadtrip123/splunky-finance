@@ -1,4 +1,5 @@
 import asyncio
+import time
 
 FALLBACK = "I couldn't verify that answer against the bank's policies. Please check the account terms or contact the bank for confirmation."
 BLOCKED = "That request is not available from My Bank Agent."
@@ -17,11 +18,32 @@ class Protection:
 
     def __init__(self, settings):
         self.settings = settings
+        # Per stage, because the two gates answer different questions and conflating them made a
+        # working guardrail report "failed". The pre gate decides whether a tool runs; the post gate
+        # inspects the answer. Controls scoped to tools are invisible to the post gate, which then
+        # correctly reports that nothing applied -- and since only the last call was kept, that was
+        # all anyone ever saw.
+        self.stages: dict = {}
         self.status = "unverified"
-        # The last reason the gate could not reach a verdict. Without this, a 401 was only visible
-        # inside a turn record -- so a guardrail failing closed looked identical to one working, and
-        # finding out which meant driving a turn and reading its action_decisions.
+        # The detail behind `status`. Without this a 401 was only visible inside a turn record, so
+        # a guardrail failing closed looked identical to one working and telling them apart meant
+        # driving a turn and reading its action_decisions.
         self.detail: dict = {}
+
+    # Best first: a stage that reached a verdict is the meaningful answer, and "no control applied"
+    # is an outcome rather than a fault -- it is what a tool-scoped control looks like to the gate
+    # that inspects answers.
+    PRECEDENCE = ("verified", "failed", "no_control", "unverified")
+
+    def _record(self, stage, status, detail=None):
+        self.stages[stage] = {"status": status, "detail": detail or {}, "at": time.time()}
+        best = min(
+            (s for s in self.stages.values()),
+            key=lambda s: self.PRECEDENCE.index(s["status"]),
+        )
+        self.status = best["status"]
+        self.detail = best["detail"]
+        return detail or {}
 
     def _unavailable(self, reason, diagnosis=None):
         details = {
@@ -223,24 +245,24 @@ class Protection:
             )
             details = self._details(result, evaluated, "execute", "block")
             self._log_controls(logger, evaluated, result, arguments, "tool_call", "pre", details)
-            self.status = "verified"
-            self.detail = {}
+            self._record("pre", "verified")
             return result.is_safe, details
         except ControlNotEvaluated as exc:
-            self.status = "failed"
-            self.detail = exc.diagnosis
-            return False, self._unavailable("No control evaluated this action", self.detail)
+            # The gate answered; nothing was scoped to this step. Not a failure.
+            self._record("pre", "no_control", exc.diagnosis)
+            return False, self._unavailable("No control evaluated this action", exc.diagnosis)
         except Exception as exc:  # noqa: BLE001 - sanitize credential-bearing SDK errors
-            self.status = "failed"
-            self.detail = self._failure(exc)
-            return False, self._unavailable("Protection request failed", self.detail)
+            diagnosis = self._failure(exc)
+            self._record("pre", "failed", diagnosis)
+            return False, self._unavailable("Protection request failed", diagnosis)
 
     async def check(self, candidate, prompt, evidence, logger, enabled):
         if not enabled:
             return candidate, {"decision": "disabled", "source": "application", "verified": False}
         if not self._configured(logger):
-            self.detail = {"cause": "not_configured"}
-            return FALLBACK, self._unavailable("Protection is not fully configured", self.detail)
+            diagnosis = {"cause": "not_configured"}
+            self._record("post", "failed", diagnosis)
+            return FALLBACK, self._unavailable("Protection is not fully configured", diagnosis)
         try:
             result, evaluated = await self._evaluate(
                 logger,
@@ -253,14 +275,14 @@ class Protection:
             )
             details = self._details(result, evaluated, "deliver", "safe_fallback")
             self._log_controls(logger, evaluated, result, candidate, "llm_call", "post", details)
-            self.status = "verified"
-            self.detail = {}
+            self._record("post", "verified")
             return candidate if result.is_safe else FALLBACK, details
         except ControlNotEvaluated as exc:
-            self.status = "failed"
-            self.detail = exc.diagnosis
-            return FALLBACK, self._unavailable("No control evaluated this answer", self.detail)
+            # Expected when every control is scoped to a tool: this gate inspects the answer, so
+            # nothing applies to it. Reporting that as a failure made a working guardrail look broken.
+            self._record("post", "no_control", exc.diagnosis)
+            return FALLBACK, self._unavailable("No control evaluated this answer", exc.diagnosis)
         except Exception as exc:  # noqa: BLE001 - sanitize credential-bearing SDK errors
-            self.status = "failed"
-            self.detail = self._failure(exc)
-            return FALLBACK, self._unavailable("Protection request failed", self.detail)
+            diagnosis = self._failure(exc)
+            self._record("post", "failed", diagnosis)
+            return FALLBACK, self._unavailable("Protection request failed", diagnosis)
