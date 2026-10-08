@@ -10,15 +10,14 @@ Your instructor gives you one URL, an account number and two passwords. Everythi
 
 ## Before you start
 
-| | |
+| What | Where it comes from |
 | --- | --- |
-| Your app | `https://p<NN>.<workshop-domain>` |
+| Your app | the URL your instructor gives you |
 | Customer login | account `12345678`, password `AlexDemo1234!` |
-| Presenter portal | the same URL at `https://<domian>/demo-admin`, password `PresenterDemo1234!` |
-
-| Galileo Console URL | the same URL at `https://<domian>/demo-admin`,  |
-| Galileo API  URL | the same URL at `https://<domian>/demo-admin`,  |
-| Galileo Agent Control  URL | the same URL at `https://<domian>/demo-admin`,  |
+| Presenter portal | the same URL with `/demo-admin` on the end, password `PresenterDemo1234!` |
+| Galileo console URL | your instructor — shaped like `https://console.<tenant>.galileocloud.io` |
+| Galileo API URL | your instructor — shaped like `https://api.<tenant>.galileocloud.io` |
+| Galileo Agent Control URL | your instructor |
 
 
 Open the app, sign in to banking, then open `/demo-admin` in **another tab of the same browser profile**. The two link automatically.
