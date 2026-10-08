@@ -239,7 +239,7 @@ is obviously wrong for some other reason, and say so in your reasoning rather th
 
 <img width="1313" height="245" alt="image" src="https://github.com/user-attachments/assets/08aec3ad-ce9d-44af-a6e6-7cb73ec32243" />
 
-3. Click on the name at the top and call it 'SplunkyRightCustomer-<Your initials>'. Change the **LLM Model** 'GPT-40 mini', **Modality** 'Text", **Apply to** 'trace', and **Input style** 'Full Trace'. (This evaluator is will check - Do the numbers match the ledger?)
+3. Click on the name at the top and call it 'SplunkyRightCustomer-<Your initials>'. Change the **LLM Model** 'GPT-40 mini', **Modality** 'Text", **Apply to** 'trace', and **Input style** 'Full Trace'. (This evaluator is will check - Is this even the right customer?)
 <img width="586" height="609" alt="image" src="https://github.com/user-attachments/assets/8ecf6930-ed40-407b-bd79-8c44561b6825" />
 
 
