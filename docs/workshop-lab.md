@@ -47,8 +47,14 @@ In the Galileo console:
   <img width="432" height="221" alt="image" src="https://github.com/user-attachments/assets/354b2c5d-fef6-499e-9197-7c3ecb95cea5" />
 6. Go to **Project** on the left screen and select **View all**
 <img width="558" height="757" alt="image" src="https://github.com/user-attachments/assets/87b5f0d1-6271-471a-9c62-d75fbc026d40" />
-
-
+7. Click on **Create new project**
+<img width="1366" height="140" alt="image" src="https://github.com/user-attachments/assets/db5404c3-1a47-45e4-81fc-1e129e349b23" />
+8. Give it a Project Name and click **Create Project**
+<img width="358" height="164" alt="image" src="https://github.com/user-attachments/assets/3f3054ce-6781-44d7-aaa1-6722485f5f3f" />
+9. It will automatically take you to the **Agent Stream** tab for your new project. Here you will need to configure the **Agent Streams**. An **Agent Stream** will be where all the logs will be sent to. Click **Create Agent Stream**
+<img width="1266" height="287" alt="image" src="https://github.com/user-attachments/assets/ac6e9e54-654e-4023-bafd-01c77cb9316d" />
+10. Give the name of the stream as 'my-bank-agent' and click **Create Agent Stream**
+<img width="356" height="168" alt="image" src="https://github.com/user-attachments/assets/f7d30cee-5e90-40f9-894c-25472c3288ca" />
 
 
 7.     Create an **API key** and copy it somewhere — you cannot read it again later
