@@ -37,6 +37,15 @@ reading it.
   place and restart: `sed -i 's|^DEMO_PASSWORD=.*|DEMO_PASSWORD=AlexDemo1234!|' .env`. Do this before
   taking an image, or every clone carries the old one.
 
+## v1.0.2 — No project pre-filled into every clone
+
+- **`GALILEO_PROJECT` defaults to blank**, in `config.py` and `.env.example`. It shipped as
+  `splunky-finance`, which meant every instance made from an image arrived pre-filled with one
+  person's project. A participant who leaves it points at a project they probably cannot read, and
+  the failure reads as a broken box rather than a wrong field. Two projects one letter apart already
+  cost a day on exactly this confusion; shipping one pre-filled a hundred times is worse.
+- The log stream keeps its default, because the lab has everyone create a stream by that name.
+
 ## v1.0.1 — Resetting a box without the units
 
 - `reset_for_snapshot.sh` falls back to `docker compose up` when no `splunky-finance` unit is

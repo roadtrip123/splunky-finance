@@ -36,7 +36,11 @@ class Settings(BaseSettings):
     llm_max_output_tokens: int = 2000
     galileo_enabled: bool = True
     galileo_api_key: SecretStr = SecretStr("")
-    galileo_project: str = "splunky-finance"
+    # Blank, deliberately. A default here is pre-filled into every deployment made from an image,
+    # and a participant who leaves it points at somebody else's project -- which they probably
+    # cannot read, producing a failure that looks like a broken box. The stream keeps its default
+    # because the lab has everyone create one by that name.
+    galileo_project: str = ""
     galileo_log_stream: str = "my-bank-agent"
     galileo_console_url: str = ""
     galileo_api_url: str = ""
