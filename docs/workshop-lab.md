@@ -156,7 +156,7 @@ Now we are connect to configure the Galileo Evaluators.
 <img width="1313" height="245" alt="image" src="https://github.com/user-attachments/assets/08aec3ad-ce9d-44af-a6e6-7cb73ec32243" />
 
 3. Click on the name at the top and call it 'SplunkyAnswerWholeQuestion-<Your initials>'. Change the **LLM Model** 'GPT-4.1 mini', **Modality** 'Text", **Apply to** 'trace', and **Input style** 'Full Trace'. (This evaluator is will check - did the answer address the whole question?)
-<img width="1434" height="659" alt="image" src="https://github.com/user-attachments/assets/0fda7777-7102-4675-8cfa-18df79e36556" />
+<img width="1135" height="617" alt="image" src="https://github.com/user-attachments/assets/df6fe363-7d99-4446-92c7-671ad7500d44" />
 
 4.  Scroll down on the left panel and select **Step-by-Step reasoning** and **No of judges** '3'
 
