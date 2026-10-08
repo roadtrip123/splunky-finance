@@ -28,6 +28,43 @@ reading it.
   or `/etc/rc.local`.** A rule deleted by hand comes back on the next boot, and on a box destined to
   become an AMI that means every clone starts with the port broken.
 
+## v0.6.9 — A certificate nobody has to accept
+
+- **`install.sh --cert/--key` serves an existing certificate**, which is the mode to use wherever an
+  organisation wildcard exists. It is the only one with no issuance step: nothing is fetched at boot,
+  no rate limit applies, and a clone serves immediately. Everything that existed to cope with a bare
+  IP disappears with it — no `tls internal`, no `default_sni`, no accepted warning, and `http://`
+  redirects to `https://` for free. Verified live against a DigiCert wildcard: `ssl_verify=0` from
+  outside with no `-k`.
+- **`--acme`** fetches a Let's Encrypt certificate, and is **never attempted unless asked**. A
+  hostname that does not resolve publicly would otherwise hang trying to reach Let's Encrypt, which
+  is exactly the home-lab case. It also refuses an IP, since no public authority will issue for one.
+- **`--lan-http`** serves plain HTTP for a home lab on a trusted network, and only for an RFC1918
+  address, because the application refuses it anywhere else. It says what that costs.
+- `--host` is now required wherever EC2 metadata is unavailable, and says so with examples rather
+  than failing obscurely. All four TLS modes were generated from the script's own code and validated
+  through Caddy, and the no-SNI handshake — what a browser sends to a bare IP — was exercised.
+
+### Removing configuration actually removes it
+
+Both found while preparing an image for cloning, where the stakes are a hundred people holding
+someone else's API key.
+
+- **Deleting a model endpoint left its credentials live.** `apply_endpoint` returned early on an
+  empty endpoint and never undid what it had applied, so the endpoint vanished from the portal while
+  the next turn still called it with the same key. Deleting now restores what `.env` configured —
+  restoring rather than blanking, so a key deliberately placed in `.env` is not discarded.
+- **Switching endpoints inherited the previous key.** Fields were applied only when present, so an
+  endpoint saved without a key kept the last one's. Both are covered by tests that fail on the old
+  code.
+- **Only secrets offered "Clear saved value".** A blank field is deliberately left unchanged so a key
+  survives editing a project name, which meant a URL, project or stream name could be overwritten but
+  never removed. Every saved field now offers it.
+- **`scripts/reset_for_snapshot.sh` wipes a box before it becomes an image.** It destroys the runtime
+  volume rather than editing it, then proves `galileo-settings.json` is gone and lists what the image
+  will still carry, warning about a provider key in `.env` that the volume wipe would not touch.
+  Clearing fields in the portal is not equivalent: a field forgotten is a field every clone inherits.
+
 ## v0.6.7 — One command
 
 - **`scripts/install.sh` installs a public single-stack instance in one command.** Docker, Caddy, the

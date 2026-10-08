@@ -28,6 +28,10 @@ class Telemetry:
         # overwrite this field and switching back never restored it, so a Galileo turn kept calling
         # app.<realm>.signalfx.com with a Galileo key and the gate failed closed on every request.
         self._galileo_agent_control_url = settings.agent_control_url
+        # What .env configured, before any saved endpoint is applied over the top. Deleting an
+        # endpoint has to undo what applying it did, and "undo" means returning to this -- not
+        # blanking the fields, which would discard a key the operator put in .env on purpose.
+        self._endpoint_baseline = self._endpoint_settings()
         self.toggle_path = Path(settings.data_dir) / "galileo-settings.json"
         try:
             saved = json.loads(self.toggle_path.read_text())
@@ -237,10 +241,33 @@ class Telemetry:
             ]
         return list(endpoints or [])
 
+    def _endpoint_settings(self):
+        """Every setting an endpoint can write, as a snapshot that can be put back."""
+        fields = {"llm_provider": self.settings.llm_provider}
+        for key_field, model_field, url_field in self.MODEL_FIELDS.values():
+            for field in (key_field, model_field, url_field):
+                if field:
+                    fields[field] = getattr(self.settings, field)
+        return fields
+
+    def restore_endpoint_baseline(self):
+        """Undo whatever an endpoint applied, back to what .env configured.
+
+        Without this, deleting an endpoint removed it from the list while leaving its credentials
+        live: the portal showed no endpoint and the next turn still called the deleted one.
+        """
+        for field, value in self._endpoint_baseline.items():
+            setattr(self.settings, field, value)
+
     def apply_endpoint(self, endpoint):
-        """Point settings at this endpoint so model_name and provider_configured follow it."""
+        """Point settings at this endpoint so model_name and provider_configured follow it.
+
+        The baseline is restored first, so switching endpoints cannot leave a field behind from the
+        previous one -- an endpoint saved without a key used to inherit the last endpoint's key.
+        """
         from pydantic import SecretStr
 
+        self.restore_endpoint_baseline()
         if not endpoint:
             return
         provider = endpoint.get("provider")
@@ -326,8 +353,9 @@ class Telemetry:
         if active == identifier:
             active = endpoints[0]["id"] if endpoints else ""
         self._persist(endpoints=endpoints, active_endpoint=active)
-        if active:
-            self.apply_endpoint(next(e for e in endpoints if e["id"] == active))
+        # apply_endpoint restores the baseline itself, and is called even with nothing left so that
+        # the last endpoint's credentials do not stay live after it is deleted.
+        self.apply_endpoint(next((e for e in endpoints if e["id"] == active), None) if active else None)
 
     def set_active_endpoint(self, identifier):
         endpoints = self._load_endpoints(self._saved())

@@ -85,10 +85,81 @@ Two things it cannot do, and says so at the end:
 
 Then set the model endpoint in the presenter portal, not in `.env`.
 
-Options worth knowing: `--host <addr>` when metadata is unavailable or the address is not the
-instance's own, `--port <n>` where something already owns 443, `--channel branch` to follow the
-branch tip rather than releases, `--no-tls` for a box already behind a TLS proxy, and `--skip-build`
-to install without starting. `--help` lists them.
+### How TLS gets terminated
+
+The script picks nothing for you beyond the default. Pass the mode that matches where this box lives:
+
+| Mode | When | Warning in the browser? |
+| --- | --- | --- |
+| `--cert <f> --key <f>` | A certificate is already available, such as an organisation wildcard | **None**, if a public CA signed it |
+| `--acme` | A hostname that resolves publicly, and no certificate in hand | **None** |
+| *(default)* | Anything else — a bare IP, a home lab, a private name | Once per visitor |
+| `--lan-http` | A trusted private network where TLS is not wanted | No TLS at all |
+
+**`--cert` is the one to reach for wherever a wildcard exists.** It is the only mode with no issuance
+step: nothing is fetched at boot, there is no rate limit, and a clone of the image serves immediately.
+With a wildcard such as `*.example.com`, every box can carry the same certificate and serve its own
+hostname.
+
+`--acme` is **never attempted unless you ask for it**, which matters on a private network: a hostname
+that does not resolve publicly would otherwise hang trying to reach Let's Encrypt. It also refuses an
+IP address, because no public authority will issue for one.
+
+A wildcard matches **one label only**. `*.example.com` covers `demo.example.com` but not
+`demo.lab.example.com`. When asking for per-box hostnames, ask for single-label names.
+
+Other options: `--host <addr>` wherever EC2 metadata is unavailable — a home lab needs it —
+`--port <n>`, `--channel branch` to follow the branch tip rather than releases, `--email` with
+`--acme`, `--no-tls` for a box already behind a proxy, and `--skip-build`. `--help` lists them.
+
+### A hostname and a certificate
+
+The best-behaved deployment, and the one to use when an organisation wildcard is available:
+
+```bash
+sudo ./scripts/install.sh --host demo.example.com \
+  --cert /opt/certs/wildcard.example.com.crt \
+  --key /opt/certs/example.com.key
+```
+
+Everything that existed to cope with a bare IP disappears: no `tls internal`, no `default_sni`, no
+accepted warning, and `http://` redirects to `https://` for free. Check the certificate before
+trusting it — four things can be wrong and three are silent:
+
+```bash
+sudo openssl x509 -in /opt/certs/wildcard.example.com.crt -noout -subject -issuer -dates -ext subjectAltName
+```
+
+```bash
+echo "certs in file: $(sudo grep -c 'BEGIN CERTIFICATE' /opt/certs/wildcard.example.com.crt)"
+```
+
+Wanted: a `subjectAltName` covering the hostname, an issuer that is a public CA rather than an
+internal one, an expiry comfortably ahead, and **two or more certificates in the file**. One means
+leaf-only with no intermediate, which is the classic "works in curl, fails in Safari" bug. Confirm
+the key matches the certificate:
+
+```bash
+sudo bash -c 'diff <(openssl x509 -in /opt/certs/wildcard.example.com.crt -noout -pubkey) <(openssl pkey -in /opt/certs/example.com.key -pubout) >/dev/null && echo match || echo MISMATCH'
+```
+
+The files are copied to `/etc/caddy/tls.{crt,key}` with ownership the proxy can read, because a
+certificate is usually root-owned and `0600`. If yours renews on disk, point the Caddyfile at the live
+path instead so a renewal is picked up.
+
+### A home lab
+
+No EC2 metadata, so the address has to be given:
+
+```bash
+sudo ./scripts/install.sh --host 192.168.1.50
+```
+
+That serves HTTPS with a self-signed certificate — one accepted warning, no DNS and no CA involved.
+If a real hostname points at the box and port 80 or 443 reaches it from the internet, `--acme` gets a
+trusted certificate instead. `--lan-http` drops TLS altogether, and works only for an RFC1918 address
+because the application refuses plain HTTP anywhere else; anything pasted into the portal, including a
+participant's own API keys, then crosses the network in cleartext.
 
 ## Installing by hand
 
@@ -246,43 +317,74 @@ Last, open `https://<public-ip>` from a machine outside, accept the warning, and
 customer number and shared password. Then walk [workshop-lab.md](workshop-lab.md) once, including
 creating the Agent Control agent — the step most likely to catch people.
 
-## Bake an AMI before the second one
+## Bake an AMI
 
-Instance-per-demo otherwise repeats the build, and the egress and firewall checks, on every box. Once
-one instance is verified end to end:
+Instance-per-demo otherwise repeats the build, and the egress and firewall checks, on every box.
 
-1. Stop the containers so nothing is mid-write: `docker compose down`
-2. Create an image from the instance in the console, or `aws ec2 create-image --instance-id <id> --name splunky-finance-<version>`
-3. Launch the rest from it, through a launch template carrying the type, the 30 GB volume and the
-   security group
+### First, remove your own credentials
 
-Every clone carries the address of the box it was baked from, in `.env` and in
-`/etc/caddy/Caddyfile`. Both have to be rewritten on first boot, and the session secret should not be
-shared between boxes:
+**Clearing fields in the portal is not good enough.** Credentials live in `galileo-settings.json`
+inside the runtime volume, and a field you forget to clear is a field every clone inherits — a
+hundred people holding your API key. Destroy the volume rather than editing it:
 
 ```bash
-TOKEN=$(curl -sX PUT http://169.254.169.254/latest/api/token -H 'X-aws-ec2-metadata-token-ttl-seconds: 60')
-IP=$(curl -s -H "X-aws-ec2-metadata-token: $TOKEN" http://169.254.169.254/latest/meta-data/public-ipv4)
+sudo ./scripts/reset_for_snapshot.sh --confirm
+```
+
+Run it without `--confirm` first and it prints exactly what it will delete. It stops the stack,
+destroys the runtime volume, starts clean, then **proves** `galileo-settings.json` is gone rather
+than assuming it, and lists what the image will still carry. It also warns if a provider key is set
+in `.env`, which is not in the volume and would survive.
+
+Then confirm by eye: open the portal, check the Setup tab lists no endpoint and no observability
+credentials, and that the app still answers on its public address from another machine.
+
+### Then snapshot
+
+1. `aws ec2 create-image --instance-id <id> --name splunky-finance-<version>`, or the console
+2. Launch the rest through a launch template carrying the instance type, the 30 GB volume and the
+   security group
+
+### Every clone needs three things rewritten
+
+A clone carries the address of the box it was baked from, in `.env` and in the proxy's config, and a
+session secret shared with every other clone. This is the whole of a `cloud-init` `runcmd` block,
+for a **hostname with a wildcard certificate** — the shape that scales, because the certificate is
+identical on every box and only the site name differs:
+
+```bash
+HOST="$(hostname -f)"
 cd /home/ubuntu/splunky-finance
-sudo -u ubuntu python3 scripts/setup_env.py --origin "$IP" --rotate-secret
-printf '{\n\tauto_https disable_redirects\n\tdefault_sni %s\n\tskip_install_trust\n}\n%s:443 {\n\ttls internal\n\treverse_proxy 127.0.0.1:3000\n}\n' "$IP" "$IP" | tee /etc/caddy/Caddyfile >/dev/null
+sudo -u ubuntu python3 scripts/setup_env.py --origin "$HOST" --rotate-secret
+printf '%s {\n\ttls /etc/caddy/tls.crt /etc/caddy/tls.key\n\treverse_proxy 127.0.0.1:3000\n}\n' "$HOST"   > /etc/caddy/Caddyfile
 systemctl restart caddy
 systemctl restart splunky-finance
 ```
 
-`systemctl restart splunky-finance` rather than `docker compose up -d`, so the clone picks up any
-release published since the AMI was baked. Enable the unit before taking the snapshot and the clones
-do this on their own at every boot.
+Substitute however the platform tells a box its own name; `hostname -f` works when it is set from
+DHCP or cloud-init. For a **bare IP with a self-signed certificate**, read the address from instance
+metadata instead and generate that form of config:
 
-That is the whole of a `cloud-init` `runcmd` block, which makes the clones self-configuring — the IMDS
-address returns the instance's own public IP from inside it. The token request is the IMDSv2 handshake;
-new instances commonly have IMDSv1 disabled, where the plain `curl` returns nothing and `--origin`
-would be handed an empty string. `--rotate-secret` issues a new cookie
-signing key, so a session on one box is not valid on another.
+```bash
+TOKEN=$(curl -sX PUT http://169.254.169.254/latest/api/token -H 'X-aws-ec2-metadata-token-ttl-seconds: 60')
+HOST=$(curl -s -H "X-aws-ec2-metadata-token: $TOKEN" http://169.254.169.254/latest/meta-data/public-ipv4)
+printf '{\n\tauto_https disable_redirects\n\tskip_install_trust\n\tdefault_sni %s\n}\n%s {\n\ttls internal\n\treverse_proxy 127.0.0.1:3000\n}\n' "$HOST" "$HOST" > /etc/caddy/Caddyfile
+```
 
-One thing it cannot cover: the container egress `iptables` rule, if that host needs one. It does not
-survive a reboot, let alone an AMI, so add it to the same block if the platform redirects container
-traffic.
+The token request is the IMDSv2 handshake; new instances commonly have IMDSv1 disabled, where the
+plain request returns nothing and `--origin` is handed an empty string.
+
+`systemctl restart splunky-finance` rather than `docker compose up -d`, so a clone picks up any
+release published since the image was baked. `--rotate-secret` issues a new cookie signing key:
+without it a session cookie minted on one box is valid on all of them.
+
+Two things a clone block cannot cover:
+
+- **The container egress `iptables` rule**, if the platform redirects container traffic. It does not
+  survive a reboot, let alone an image, so add it to the same block.
+- **A certificate expiry baked into the image.** Clones launched after that date serve an expired
+  certificate. Record the expiry wherever the image is recorded —
+  `openssl x509 -in /etc/caddy/tls.crt -noout -enddate` prints it.
 
 ## Why not one instance with fifty stacks
 

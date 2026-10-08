@@ -164,3 +164,67 @@ def test_install_conflicts_when_the_host_side_is_absent(update_client, tmp_path)
     response = update_client.post("/api/demo-admin/update/install", headers=headers)
     assert response.status_code == 409, response.text
     assert "not installed" in response.json()["error"]["message"]
+
+
+# --- Removing configuration -------------------------------------------------------------------
+# Both of these matter before a snapshot: an image taken with credentials still live ships them to
+# every clone made from it.
+
+
+def endpoint_payload(name, key):
+    return {"name": name, "provider": "openai", "model": "gpt-4o", "base_url": "", "api_key": key}
+
+
+def test_deleting_the_last_endpoint_stops_it_being_used(client, settings):
+    headers = login(client, admin=True)
+    baseline = settings.openai_api_key.get_secret_value()
+
+    created = client.put("/api/demo-admin/endpoints", headers=headers,
+                         json=endpoint_payload("Sharon AI", "sk-sharon-secret"))
+    assert created.status_code == 200, created.text
+    identifier = created.json()["endpoints"][-1]["id"]
+    assert settings.openai_api_key.get_secret_value() == "sk-sharon-secret"
+
+    removed = client.delete(f"/api/demo-admin/endpoints/{identifier}", headers=headers)
+    assert removed.status_code == 200, removed.text
+    assert removed.json()["endpoints"] == []
+    # The endpoint is gone from the list; its credential must be gone from the live settings too.
+    assert settings.openai_api_key.get_secret_value() == baseline
+    assert settings.openai_api_key.get_secret_value() != "sk-sharon-secret"
+
+
+def test_switching_endpoints_does_not_inherit_the_previous_key(client, settings):
+    headers = login(client, admin=True)
+    first = client.put("/api/demo-admin/endpoints", headers=headers,
+                       json=endpoint_payload("With key", "sk-first-secret"))
+    assert first.status_code == 200, first.text
+    second = client.put("/api/demo-admin/endpoints", headers=headers,
+                        json=endpoint_payload("No key", ""))
+    assert second.status_code == 200, second.text
+    identifier = second.json()["endpoints"][-1]["id"]
+
+    activated = client.post("/api/demo-admin/endpoints/active", headers=headers,
+                            json={"id": identifier})
+    assert activated.status_code == 200, activated.text
+    assert settings.openai_api_key.get_secret_value() != "sk-first-secret", (
+        "an endpoint saved without a key must not inherit the previous endpoint's key"
+    )
+
+
+def test_a_non_secret_connection_field_can_be_cleared(client, settings):
+    headers = login(client, admin=True)
+    saved = client.put("/api/demo-admin/galileo/connection", headers=headers,
+                       json={"galileo_project": "my-project", "galileo_log_stream": "my-stream"})
+    assert saved.status_code == 200, saved.text
+    assert saved.json()["connection"]["galileo_project"] == "my-project"
+
+    # A blank value is deliberately ignored, so clearing has to be explicit.
+    blanked = client.put("/api/demo-admin/galileo/connection", headers=headers,
+                         json={"galileo_project": ""})
+    assert blanked.json()["connection"]["galileo_project"] == "my-project"
+
+    cleared = client.put("/api/demo-admin/galileo/connection", headers=headers,
+                         json={"galileo_project": "", "clear": ["galileo_project"]})
+    assert cleared.status_code == 200, cleared.text
+    assert cleared.json()["connection"]["galileo_project"] == ""
+    assert cleared.json()["connection"]["galileo_log_stream"] == "my-stream", "clear must be surgical"

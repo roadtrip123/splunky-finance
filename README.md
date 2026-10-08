@@ -37,6 +37,11 @@ the app sends, and the controls attached to that agent rather than only to the l
 three hold, the app fails closed — which looks identical from the chat and is distinguishable only in
 `action_decisions`.
 
+**A publicly-trusted deployment is verified.** A hostname with an organisation wildcard certificate,
+validated from outside against a real trust store with no exception — so visitors accept nothing.
+That path needs no certificate authority round trip at boot, which is what makes it the one that
+scales to many instances from one image.
+
 **Deployment verified on a hostile network.** Image builds, container egress to a live model endpoint,
 two concurrent participant stacks, and TLS on a bare IP all confirmed working on an EC2 instance whose
 host redirects container traffic. Browser access was not confirmed, because that network's perimeter

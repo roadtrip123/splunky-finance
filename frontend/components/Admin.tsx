@@ -887,10 +887,18 @@ export default function Admin() {
                           />
                           <small className="field-hint" id={`${key}-hint`}>
                             {hint}
-                            {type === "password" &&
-                              (status.connection as Record<string, string | boolean>)[
-                                `${key}_set`
-                              ] === true && (
+                            {/* Offered for every saved field, not only secrets. A blank field is
+                                deliberately left unchanged so a key survives editing a project
+                                name, which meant a URL or project name could be overwritten but
+                                never removed. A secret reports `<field>_set`, because its value is
+                                never echoed back; everything else reports the value itself. */}
+                            {(type === "password"
+                              ? (status.connection as Record<string, string | boolean>)[
+                                  `${key}_set`
+                                ] === true
+                              : !!(status.connection as Record<string, string | boolean>)[
+                                  key
+                                ]) && (
                                 <>
                                   {" "}
                                   <button
