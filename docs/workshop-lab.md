@@ -74,8 +74,33 @@ Note the **console URL** and **API URL** for your tenant, and the **Agent Contro
 <img width="1520" height="723" alt="image" src="https://github.com/user-attachments/assets/cd0e18c3-91d1-44f1-98b4-a8324116071d" />
 3. Scroll down until you get to the **Connect to Splunk Agent Observability / Galileo**. Select **Galileo**. Fill out your 'Project', 'Log Stream', 'Console URL', 'API URL' and 'Agent Control URL'. (These URLs can be found with your credentials). Once filled out click **Save and Connect**
 <img width="1093" height="774" alt="image" src="https://github.com/user-attachments/assets/11c2d4b9-c9dc-4523-af63-936f4d4cce8d" />
+4. Once saved, scroll to the top and verify you can see it is **Connected**
+<img width="1033" height="585" alt="image" src="https://github.com/user-attachments/assets/d53322a1-8785-4f22-b566-0d26d6fe9640" />
 
-4.  
+## Step 3 — Connect to your My-Banking-Agent to LLM
+
+1. Go to your demo admin portal - https://<domain>/demo-admin` and sign in
+<img width="1811" height="651" alt="image" src="https://github.com/user-attachments/assets/c471041a-8325-4b8d-b3e7-a9efd77fe678" />
+
+2.  Click **Setup**
+<img width="1520" height="723" alt="image" src="https://github.com/user-attachments/assets/cd0e18c3-91d1-44f1-98b4-a8324116071d" />
+
+3. Scroll down to the **Model endpoint** section. Enter in your 'Model Nam", select 'Provider', 'API Keys', and 'Model'. (The model is which specific model you are using). Click **Add endpoint**
+<img width="1092" height="693" alt="image" src="https://github.com/user-attachments/assets/c50566a7-c8c2-4124-b66d-06d13fc8bae5" />
+4. It will show at the top of the page, the selected and configured model
+<img width="1096" height="662" alt="image" src="https://github.com/user-attachments/assets/4fa0a300-a1b0-4233-966d-c207a670997a" />
+5. To test if everyone is working correctly, go to **Demo** tab
+<img width="1054" height="541" alt="image" src="https://github.com/user-attachments/assets/c91c97eb-92be-4011-b2bf-27e0f3911bc9" />
+6. Select **Run** next to the 'Questions for this scenario'. This will trigger an LLM call from the My Banking Agent.
+<img width="1017" height="393" alt="image" src="https://github.com/user-attachments/assets/ead70e8a-c6a6-4d39-8586-d08b9ca314cd" />
+7. If you scroll down, after a few seconds it will give you the answer, if it is working correctly.
+<img width="1093" height="382" alt="image" src="https://github.com/user-attachments/assets/b1d3552b-fe97-4c8a-a7ec-8efb4a2ea086" />
+6. Now go back to Galileo to make sure you can see that message. Click on your project and select your **Agent Stream**
+<img width="1414" height="373" alt="image" src="https://github.com/user-attachments/assets/bb04ea52-8af1-4186-ae83-e1f25511294a" />
+
+8. 
+9.  
+
 **Model endpoint.** Choose your provider, fill in the key and model, and press **Add endpoint**. Sharon AI and any other OpenAI-compatible service use the OpenAI protocol with their own base URL, which the preset fills in for you.
 
 **Connect to Splunk Agent Observability / Galileo.** Choose where traces are sent — one backend at a time. The form then asks only for that backend's credentials, each marked required or optional with a note saying where to find it:
