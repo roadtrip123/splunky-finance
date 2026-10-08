@@ -37,6 +37,13 @@ reading it.
   place and restart: `sed -i 's|^DEMO_PASSWORD=.*|DEMO_PASSWORD=AlexDemo1234!|' .env`. Do this before
   taking an image, or every clone carries the old one.
 
+## v1.0.1 — Resetting a box without the units
+
+- `reset_for_snapshot.sh` falls back to `docker compose up` when no `splunky-finance` unit is
+  installed. It restarted through the unit unconditionally, so on a box where only the manual path
+  was ever set up — a workstation — it destroyed the runtime volume and then failed, leaving the
+  stack down. Wiping and not restarting is the one outcome that script must never produce.
+
 ## v1.0.0 — The working version
 
 The first release verified end to end against a live Galileo tenant on two independent deployments:

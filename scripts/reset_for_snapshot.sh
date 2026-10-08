@@ -53,9 +53,21 @@ sudo -u "$OWNER" docker compose --project-directory "$ROOT" down -v || die "comp
 note "volume removed"
 
 say "Starting clean"
-# Through the unit rather than compose, so the state file the portal reads is written too.
-# restart, not start: the unit is left `active (exited)` and `start` on an active unit is a no-op.
-systemctl restart splunky-finance || die "could not start splunky-finance; see journalctl -u splunky-finance"
+# Through the unit where one exists, so the state file the portal reads is written too. restart,
+# not start: the unit is left `active (exited)` and `start` on an active unit is a no-op.
+#
+# Falling back to compose matters: a box without the units -- a workstation, or anything where only
+# the manual path was ever set up -- would otherwise have its volume destroyed and then fail here,
+# leaving the stack down. Wiping and not restarting is the one outcome this script must not produce.
+if systemctl list-unit-files splunky-finance.service >/dev/null 2>&1 \
+  && systemctl cat splunky-finance.service >/dev/null 2>&1; then
+  systemctl restart splunky-finance \
+    || die "could not start splunky-finance; see journalctl -u splunky-finance"
+else
+  note "no splunky-finance unit installed; starting with compose instead"
+  sudo -u "$OWNER" docker compose --project-directory "$ROOT" up -d --wait --wait-timeout 240 \
+    || die "could not start the stack; see docker compose logs"
+fi
 
 say "Verifying nothing was left behind"
 LEFT="$(sudo -u "$OWNER" docker compose --project-directory "$ROOT" exec -T backend \
