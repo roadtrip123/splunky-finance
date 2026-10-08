@@ -22,9 +22,12 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 UNIT_DIR = Path("/etc/systemd/system")
-# The uid the backend container runs as; see backend/Dockerfile. The shared directory has to be
-# writable by it, or the portal can report versions but not request an update.
-CONTAINER_UID = 10001
+# The gid the backend container runs as; see backend/Dockerfile. The shared directory is group-owned
+# by it so the container can write a request, and user-owned by the account running the units so the
+# host can write the state file. Giving it to the container outright locks the host out of its own
+# directory, which presents as selfupdate.py failing to record what it did.
+CONTAINER_GID = 10001
+SHARED_MODE = 0o770
 UNITS = (
     "splunky-finance.service",
     "splunky-finance-update.service",
@@ -75,8 +78,9 @@ def main():
     # Must exist and be writable by the container before compose mounts it, or Docker creates it
     # root-owned and the portal's button is absent.
     state_dir.mkdir(parents=True, exist_ok=True)
-    os.chown(state_dir, CONTAINER_UID, CONTAINER_UID)
-    print(f"created {state_dir}, owned by uid {CONTAINER_UID}")
+    os.chown(state_dir, pwd.getpwnam(user).pw_uid, CONTAINER_GID)
+    state_dir.chmod(SHARED_MODE)
+    print(f"created {state_dir}, owned by {user}:{CONTAINER_GID} mode {oct(SHARED_MODE)}")
 
     for unit in UNITS:
         target = UNIT_DIR / unit

@@ -6,6 +6,28 @@ Versions mark states worth returning to. Tags are annotated, so `git tag -n` and
 Open defects are tracked as [GitHub issues](https://github.com/roadtrip123/splunky-finance/issues);
 planned work is in [TODO.md](TODO.md).
 
+## v0.6.8 — What the first real install found
+
+Three defects, all in the install path, all found by running it on a fresh instance rather than by
+reading it.
+
+- **The shared update directory locked out the host.** It was given to the container's uid outright,
+  so the account running the updater could no longer write the state file beside the container's
+  request file. It is now `<owner>:10001` with mode `0770` — user for the host, group for the
+  container. The symptom was `selfupdate.py` reporting it could not record what it did, after a
+  successful build.
+- **The proxy was verified the instant after `systemctl restart`.** Caddy provisions its internal
+  certificate authority and binds after systemd reports the restart complete, so the check failed on
+  a proxy that was already about to serve — and the installer reported a working deployment as
+  broken. It now retries for twenty seconds, and if the local check still fails it says that the
+  check goes through loopback and names the command to confirm from another machine, rather than
+  asserting the proxy is down.
+- **`[ ... ] && break` inside the retry loop** would have taken the script down under `set -e` on the
+  first retry, which is the same trap already fixed once in the egress check.
+- **`install.sh` now warns when a redirect for the chosen port is still in `/etc/iptables/rules.v4`
+  or `/etc/rc.local`.** A rule deleted by hand comes back on the next boot, and on a box destined to
+  become an AMI that means every clone starts with the port broken.
+
 ## v0.6.7 — One command
 
 - **`scripts/install.sh` installs a public single-stack instance in one command.** Docker, Caddy, the

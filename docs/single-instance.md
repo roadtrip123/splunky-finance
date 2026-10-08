@@ -62,7 +62,7 @@ pass `--port <n>` and use a high port.
 
 ```bash
 sudo apt-get update && sudo apt-get install -y git
-git clone --branch v0.6.7 https://github.com/roadtrip123/splunky-finance.git
+git clone --branch v0.6.8 https://github.com/roadtrip123/splunky-finance.git
 cd splunky-finance
 sudo ./scripts/install.sh
 ```
@@ -103,7 +103,7 @@ curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' | sudo gpg --d
 curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' | sudo tee /etc/apt/sources.list.d/caddy-stable.list >/dev/null
 sudo apt-get update && sudo apt-get install -y caddy
 
-git clone --branch v0.6.7 https://github.com/roadtrip123/splunky-finance.git
+git clone --branch v0.6.8 https://github.com/roadtrip123/splunky-finance.git
 cd splunky-finance
 python3 scripts/setup_env.py --origin <public-ip>
 ```
@@ -175,9 +175,12 @@ the units, restart it so it picks up the new bind mount:
 docker compose up -d
 ```
 
-The shared directory has to be writable by uid 10001, the uid the backend container runs as, which
-the installer handles. Without it the card still reports versions but the install button is absent,
-and it says exactly why.
+`runtime/update/` is written by two different identities and needs both: the host account that runs
+the updater writes the state file, and the container writes the request. The installer gives it to
+`<owner>:10001` with mode `0770` — user for the host, group for the container, which runs as uid and
+gid 10001. Handing it to the container outright locks the host out of its own directory, and the
+symptom is the updater reporting that it could not record what it did. If the card reports versions
+but offers no install button, it says which half is missing.
 
 The container does not perform the update. It writes a request file into `runtime/update/`, a
 systemd path unit notices, and the host does the work. That boundary is deliberate: the presenter

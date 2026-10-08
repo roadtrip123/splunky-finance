@@ -110,6 +110,14 @@ if [ "$WITH_TLS" -eq 1 ]; then
        Then either remove that rule or pick a different port with --port <n>."
   fi
   note "port $PORT is free"
+  # A rule removed by hand is still in the persisted ruleset, and comes back on the next boot. On a
+  # box destined to become an AMI that means every clone starts with the port broken.
+  for FILE in /etc/iptables/rules.v4 /etc/rc.local; do
+    if [ -f "$FILE" ] && grep -q -- "--dport $PORT" "$FILE" 2>/dev/null; then
+      note "WARNING: $FILE still redirects port $PORT, so a reboot will undo this."
+      note "         Inspect with: grep -n -- '--dport $PORT' $FILE"
+    fi
+  done
 fi
 
 say "Writing configuration"
@@ -168,10 +176,25 @@ if [ "$BUILD" -eq 1 ]; then
   note "stack on 127.0.0.1:3000 -> $STACK"
   [ "$STACK" = "200" ] || die "The application is not answering. Check: docker compose ps; docker compose logs backend"
   if [ "$WITH_TLS" -eq 1 ]; then
-    PROXY="$(curl -sk -o /dev/null -w '%{http_code}' --max-time 10 \
-      --connect-to "$HOST:$PORT:127.0.0.1:$PORT" "https://$HOST:$PORT/" || true)"
+    # Retried, not sampled once: Caddy provisions its internal certificate authority and binds after
+    # systemd reports the restart done, so an immediate check fails on a proxy that is about to work.
+    PROXY="000"
+    for _ in 1 2 3 4 5 6 7 8 9 10; do
+      PROXY="$(curl -sk -o /dev/null -w '%{http_code}' --max-time 5 \
+        --connect-to "$HOST:$PORT:127.0.0.1:$PORT" "https://$HOST:$PORT/" || true)"
+      # `if`, not `[ ... ] && break`: an AND-list whose test fails returns non-zero, and `set -e`
+      # would take the whole script down on the first retry. Same trap as in the egress check.
+      if [ "$PROXY" = "200" ]; then break; fi
+      sleep 2
+    done
     note "proxy on $PORT -> $PROXY"
-    [ "$PROXY" = "200" ] || die "Caddy is not serving. Check: journalctl -u caddy -n 30"
+    if [ "$PROXY" != "200" ]; then
+      note "the proxy may still be serving correctly: this check goes through loopback, and some"
+      note "configurations only answer on the public address, which this instance cannot reach."
+      note "Confirm from another machine before treating it as broken:"
+      note "  curl -skI $ORIGIN/"
+      die "Could not verify the proxy locally. Check: journalctl -u caddy -n 30"
+    fi
   fi
 fi
 
