@@ -2,7 +2,7 @@
 
 You have your own copy of a fictional Australian bank whose assistant answers customer questions using read-only banking tools over synthetic data. Nothing here is real and no real banking action exists.
 
-By the end you will have connected it to your own Galileo project, built the evaluators that catch a bad answer, and built a guardrail that stops an unsafe action before it happens.
+By the end you will have connected it to your own Galileo / Splunk Agent Observability project, built the evaluators that catch a bad answer, and built a guardrail that stops an unsafe action before it happens.
 
 Your instructor gives you one URL, an account number and two passwords. Everything else you build yourself.
 
@@ -14,9 +14,16 @@ Your instructor gives you one URL, an account number and two passwords. Everythi
 | --- | --- |
 | Your app | `https://p<NN>.<workshop-domain>` |
 | Customer login | account `12345678`, password `-AlexDemo1234!` |
-| Presenter portal | the same URL at `/demo-admin`, password `PresenterDemo1234!` |
+| Presenter portal | the same URL at `https://<domian>/demo-admin`, password `PresenterDemo1234!` |
 
 Open the app, sign in to banking, then open `/demo-admin` in **another tab of the same browser profile**. The two link automatically.
+
+Banking App:
+<img width="1812" height="869" alt="image" src="https://github.com/user-attachments/assets/dd1a734f-248e-4e84-b11f-09c313bb8d54" />
+
+Demo-Admin:
+<img width="1817" height="654" alt="image" src="https://github.com/user-attachments/assets/640afc6b-f0c8-4f06-bfb7-35c5aff62de1" />
+
 
 Your instance is yours alone: your own dataset, your own settings. What you do will not affect anyone else.
 
