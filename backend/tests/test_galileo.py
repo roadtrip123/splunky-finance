@@ -967,3 +967,58 @@ def test_the_numerical_judge_reads_every_evidence_key():
     assert "never read one as the other" in prompt
     # And the rule that keeps it quiet when there is nothing to contradict must survive.
     assert "states no money amount and no count, return true" in prompt
+
+
+async def test_the_galileo_gateway_set_from_the_portal_survives_a_connection_check(settings):
+    """It did not, and the symptom was a portal field that silently would not save.
+
+    `agent_control_url` is Galileo's input and also the live field the gate reads, and the live one
+    is rewritten per backend from a value remembered at construction. A URL set from the portal was
+    applied, then overwritten by the next connection check with whatever `.env` had at startup --
+    usually nothing. The save returned 200 and the field read back empty.
+    """
+    from app.observability.galileo import Telemetry
+
+    settings.agent_control_url = ""
+    telemetry = Telemetry(settings)
+    telemetry.set_connection({"agent_control_url": "https://gateway.test/agent-control"})
+    assert settings.agent_control_url == "https://gateway.test/agent-control"
+
+    telemetry.apply_agent_control_defaults()
+    assert settings.agent_control_url == "https://gateway.test/agent-control", (
+        "the connection check must not revert a gateway set from the portal"
+    )
+
+
+async def test_switching_to_splunk_ao_and_back_keeps_the_galileo_gateway(settings):
+    from app.observability.galileo import Telemetry
+
+    settings.agent_control_url = ""
+    telemetry = Telemetry(settings)
+    telemetry.set_connection({
+        "agent_control_url": "https://galileo.test/agent-control",
+        # Set explicitly rather than relying on the realm derivation, which only applies in o11y
+        # mode. A Splunk AO deployment with no gateway of its own is a separate gap.
+        "splunk_ao_agent_control_url": "https://app.au0.signalfx.com/ao/agent-control",
+    })
+
+    telemetry.set_active_backend("splunk_ao")
+    telemetry.apply_agent_control_defaults()
+    assert "signalfx.com" in settings.agent_control_url, "Splunk AO must use its own gateway"
+
+    telemetry.set_active_backend("galileo")
+    telemetry.apply_agent_control_defaults()
+    assert settings.agent_control_url == "https://galileo.test/agent-control", (
+        "switching back must restore Galileo's gateway, not the Splunk AO one"
+    )
+
+
+async def test_clearing_the_gateway_is_not_undone_by_the_next_check(settings):
+    from app.observability.galileo import Telemetry
+
+    telemetry = Telemetry(settings)
+    telemetry.set_connection({"agent_control_url": "https://gateway.test/agent-control"})
+    telemetry.set_connection({"agent_control_url": ""}, clear=["agent_control_url"])
+    assert settings.agent_control_url == ""
+    telemetry.apply_agent_control_defaults()
+    assert settings.agent_control_url == "", "a cleared gateway must stay cleared"

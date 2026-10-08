@@ -134,6 +134,13 @@ class Telemetry:
                 continue
             secret = field in self.SECRET_FIELDS
             setattr(self.settings, field, SecretStr(value) if secret else value)
+            if field == "agent_control_url":
+                # agent_control_url is both Galileo's input and the live field the gate reads, and
+                # the live one is rewritten per backend from this remembered value. Without updating
+                # it here, a URL set from the portal was reverted by the very next connection check
+                # -- the save returned 200 and the field came back empty, so it read as a portal
+                # that would not save rather than as a value being overwritten.
+                self._galileo_agent_control_url = value
 
     @staticmethod
     def mask(secret):
@@ -202,6 +209,10 @@ class Telemetry:
             if field in self.CONNECTION_FIELDS:
                 current.pop(field, None)
                 setattr(self.settings, field, SecretStr("") if field in self.SECRET_FIELDS else "")
+                if field == "agent_control_url":
+                    # Clearing has to clear the remembered value too, or the next connection check
+                    # restores what was just removed.
+                    self._galileo_agent_control_url = ""
         for field in self.CONNECTION_FIELDS:
             value = values.get(field)
             if isinstance(value, str) and value:

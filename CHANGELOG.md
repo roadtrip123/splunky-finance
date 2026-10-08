@@ -37,6 +37,21 @@ reading it.
   place and restart: `sed -i 's|^DEMO_PASSWORD=.*|DEMO_PASSWORD=AlexDemo1234!|' .env`. Do this before
   taking an image, or every clone carries the old one.
 
+## v0.6.18 — The Agent Control URL could never be saved
+
+- **Setting the Galileo Agent Control URL from the portal silently did nothing.** The save returned
+  200 and the field read back empty, which looked like a portal that would not save. In fact the
+  value was applied and then overwritten: `agent_control_url` is Galileo's input *and* the live field
+  the gate reads, and the live one is rewritten per backend from a value captured once at
+  construction — so the next connection check restored whatever `.env` held at startup, usually
+  nothing.
+- Which means the guardrail has never been configurable from the portal at all, only from `.env`
+  before the process started. A good deal of this week's confusion about agents and agent names
+  traces to this one line.
+- `apply_connection` now updates the remembered Galileo gateway when one is applied, and clearing the
+  field clears it too, so a cleared value is not restored by the next check. Three tests cover it:
+  set then check, switch to Splunk AO and back, and clear then check.
+
 ## v0.6.17 — The agent name leaves the portal again
 
 - **The Agent Control agent name is no longer a portal field.** It was added one release earlier so a
