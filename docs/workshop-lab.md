@@ -212,7 +212,7 @@ rather than failing it.
 
    <img width="1313" height="245" alt="image" src="https://github.com/user-attachments/assets/08aec3ad-ce9d-44af-a6e6-7cb73ec32243" />
 
-3. Click on the name at the top and call it `SplunkyNumericalCorrectness-<your initials>`. Change the **LLM Model** 'GPT-40 mini', **Modality** 'Text", **Apply to** 'trace', and **Input style** 'Full Trace'. (This evaluator is will check - Do the numbers match the ledger?)
+3. Click on the name at the top and call it `SplunkyNumericalCorrectness-<your initials>`. Change the **LLM Model** 'Gpt-4.1-mini', **Modality** 'Text", **Apply to** 'trace', and **Input style** 'Full Trace'. (This evaluator is will check - Do the numbers match the ledger?)
 
    <img width="1434" height="659" alt="image" src="https://github.com/user-attachments/assets/0fda7777-7102-4675-8cfa-18df79e36556" />
 
