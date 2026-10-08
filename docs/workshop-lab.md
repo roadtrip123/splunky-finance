@@ -202,33 +202,33 @@ rather than failing it.
 
 4.  Scroll down on the left panel and select **Step-by-Step reasoning** and **No of judges** '3'
 
-<img width="608" height="665" alt="image" src="https://github.com/user-attachments/assets/30041918-8872-41d1-a752-9d4939283ce9" />
+<img width="480" height="618" alt="image" src="https://github.com/user-attachments/assets/8a9f2efe-a6bb-4a92-b12b-7bbf95d64fb5" />
 
 5. In the Prompt box enter turn off **Help me write** and enter in the below text and click **Create Evaluator**
 
- ```
-Decide whether candidate_output answers every part the question asked for. The question is the
-`question` field of the trace output JSON; use that text, never an implied or reconstructed
-question, and if it is missing return true rather than guessing. Derive the required parts from
-that question; do not assume a fixed list. Return false when a part of the question is left
-unanswered. An answer that addresses every part is covered even when its content is incorrect:
-whether a stated figure is right, and whether it describes the right customer, are not this
-metric's concern. Evaluate candidate_output, not final_output. The trace output is JSON
-containing question, candidate_output and evidence. A part of the question that candidate_output
-does not address is exactly what this metric measures. An omission is a failure here, whatever
-other metrics make of it. This trace also contains the agent's own spans, and their outputs may
-include a fuller draft than the customer received. Ignore every span. Judge only the trace-level
-candidate_output. If part of the question is answered somewhere in a span but not in
-candidate_output, it was never delivered and the answer is incomplete: return false. The
-evidence and retrieved context show what was available to the agent, not what it said. A figure
-or fact present only in evidence was not communicated to the customer and does not count as an
-answered part. Judge only the single property described above. An answer can be wrong in ways
-this metric does not measure: a wrong amount, an invented rule, a misnamed customer. Each of
-those is measured by a different metric. When the property you are judging is correct, return
-true even if the answer is obviously wrong for some other reason, and say so in your reasoning
-rather than failing it.
 ```
-<img width="1526" height="757" alt="image" src="https://github.com/user-attachments/assets/c430f991-5a73-48ef-8735-10d41abb19fe" />
+Decide whether the money amounts and counts stated in candidate_output agree with the figures
+the tools returned. Those arrive in three places, all in integer AUD cents where a dollar is 100
+cents: evidence.calculations for spending calculations, evidence.lookups for account balances,
+and evidence.transfers for money that moved. Check all three. For each figure, first work out
+which account or person candidate_output attributes it to, then find that same account in the
+evidence and compare only against it. A number that appears in the evidence under a different
+account or a different person does not excuse the claim: reporting one account's balance as
+another's is a disagreement, and it is the most common way this fails. In evidence.transfers,
+from_account_balance_cents is the balance of from_account and to_account_balance_cents is the
+balance of to_account; never read one as the other. Return false when a stated figure disagrees
+with the evidence for the account or person it is attributed to. If candidate_output states no
+money amount and no count, return true: there is nothing to contradict, and an answer that omits
+a figure is a different fault measured by another metric. Evaluate candidate_output, not
+final_output. The trace output is JSON containing question, candidate_output and evidence. Judge
+only what candidate_output actually claims: the absence of a claim is not a failure. Judge only
+the single property described above. An answer can be wrong in ways this metric does not
+measure: an omitted part, an invented rule, a misnamed customer. Each of those is measured by a
+different metric. When the property you are judging is correct, return true even if the answer
+is obviously wrong for some other reason, and say so in your reasoning rather than failing it.
+```
+<img width="1433" height="670" alt="image" src="https://github.com/user-attachments/assets/c7128a49-7210-460e-adf3-659bebd3ed17" />
+
 
 
 
