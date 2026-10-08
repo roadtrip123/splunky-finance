@@ -11,7 +11,9 @@
 # visible in `systemctl status` rather than only in the application.
 #
 #   journalctl -u splunky-finance          what happened on the last boot
-#   systemctl start splunky-finance        update now, without rebooting
+#   systemctl restart splunky-finance      update now, without rebooting. `restart`, not
+#                                          `start`: this unit stays `active (exited)` once it
+#                                          has run, and `start` on an active unit does nothing
 #
 # Type=oneshot with RemainAfterExit so the unit reads as active once the stack is up, rather than as
 # dead the moment the script returns.

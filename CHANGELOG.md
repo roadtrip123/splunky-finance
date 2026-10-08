@@ -28,6 +28,20 @@ reading it.
   or `/etc/rc.local`.** A rule deleted by hand comes back on the next boot, and on a box destined to
   become an AMI that means every clone starts with the port broken.
 
+## v0.6.10 — "Request origin rejected" now says what it expected
+
+- **Every "update now" instruction says `restart`, not `start`.** The unit is `Type=oneshot` with
+  `RemainAfterExit=yes`, so once it has run it sits in `active (exited)`, and `systemctl start` on an
+  active unit does nothing and says nothing. It is the quietest possible way to believe a change was
+  applied when it was not: an `APP_ORIGIN` edit stayed unapplied and the application then rejected
+  every request for an origin it had never been told about. Corrected in `install.sh`, the unit's own
+  comments, `reset_for_snapshot.sh` and the documentation.
+- **The origin rejection names both addresses.** It fires for two causes that need opposite fixes — a
+  container still holding a previous `APP_ORIGIN`, or a browser on a different address than the one
+  configured — and the bare message distinguished neither. It now states what the deployment answers
+  to, what arrived, and the two ways to resolve it. The origin is the URL the deployment is reached
+  at rather than a secret, and every participant configuring their own box will meet this once.
+
 ## v0.6.9 — A certificate nobody has to accept
 
 - **`install.sh --cert/--key` serves an existing certificate**, which is the mode to use wherever an

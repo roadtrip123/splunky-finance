@@ -54,7 +54,8 @@ note "volume removed"
 
 say "Starting clean"
 # Through the unit rather than compose, so the state file the portal reads is written too.
-systemctl start splunky-finance || die "could not start splunky-finance; see journalctl -u splunky-finance"
+# restart, not start: the unit is left `active (exited)` and `start` on an active unit is a no-op.
+systemctl restart splunky-finance || die "could not start splunky-finance; see journalctl -u splunky-finance"
 
 say "Verifying nothing was left behind"
 LEFT="$(sudo -u "$OWNER" docker compose --project-directory "$ROOT" exec -T backend \

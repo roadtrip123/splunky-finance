@@ -340,6 +340,6 @@ Still to do, and neither can be done from this box:
 
 Then set the model endpoint in the presenter portal -- not in .env.
 
-  Update now        sudo systemctl start splunky-finance
+  Update now        sudo systemctl restart splunky-finance
   What it decided   journalctl -u splunky-finance -n 30
 EOF

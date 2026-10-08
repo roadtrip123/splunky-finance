@@ -228,3 +228,16 @@ def test_a_non_secret_connection_field_can_be_cleared(client, settings):
     assert cleared.status_code == 200, cleared.text
     assert cleared.json()["connection"]["galileo_project"] == ""
     assert cleared.json()["connection"]["galileo_log_stream"] == "my-stream", "clear must be surgical"
+
+
+def test_origin_rejection_names_both_addresses(client, settings):
+    """The bare message was undiagnosable: it fires for a stale container and for the wrong URL."""
+    response = client.post(
+        "/api/demo-admin/login",
+        headers={"Origin": "https://not-the-configured-host.example"},
+        json={"account_number": "12345678", "password": "wrong"},
+    )
+    assert response.status_code == 403
+    message = response.json()["error"]["message"]
+    assert settings.app_origin in message, "must say which origin this deployment expects"
+    assert "not-the-configured-host.example" in message, "must say which origin was sent"

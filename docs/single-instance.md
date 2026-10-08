@@ -230,8 +230,14 @@ journal.
 
 `sudo python3 scripts/install_service.py --dry-run` prints the units it would write, without root.
 
-`systemctl start splunky-finance` updates now without rebooting, and
+`sudo systemctl restart splunky-finance` updates now without rebooting, and
 `journalctl -u splunky-finance` is the record of what the last boot decided.
+
+**`restart`, not `start`.** The unit is `Type=oneshot` with `RemainAfterExit=yes`, so once it has
+run it sits in `active (exited)` — and `systemctl start` on an active unit does nothing and says
+nothing. It is the quietest way to believe you applied a change that you did not: an `.env` edit
+stays unapplied, and the symptom is the application rejecting requests for an origin it has never
+been told about.
 
 ### Updating from the presenter portal
 
