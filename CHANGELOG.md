@@ -28,6 +28,15 @@ reading it.
   or `/etc/rc.local`.** A rule deleted by hand comes back on the next boot, and on a box destined to
   become an AMI that means every clone starts with the port broken.
 
+## v0.6.12 — Radios are not text fields
+
+- **Radios and checkboxes no longer inherit text-field sizing.** The base stylesheet gives every
+  `input` full width, a 44px minimum height and 13px of padding, which is right for something you
+  type into and produces an enormous circle on a control the browser draws itself. The endpoint
+  selector has looked that way since it was added: the sizing dates from the first commit and the
+  radio arrived later with nothing exempting it. Selected by type rather than by the one place it was
+  noticed, so any added later inherits sane sizing; the clickable label remains the touch target.
+
 ## v0.6.11 — The Remove buttons were never wired up
 
 - **The API proxy did not forward `DELETE`.** Next answers 405 for any method with no export, before

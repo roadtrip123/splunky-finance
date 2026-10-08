@@ -517,6 +517,19 @@ input::placeholder,
 textarea::placeholder {
   color: #858b91;
 }
+/* A radio or a checkbox is not a text field. The full-width, 44px-tall, 13px-padded sizing above is
+   for something you type into; applied to a control the browser draws itself it produces an enormous
+   circle that fills its row. Selected by type rather than by the one place it was noticed, so any
+   added later inherits sane sizing. The clickable label stays the touch target. */
+input[type="radio"],
+input[type="checkbox"] {
+  width: 15px;
+  min-height: 15px;
+  padding: 0;
+  margin: 0;
+  flex: none;
+  accent-color: var(--accent);
+}
 .login-page {
   display: grid;
   grid-template-columns: 1fr 1fr;
