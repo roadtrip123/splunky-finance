@@ -3,6 +3,7 @@ from types import SimpleNamespace
 
 import httpx
 import pytest
+from pydantic import SecretStr
 
 from app.observability.protection import FALLBACK, Protection
 
@@ -162,3 +163,56 @@ def test_a_failed_request_records_the_http_status():
 
     # No response at all still names the exception, as before.
     assert protection._failure(RuntimeError("x")) == {"cause": "request_failed", "error": "RuntimeError"}
+
+
+async def test_the_last_failure_is_kept_so_a_401_is_visible_without_a_turn(settings, monkeypatch):
+    """A guardrail failing closed looks identical to one working, from the chat.
+
+    Before this, the only record of why was inside a turn's action_decisions, so establishing
+    whether a refusal was real meant driving a turn and reading it back. The reason is now kept on
+    the adapter and reported by the status endpoint.
+    """
+    import agent_control
+    import httpx
+
+    from app.observability.protection import Protection
+
+    class Client:
+        def __init__(self, **kwargs):
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *args):
+            return False
+
+        async def post_runtime_evaluation(self, **kwargs):
+            request = httpx.Request("POST", "https://gateway.test/evaluation")
+            raise httpx.HTTPStatusError(
+                "unauthorized", request=request, response=httpx.Response(401, request=request)
+            )
+
+    monkeypatch.setattr(agent_control, "AgentControlClient", Client)
+    # The gate only runs when it is configured; otherwise it short-circuits before any request.
+    settings.galileo_enabled = True
+    settings.galileo_api_key = SecretStr("test-key")
+    settings.agent_control_url = "https://gateway.test/agent-control"
+    protection = Protection(settings)
+    assert protection.detail == {}
+
+    _, decision = await protection.check(
+        "answer", "question", {}, SimpleNamespace(log_stream_id="test-stream"), True
+    )
+    assert decision["decision"] == "unavailable"
+    assert protection.status == "failed"
+    assert protection.detail["http_status"] == 401
+    assert "credentials rejected" in protection.detail["hint"]
+
+
+def test_the_runtime_auth_mode_is_configurable(settings):
+    """A tenant without the token exchange rejects jwt with 401 while accepting the same key for
+    the management API, so trying the alternative must not need a code change."""
+    assert settings.agent_control_runtime_auth_mode == "jwt"
+    settings.agent_control_runtime_auth_mode = "api_key"
+    assert settings.agent_control_runtime_auth_mode == "api_key"

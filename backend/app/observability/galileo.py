@@ -881,7 +881,7 @@ class Telemetry:
                 timeout=30,
                 api_key=s.galileo_api_key.get_secret_value(),
                 api_key_header=s.agent_control_api_key_header,
-                runtime_auth_mode="jwt",
+                runtime_auth_mode=s.agent_control_runtime_auth_mode,
                 runtime_token_header=s.agent_control_runtime_token_header,
             ) as client:
                 for name, definition in CONTROLS.items():

@@ -51,6 +51,11 @@ class Settings(BaseSettings):
     # Splunk value for Galileo sends the JWT off Authorization entirely and the route answers
     # "Missing Authorization header" with a 401.
     agent_control_runtime_token_header: str = ""
+    # How the runtime evaluation call authenticates. "jwt" exchanges the API key for a short-lived
+    # token, which is what Galileo's gateway expects; a tenant that has not enabled the exchange
+    # rejects it with 401 while the management API accepts the same key. Settable so that can be
+    # tried without a code change.
+    agent_control_runtime_auth_mode: Literal["jwt", "api_key", "auto", "none"] = "jwt"
     galileo_protection_enabled: bool = False
     # Which observability SDK is active. One at a time: two backends would leave Agent Control
     # without an adjudicator, and two tenants disagreeing on one tool call has no good answer.

@@ -18,6 +18,10 @@ class Protection:
     def __init__(self, settings):
         self.settings = settings
         self.status = "unverified"
+        # The last reason the gate could not reach a verdict. Without this, a 401 was only visible
+        # inside a turn record -- so a guardrail failing closed looked identical to one working, and
+        # finding out which meant driving a turn and reading its action_decisions.
+        self.detail: dict = {}
 
     def _unavailable(self, reason, diagnosis=None):
         details = {
@@ -91,7 +95,7 @@ class Protection:
             timeout=10,
             api_key=s.galileo_api_key.get_secret_value(),
             api_key_header=s.agent_control_api_key_header,
-            runtime_auth_mode="jwt",
+            runtime_auth_mode=s.agent_control_runtime_auth_mode,
             # Omitted when blank: the SDK rejects an empty header name, and its own default is a
             # Bearer token on Authorization, which is what the Galileo gateway requires.
             **(
@@ -213,21 +217,23 @@ class Protection:
             details = self._details(result, evaluated, "execute", "block")
             self._log_controls(logger, evaluated, result, arguments, "tool_call", "pre", details)
             self.status = "verified"
+            self.detail = {}
             return result.is_safe, details
         except ControlNotEvaluated as exc:
             self.status = "failed"
-            return False, self._unavailable("No control evaluated this action", exc.diagnosis)
+            self.detail = exc.diagnosis
+            return False, self._unavailable("No control evaluated this action", self.detail)
         except Exception as exc:  # noqa: BLE001 - sanitize credential-bearing SDK errors
             self.status = "failed"
-            return False, self._unavailable("Protection request failed", self._failure(exc))
+            self.detail = self._failure(exc)
+            return False, self._unavailable("Protection request failed", self.detail)
 
     async def check(self, candidate, prompt, evidence, logger, enabled):
         if not enabled:
             return candidate, {"decision": "disabled", "source": "application", "verified": False}
         if not self._configured(logger):
-            return FALLBACK, self._unavailable(
-                "Protection is not fully configured", {"cause": "not_configured"}
-            )
+            self.detail = {"cause": "not_configured"}
+            return FALLBACK, self._unavailable("Protection is not fully configured", self.detail)
         try:
             result, evaluated = await self._evaluate(
                 logger,
@@ -241,10 +247,13 @@ class Protection:
             details = self._details(result, evaluated, "deliver", "safe_fallback")
             self._log_controls(logger, evaluated, result, candidate, "llm_call", "post", details)
             self.status = "verified"
+            self.detail = {}
             return candidate if result.is_safe else FALLBACK, details
         except ControlNotEvaluated as exc:
             self.status = "failed"
-            return FALLBACK, self._unavailable("No control evaluated this answer", exc.diagnosis)
+            self.detail = exc.diagnosis
+            return FALLBACK, self._unavailable("No control evaluated this answer", self.detail)
         except Exception as exc:  # noqa: BLE001 - sanitize credential-bearing SDK errors
             self.status = "failed"
-            return FALLBACK, self._unavailable("Protection request failed", self._failure(exc))
+            self.detail = self._failure(exc)
+            return FALLBACK, self._unavailable("Protection request failed", self.detail)

@@ -37,6 +37,20 @@ reading it.
   place and restart: `sed -i 's|^DEMO_PASSWORD=.*|DEMO_PASSWORD=AlexDemo1234!|' .env`. Do this before
   taking an image, or every clone carries the old one.
 
+## v0.6.19 — Why the gate failed, without driving a turn to find out
+
+Reaching a real gateway for the first time produced a 401 on the runtime evaluation call while
+registration with the same key succeeded. Establishing that took driving a presenter turn and reading
+its `action_decisions`, which is the wrong amount of work for the question "is this guardrail real".
+
+- **The last reason the gate could not decide is kept and reported.** `protection_detail` in the
+  admin status carries the diagnosis — `http_status`, `hint`, `cause` — so a guardrail failing closed
+  is distinguishable from one working without reproducing a turn. The not-configured path reports its
+  reason too, rather than leaving the field empty.
+- **`AGENT_CONTROL_RUNTIME_AUTH_MODE` is configurable**, defaulting to `jwt`. A tenant that has not
+  enabled the token exchange rejects `jwt` with 401 while accepting the same key for the management
+  API, which is exactly the shape observed. Trying `api_key` no longer needs a code change.
+
 ## v0.6.18 — The Agent Control URL could never be saved
 
 - **Setting the Galileo Agent Control URL from the portal silently did nothing.** The save returned
