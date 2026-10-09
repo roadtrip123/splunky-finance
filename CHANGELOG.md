@@ -37,6 +37,23 @@ reading it.
   place and restart: `sed -i 's|^DEMO_PASSWORD=.*|DEMO_PASSWORD=AlexDemo1234!|' .env`. Do this before
   taking an image, or every clone carries the old one.
 
+## v1.0.3 — Armed protection no longer replaces every legitimate answer
+
+- **With the guardrail on, no own-account question could succeed.** Asking for your own savings
+  balance returned *"I couldn't verify that answer against the bank's policies"* — the safe fallback,
+  not the block message. The cause: controls are scoped to tools, so nothing is scoped to the answer
+  step, and the answer gate treated "no control applies" as fail-closed. Every legitimate answer was
+  replaced the moment protection was armed, which is the opposite of what a guardrail is for. Found
+  by running the half of the lab's Step 8 that had never been tested.
+- The two causes behind a missing verdict are now separated. `no_control_selected` — the gateway
+  answered and nothing was scoped to this step — delivers the answer with `decision: not_covered`
+  and `verified: false`, because nothing objected and nothing enforced. `control_errored` still fails
+  closed: asked and unable to answer is different from never asked.
+- **The action gate deliberately still fails closed**, including when no control covers the tool. A
+  transfer is irreversible, so "no policy covers this" is not grounds to let it through; replacing an
+  answer costs nothing and refusing one costs the customer their own banking. The asymmetry is
+  commented where both branches are.
+
 ## v1.0.2 — No project pre-filled into every clone
 
 - **`GALILEO_PROJECT` defaults to blank**, in `config.py` and `.env.example`. It shipped as

@@ -57,6 +57,27 @@ class Protection:
             details["diagnosis"] = diagnosis
         return details
 
+    def _not_covered(self, reason, action, diagnosis=None):
+        """The gateway answered and no control is scoped to this step.
+
+        Distinct from `_unavailable`, which means the gate could not reach a verdict. Nothing
+        objected here, because nothing was asked to: that is a policy gap, not a danger signal, and
+        treating it as one made every answer unusable the moment protection was armed.
+
+        `verified` stays false. Agent Control enforced nothing, and the one thing this code must
+        never do is let "no policy" read as "policy satisfied".
+        """
+        details = {
+            "decision": "not_covered",
+            "source": "galileo-agent-control",
+            "verified": False,
+            "action": action,
+            "reason": reason,
+        }
+        if diagnosis:
+            details["diagnosis"] = diagnosis
+        return details
+
     def _failure(self, exc):
         """Why the request did not complete, with the HTTP status when there was one.
 
@@ -260,8 +281,12 @@ class Protection:
             self._record("pre", "verified")
             return result.is_safe, details
         except ControlNotEvaluated as exc:
-            # The gate answered; nothing was scoped to this step. Not a failure.
-            self._record("pre", "no_control", exc.diagnosis)
+            # An action gate fails closed even when nothing was scoped to the tool. A transfer is
+            # irreversible, so "no policy covers this" is not grounds to let it through. The answer
+            # gate deliberately differs: replacing an answer costs nothing and refusing one costs
+            # the customer their own banking.
+            uncovered = exc.diagnosis.get("cause") == "no_control_selected"
+            self._record("pre", "no_control" if uncovered else "failed", exc.diagnosis)
             return False, self._unavailable("No control evaluated this action", exc.diagnosis)
         except Exception as exc:  # noqa: BLE001 - sanitize credential-bearing SDK errors
             diagnosis = self._failure(exc)
@@ -290,9 +315,16 @@ class Protection:
             self._record("post", "verified")
             return candidate if result.is_safe else FALLBACK, details
         except ControlNotEvaluated as exc:
-            # Expected when every control is scoped to a tool: this gate inspects the answer, so
-            # nothing applies to it. Reporting that as a failure made a working guardrail look broken.
-            self._record("post", "no_control", exc.diagnosis)
+            if exc.diagnosis.get("cause") == "no_control_selected":
+                # Expected whenever every control is scoped to a tool: this gate inspects the
+                # answer, so nothing applies to it. Returning the fallback here replaced every
+                # legitimate answer the moment protection was armed -- the customer could not check
+                # their own balance, which is the opposite of what a guardrail is for.
+                self._record("post", "no_control", exc.diagnosis)
+                return candidate, self._not_covered(
+                    "No control applies to this answer", "deliver", exc.diagnosis
+                )
+            self._record("post", "failed", exc.diagnosis)
             return FALLBACK, self._unavailable("No control evaluated this answer", exc.diagnosis)
         except Exception as exc:  # noqa: BLE001 - sanitize credential-bearing SDK errors
             diagnosis = self._failure(exc)

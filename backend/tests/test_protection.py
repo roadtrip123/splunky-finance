@@ -354,3 +354,61 @@ async def test_a_server_error_body_is_not_captured(settings, monkeypatch):
     await protection.check("answer", "question", {}, SimpleNamespace(log_stream_id="s"), True)
     assert protection.detail["http_status"] == 503
     assert "response" not in protection.detail
+
+
+async def test_an_answer_no_control_covers_is_delivered(settings):
+    """Armed protection must not replace every legitimate answer.
+
+    Controls are scoped to tools, so nothing is scoped to the answer step. Treating "nothing
+    applies" as fail-closed meant that with the guardrail on, a customer asking for their own
+    savings balance got "I couldn't verify that answer against the bank's policies" -- the opposite
+    of what a guardrail is for. Observed on a live deployment, with both own-account questions in
+    the lab's own Step 8 failing.
+    """
+    from app.observability.protection import ControlNotEvaluated, Protection
+
+    protection = Protection(settings)
+    settings.galileo_enabled = True
+    settings.galileo_api_key = SecretStr("test-key")
+    settings.agent_control_url = "https://gateway.test/agent-control"
+
+    async def nothing_applies(*args, **kwargs):
+        raise ControlNotEvaluated(
+            {"cause": "no_control_selected", "matches": 0, "non_matches": 0, "errors": []}
+        )
+
+    protection._evaluate = nothing_applies
+    answer, decision = await protection.check(
+        "Your Savings balance is $4,210.00", "balance?", {},
+        SimpleNamespace(log_stream_id="s"), True,
+    )
+    assert answer == "Your Savings balance is $4,210.00", "the real answer must be delivered"
+    assert decision["decision"] == "not_covered"
+    assert decision["action"] == "deliver"
+    # Never verified: Agent Control enforced nothing, and "no policy" must not read as "satisfied".
+    assert decision["verified"] is False
+    assert protection.stages["post"]["status"] == "no_control"
+
+
+async def test_a_control_that_errored_still_fails_closed(settings):
+    """Asked and unable to answer is different from never asked."""
+    from app.observability.protection import ControlNotEvaluated, Protection
+
+    protection = Protection(settings)
+    settings.galileo_enabled = True
+    settings.galileo_api_key = SecretStr("test-key")
+    settings.agent_control_url = "https://gateway.test/agent-control"
+
+    async def errored(*args, **kwargs):
+        raise ControlNotEvaluated(
+            {"cause": "control_errored", "matches": 0, "non_matches": 0, "errors": ["boom"]}
+        )
+
+    protection._evaluate = errored
+    answer, decision = await protection.check(
+        "Your Savings balance is $4,210.00", "balance?", {},
+        SimpleNamespace(log_stream_id="s"), True,
+    )
+    assert answer != "Your Savings balance is $4,210.00", "a control that errored must fail closed"
+    assert decision["decision"] == "unavailable"
+    assert protection.stages["post"]["status"] == "failed"
