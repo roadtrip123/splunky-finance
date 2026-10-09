@@ -37,6 +37,24 @@ reading it.
   place and restart: `sed -i 's|^DEMO_PASSWORD=.*|DEMO_PASSWORD=AlexDemo1234!|' .env`. Do this before
   taking an image, or every clone carries the old one.
 
+## v1.0.4 — The policy corpus denied the transfer tool existed
+
+- **The agent refused its own `transfer_funds` tool**, answering "I cannot execute transfers or
+  payments" to a transfer between the customer's own accounts. Not the block message and not the
+  fallback — the model's own refusal, because the retrieved policy told it so:
+  `assistant-boundaries.md` said "It cannot move money" and `external-transfers.md` said "My Bank
+  Agent cannot initiate transfers or change limits". The corpus described an application that cannot
+  do what it does, and a retrieved policy outranks the system prompt.
+- Both now say it can move money and keep the limits that are real: it cannot change limits, change
+  account details, execute investments or give advice. `security.md` is unchanged — it says the agent
+  cannot authenticate third parties or bypass ownership checks, which remains true and is the
+  guardrail's own subject.
+- The system prompt already carried a comment about exactly this failure mode, from a previous fix:
+  "a prompt claiming transfers are impossible made the model refuse its own tool". The same mistake
+  was sitting in the corpus, where nobody had looked.
+- It was invisible until `v1.0.3`, because the answer gate was replacing every armed-mode answer with
+  the fallback, so the model's refusal never reached the customer.
+
 ## v1.0.3 — Armed protection no longer replaces every legitimate answer
 
 - **With the guardrail on, no own-account question could succeed.** Asking for your own savings
