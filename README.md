@@ -49,13 +49,23 @@ identically and is the failure this release can finally tell apart.
 
 **Deployment verified on a hostile network.** Image builds, container egress to a live model endpoint,
 two concurrent participant stacks, and TLS on a bare IP all confirmed working on an EC2 instance whose
-host redirects container traffic. Browser access was not confirmed, because that network's perimeter
-publishes a single port — which is what [docs/single-instance.md](docs/single-instance.md) exists to
-address.
+host redirects container traffic.
 
-**Not verified.** Anthropic as a model provider. The boot-time self-update in
-`scripts/selfupdate.py` has had every decision branch exercised, but no rollback has yet been
-observed against a genuinely broken release. And no human has followed
+**Browser access confirmed.** An instance behind a hostname with a wildcard certificate serves the
+banking app and the presenter portal to a browser with no certificate warning to explain away, which
+is the only access participants get. Reaching it took finding a redirect of port 443 saved in the
+host image: the box was healthy by every internal measure and unreachable from outside, because
+arriving connections were sent to a port nothing listens on.
+`splunky-finance-ports.service` now removes that rule on every boot.
+
+**Self-update confirmed on a deployed box.** An instance running `v1.0.4` was restarted and took
+itself to `v1.0.5`, recording `"result": "updated"` — the path the workshop depends on, since nobody
+will have SSH to a participant instance.
+
+**Not verified.** Anthropic as a model provider. No rollback has yet been observed against a
+genuinely broken release, though every decision branch in `scripts/selfupdate.py` has been exercised.
+The live firewall path in `scripts/fix_ports.py` is covered by unit tests and by one deliberate break
+on a real box, not by an automated test. And no human has followed
 [docs/workshop-lab.md](docs/workshop-lab.md) from end to end, which remains the gap most likely to
 surface during a session rather than before one.
 

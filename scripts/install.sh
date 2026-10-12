@@ -198,6 +198,8 @@ if [ "$WITH_PROXY" -eq 1 ]; then
     if [ -f "$FILE" ] && grep -q -- "--dport $PORT" "$FILE" 2>/dev/null; then
       warn "WARNING: $FILE still mentions port $PORT, so a reboot may undo this."
       warn "         Inspect with: grep -n -- '--dport $PORT' $FILE"
+      warn "         Remove it for good with: sudo python3 scripts/fix_ports.py --persist"
+      warn "         scripts/install_service.py also installs a unit that does this every boot."
     fi
   done
 fi

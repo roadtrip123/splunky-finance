@@ -221,12 +221,21 @@ updates itself each time it starts:
 sudo python3 scripts/install_service.py --build
 ```
 
-That installs all three units, substituting the repository's real path and the account that invoked
+That installs all four units, substituting the repository's real path and the account that invoked
 `sudo` — the units ship with defaults for a stock Ubuntu AMI, and a box whose user or path differs
 would install them, report success and never work. It also creates `runtime/update/` owned by the uid
 the backend container runs as, which is what the portal's install button needs. `--build` then runs
 the first update in the foreground so the image build's output is visible rather than buried in the
 journal.
+
+One of the four is not about updates. `splunky-finance-ports.service` runs
+[`scripts/fix_ports.py`](../scripts/fix_ports.py) on every boot to remove a redirect of port 443,
+which shared lab images carry in `/etc/iptables/rules.v4` so that an unprivileged web server can sit
+on 8443. Our proxy binds 443 directly, so the redirect sends every arriving connection to a port
+nothing listens on: the box is healthy by every internal measure and unreachable from a browser. The
+unit is ordered `After=netfilter-persistent.service`, because that is what replays the saved rules at
+boot and would otherwise undo an earlier fix. It only ever deletes, only matches a REDIRECT of 443,
+and exits cleanly when there is nothing to do, so it is inert on a box that does not have the fault.
 
 `sudo python3 scripts/install_service.py --dry-run` prints the units it would write, without root.
 
@@ -344,6 +353,27 @@ in `.env`, which is not in the volume and would survive.
 
 Then confirm by eye: open the portal, check the Setup tab lists no endpoint and no observability
 credentials, and that the app still answers on its public address from another machine.
+
+### Check the saved firewall rules before you snapshot
+
+A redirect of port 443 saved in `/etc/iptables/rules.v4` is baked into the image and replayed on
+every clone, which makes each one unreachable from a browser while looking perfectly healthy inside.
+`splunky-finance-ports.service` removes it at boot, so an image carrying the rule still works — but
+confirm the unit is installed and enabled rather than relying on it silently:
+
+```bash
+systemctl is-enabled splunky-finance-ports
+sudo python3 scripts/fix_ports.py --dry-run
+```
+
+To prove the healing works on this box before it becomes a hundred boxes, add the rule back and watch
+the unit remove it:
+
+```bash
+sudo iptables -t nat -A PREROUTING -p tcp -m tcp --dport 443 -j REDIRECT --to-ports 8443
+sudo systemctl restart splunky-finance-ports
+sudo iptables -t nat -S PREROUTING | grep 443 || echo HEALED
+```
 
 ### Then snapshot
 
