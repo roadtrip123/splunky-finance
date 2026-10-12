@@ -2,7 +2,12 @@
 
 You have your own copy of a fictional Australian bank whose assistant answers customer questions using read-only banking tools over synthetic data. Nothing here is real and no real banking action exists.
 
-By the end you will have connected it to your own Galileo / Splunk Agent Observability project, built the evaluators that catch a bad answer, and built a guardrail that stops an unsafe action before it happens.
+By the end you will have:
+
+1. Connected the My Bank Agent to your LLM
+2. Connected the My Bank Agent to your own Galileo / Splunk Agent Observability project
+3. Built the evaluators that catch a bad answer
+4. Built a guardrail that stops an unsafe action before it happens.
 
 Your instructor gives you one URL, an account number and two passwords. Everything else you build yourself.
 
