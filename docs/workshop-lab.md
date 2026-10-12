@@ -37,10 +37,12 @@ Your instance is yours alone: your own dataset, your own settings. What you do w
 
 ## Step 1 — Create your Galileo project
 
-A project is the workspace that holds everything you build today, and the log stream inside it is
-where this app's conversations land. Every later step points at that stream by name: the evaluators
-attach to it, and so does the guardrail. Do this first — the app cannot connect to a project that
-does not exist.
+A **project** is your workspace in Galileo. A **stream** is a named destination inside it that
+collects what the app sends: one record per conversation, holding every model call and tool call the
+agent made on the way to its answer. The Galileo console calls it an **Agent Stream** and the app's
+Setup tab calls it a **Log Stream** — same thing, two names. Everything you build later binds to it
+by name, so the evaluators score what arrives in your stream and the guardrail is attached to it;
+do this first, because the app cannot connect to a project or a stream that does not exist.
 
 In the Galileo console:
 
