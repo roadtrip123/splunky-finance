@@ -1,6 +1,8 @@
 import asyncio
 import hashlib
 import json
+import logging
+import re
 import time
 from collections import deque
 from dataclasses import dataclass, field
@@ -69,6 +71,16 @@ class ActionGuard(AgentMiddleware):
         )
 
 
+logger = logging.getLogger("splunky.provider")
+
+# Anything key-shaped: OpenAI and Sharon AI prefixes, and a bearer header the SDK may quote back.
+SECRET_SHAPED = re.compile(r"(sk-[A-Za-z0-9_-]{8,}|tv-pat-[A-Za-z0-9_-]{8,}|Bearer\s+\S+)")
+
+
+def redact(text):
+    return SECRET_SHAPED.sub("<redacted>", text)
+
+
 def provider_error(exc, provider):
     """A cause the presenter can act on, without echoing the provider's own error text.
 
@@ -91,6 +103,25 @@ def provider_error(exc, provider):
         return (
             "The provider has no model by that name (404). Check the Model field matches the "
             "identifier your provider expects, which is not always the name shown in its console."
+        )
+    if "400" in text or "InvalidRequest" in name or "BadRequest" in name:
+        # Markers are read, never echoed. These two are the 400s this app can actually provoke:
+        # it sends max_tokens and, outside the reasoning families, temperature.
+        if "max_tokens" in text or "max_completion_tokens" in text:
+            return (
+                "The model rejected a parameter this app sends (400): it wants "
+                "max_completion_tokens rather than max_tokens. Use a gpt-4.1 or gpt-4o family "
+                "model for this lab."
+            )
+        if "temperature" in text:
+            return (
+                "The model does not accept the temperature this app sends (400). Reasoning models "
+                "reject it. Use a gpt-4.1 or gpt-4o family model for this lab."
+            )
+        return (
+            "The provider rejected the request as invalid (400). The usual cause is a Model field "
+            "that is not the provider's exact identifier: it wants `gpt-4.1-mini`, not "
+            "`GPT-4.1 mini` as the console displays it."
         )
     if "429" in text or "RateLimit" in name or "quota" in text.lower():
         return (
@@ -378,6 +409,11 @@ class ChatService:
                 )
                 if isinstance(exc, HTTPException):
                     raise
+                # The card gets a sentence; the log gets the provider's own words, because the
+                # sentence is deliberately lossy and somebody eventually has to fix the endpoint.
+                logger.warning(
+                    "provider call failed: %s: %s", type(exc).__name__, redact(str(exc))[:800]
+                )
                 self.provider_status = {
                     "state": "failed",
                     "last_checked": time.time(),

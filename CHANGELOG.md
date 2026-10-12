@@ -6,6 +6,23 @@ Versions mark states worth returning to. Tags are annotated, so `git tag -n` and
 Open defects are tracked as [GitHub issues](https://github.com/roadtrip123/splunky-finance/issues);
 planned work is in [TODO.md](TODO.md).
 
+## v1.0.7: A 400 says what to change
+
+`v1.0.6` surfaced a real failure on the first box it met and then named the exception rather than
+the mistake: "OpenAIInvalidRequestError while calling the provider". The mapper covered 401, 403,
+404 and 429 and not 400, which is the code `langchain_openai` wraps as `OpenAIInvalidRequestError`.
+
+- **400 is now mapped**, by class name as well as by code, because the wrapper does not always put
+  the number in the text. The generic case names the likeliest cause: a Model field holding the
+  display name, `GPT-4.1 mini`, rather than the provider's identifier, `gpt-4.1-mini`.
+- **Two 400s this app provokes itself** get their own sentences. It always sends `max_tokens`, which
+  newer models reject in favour of `max_completion_tokens`, and it sends `temperature` outside the
+  reasoning families, which those models also reject.
+- **The provider's own words now go to the log.** The card's sentence is deliberately lossy, and
+  until now the real message existed nowhere at all, so even an operator with SSH could not see it.
+  Key-shaped text is masked out first: a 401 body quotes the key that was sent, and a log outlives
+  the turn.
+
 ## v1.0.6: Why the model provider failed
 
 A colleague walking the lab set up OpenAI wrongly and the portal said `Failed`, in the same muted

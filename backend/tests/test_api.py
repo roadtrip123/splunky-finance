@@ -393,3 +393,47 @@ def test_the_status_endpoint_carries_the_reason_a_provider_failed(settings):
     assert provider["state"] == "failed"
     assert "401" in provider["last_error"]
     assert "sk-proj" not in provider["last_error"] and "LEAK" not in provider["last_error"]
+
+
+def test_a_bad_request_is_named_rather_than_falling_through():
+    """The regression this test exists for.
+
+    langchain_openai wraps an OpenAI 400 as OpenAIInvalidRequestError. The first version of the
+    mapper covered 401, 403, 404 and 429 and not 400, so a real workshop failure reached the card
+    as "OpenAIInvalidRequestError while calling the provider", which names the exception rather
+    than the mistake.
+    """
+    from app.agent import provider_error
+
+    # Recognised by class name alone, because the wrapper does not always put the code in the text.
+    class OpenAIInvalidRequestError(Exception):
+        pass
+
+    generic = provider_error(OpenAIInvalidRequestError("no number here"), "openai")
+    assert "400" in generic and "identifier" in generic
+    assert "OpenAIInvalidRequestError" not in generic
+
+    # The two 400s this app provokes itself: it always sends max_tokens, and sends temperature
+    # outside the reasoning families.
+    parameter = provider_error(
+        Exception("Error code: 400 - Unsupported parameter: 'max_tokens' is not supported"), "openai"
+    )
+    assert "max_completion_tokens" in parameter
+    temperature = provider_error(
+        Exception("Error code: 400 - Unsupported value: 'temperature' does not support 0.2"), "openai"
+    )
+    assert "temperature" in temperature and "Reasoning models" in temperature
+
+
+def test_the_provider_failure_is_logged_in_full_but_never_with_a_key():
+    """The card's sentence is deliberately lossy, so the provider's own words go to the log for
+    whoever has to fix the endpoint. That log must still not carry a key: a 401 body quotes the
+    one that was sent, and these logs outlive the turn."""
+    from app.agent import redact
+
+    assert redact("Incorrect API key provided: sk-proj-ABCDEFGH1234") == (
+        "Incorrect API key provided: <redacted>"
+    )
+    assert "tv-pat-" not in redact("Authorization: Bearer tv-pat-ZZZZZZZZ99")
+    # Text with nothing key-shaped survives intact, or the log would be useless.
+    assert redact("model gpt-4.1-mini does not exist") == "model gpt-4.1-mini does not exist"
