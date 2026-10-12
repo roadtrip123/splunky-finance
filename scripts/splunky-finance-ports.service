@@ -1,0 +1,33 @@
+# Remove the port 443 redirect, on every boot, after the saved rules have been restored.
+#
+#   sudo cp scripts/splunky-finance-ports.service /etc/systemd/system/
+#   sudo systemctl daemon-reload && sudo systemctl enable --now splunky-finance-ports
+#
+# scripts/install_service.py installs this along with the others and is the easier route.
+#
+# The ordering is the whole point. netfilter-persistent restores /etc/iptables/rules.v4 at boot, so a
+# fix that runs before it is undone a moment later -- which is why deleting the rule by hand looked
+# like it worked and then did not. Before= the application unit as well, so the stack is never
+# reported healthy on a box that no browser can reach.
+#
+# Runs as root, unlike the other units here, because it edits the nat table. That is not an
+# escalation: the account that owns this repository is already in the docker group and has sudo.
+#
+#   journalctl -u splunky-finance-ports -b     what it found on this boot
+#   systemctl restart splunky-finance-ports    run it again now
+
+[Unit]
+Description=Splunky Finance: remove the port 443 redirect that hides the box
+Documentation=https://github.com/roadtrip123/splunky-finance/blob/build-splunky-finance/docs/single-instance.md
+After=netfilter-persistent.service
+Wants=netfilter-persistent.service
+Before=splunky-finance.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+WorkingDirectory=/home/ubuntu/splunky-finance
+ExecStart=/usr/bin/python3 scripts/fix_ports.py --persist
+
+[Install]
+WantedBy=multi-user.target

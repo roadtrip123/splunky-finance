@@ -30,6 +30,7 @@ CONTAINER_GID = 10001
 SHARED_MODE = 0o770
 UNITS = (
     "splunky-finance.service",
+    "splunky-finance-ports.service",
     "splunky-finance-update.service",
     "splunky-finance-update.path",
 )
@@ -92,8 +93,14 @@ def main():
     # service and the watcher are enabled. Enabling the triggered one would run it at boot with no
     # request pending, which does nothing but muddy the journal.
     subprocess.run(["systemctl", "enable", "splunky-finance.service"], check=True)
+    # Enabled like the boot service, because boot is what triggers it. `--now` as well: a box being
+    # installed may be carrying the redirect at this moment, and the installer should not leave it.
+    subprocess.run(["systemctl", "enable", "--now", "splunky-finance-ports.service"], check=True)
     subprocess.run(["systemctl", "enable", "--now", "splunky-finance-update.path"], check=True)
-    print("\nenabled: splunky-finance.service (on boot), splunky-finance-update.path (watching)")
+    print(
+        "\nenabled: splunky-finance.service (on boot), splunky-finance-ports.service (on boot, "
+        "before it), splunky-finance-update.path (watching)"
+    )
 
     if args.build:
         print("\nrunning the first update now; this builds the images and takes a few minutes\n")
@@ -104,7 +111,7 @@ def main():
     print("\nNext, build and start it with the output visible:")
     print(f"  python3 scripts/selfupdate.py")
     print("Afterwards:")
-    print("  journalctl -u splunky-finance -u splunky-finance-update -f")
+    print("  journalctl -u splunky-finance -u splunky-finance-ports -u splunky-finance-update -f")
     return 0
 
 

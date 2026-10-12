@@ -287,8 +287,9 @@ def test_reprovisioning_keeps_a_participants_session_secret(tmp_path):
     A fresh secret there invalidates every signed cookie they hold.
     """
     import sys
+    from pathlib import Path
 
-    sys.path.insert(0, "/srv/splunk-finance/scripts")
+    sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "scripts"))
     from workshop import participant_env, read_env
 
     base = {"DEMO_PASSWORD": "p", "DEMO_ADMIN_PASSWORD": "a"}
