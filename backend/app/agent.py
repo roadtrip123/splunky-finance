@@ -69,6 +69,45 @@ class ActionGuard(AgentMiddleware):
         )
 
 
+def provider_error(exc, provider):
+    """A cause the presenter can act on, without echoing the provider's own error text.
+
+    "Failed" on its own made a mistyped key, a mistyped model name and an unreachable host look
+    identical, and the portal is the only surface a workshop participant has: they cannot read a log.
+
+    Only the status code and the exception's class name are read out. Provider text is never passed
+    through, because a 401 body quotes a fragment of the key that was sent and the presenter
+    password is published in this repository -- anyone who can see this card is not trusted with
+    even part of a key.
+    """
+    text = str(exc)
+    name = type(exc).__name__
+    local = provider == "ollama"
+    if "401" in text or "Unauthorized" in text or "Authentication" in name:
+        return "The provider rejected the API key (401). Check it was pasted whole and has not expired."
+    if "403" in text:
+        return "The provider accepted the key but refused the request (403). Check the key's permissions."
+    if "404" in text or "model_not_found" in text or "does not exist" in text:
+        return (
+            "The provider has no model by that name (404). Check the Model field matches the "
+            "identifier your provider expects, which is not always the name shown in its console."
+        )
+    if "429" in text or "RateLimit" in name or "quota" in text.lower():
+        return (
+            "The provider accepted the key but refused the request (429). Either its rate limit was "
+            "hit or the account has no remaining credit."
+        )
+    if any(marker in text for marker in ("timed out", "Timeout", "Connection", "refused", "resolve")):
+        if local:
+            return "No local model answered. Check the Ollama container is running on this box."
+        return (
+            "Could not reach the provider. Check the base URL, and that this box has outbound "
+            "access to it."
+        )
+    # The class name carries no secret and is usually enough to recognise the family of fault.
+    return f"{name} while calling the provider."
+
+
 class ChatService:
     def __init__(self, settings, telemetry, protection, model_builder=model_factory):
         self.settings, self.telemetry, self.protection = settings, telemetry, protection
@@ -339,7 +378,11 @@ class ChatService:
                 )
                 if isinstance(exc, HTTPException):
                     raise
-                self.provider_status = {"state": "failed", "last_checked": time.time()}
+                self.provider_status = {
+                    "state": "failed",
+                    "last_checked": time.time(),
+                    "last_error": provider_error(exc, self.settings.llm_provider),
+                }
                 raise HTTPException(
                     503, "My Bank Agent is temporarily unavailable; please try again"
                 ) from None

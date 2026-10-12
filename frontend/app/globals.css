@@ -835,6 +835,17 @@ td small {
   border-color: #746541;
   background: #302b1e;
 }
+.badge.failed {
+  color: var(--red);
+  border-color: #7a4444;
+  background: #341f1f;
+  font-weight: 700;
+}
+.badge.connected {
+  color: var(--green);
+  border-color: #456b33;
+  background: #1f2a1a;
+}
 .amount {
   font-variant-numeric: tabular-nums;
   font-size: 14px;

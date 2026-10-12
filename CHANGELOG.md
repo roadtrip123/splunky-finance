@@ -6,6 +6,28 @@ Versions mark states worth returning to. Tags are annotated, so `git tag -n` and
 Open defects are tracked as [GitHub issues](https://github.com/roadtrip123/splunky-finance/issues);
 planned work is in [TODO.md](TODO.md).
 
+## v1.0.6: Why the model provider failed
+
+A colleague walking the lab set up OpenAI wrongly and the portal said `Failed`, in the same muted
+grey as `connected`, with no reason. A participant has the portal and nothing else: no shell, no
+log. So the card said something had gone wrong, quietly, and gave them nowhere to go.
+
+- **The cause was already in hand and thrown away.** The turn's exception handler recorded
+  `type(exc).__name__` into telemetry and then set `provider_status` to a bare `failed`. It now
+  carries `last_error`, mapped to a sentence: a rejected key (401), a model name the provider does
+  not have (404), a refused request on quota or rate limit (429), permissions (403), or an
+  unreachable host, which reads differently for Ollama because the model is on the box.
+- **Provider text is never passed through.** A 401 body quotes a fragment of the key that was sent,
+  and the presenter password is published in this repository, so anyone who can read that card is
+  not trusted with part of a key. Only the status code and the exception's class name are read out,
+  the same rule the Galileo connection errors already follow. A test asserts a leaking 401 body
+  reaches the card with no key fragment, no account identifier and no URL in it.
+- **`failed` is now red and bold**, and `connected` green, through `.badge.failed` and
+  `.badge.connected`. The state is mapped to a class rather than interpolated into `className`.
+- **The card no longer tells participants to edit `.env` and restart**, which they cannot do: they
+  have no SSH. It names the Setup tab, and when the provider has failed it says to ask a question on
+  the Demo tab afterwards, because the status only re-checks when a turn runs.
+
 ## v1.0.5 — The port 443 redirect no longer survives a reboot
 
 The redirect lives in the image's `/etc/iptables/rules.v4`, and `netfilter-persistent` restores it on

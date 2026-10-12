@@ -308,3 +308,88 @@ def test_reprovisioning_keeps_a_participants_session_secret(tmp_path):
     # A participant with no env file yet still gets a fresh one.
     fresh = participant_env(base, 2, "10.0.0.5", 3102, "0.0.0.0", "workshop", "http://10.0.0.5:3102")
     assert "SESSION_SECRET=" in fresh and secret not in fresh
+
+
+def test_provider_error_names_the_cause_a_presenter_can_act_on():
+    """"Failed" alone made a mistyped key, a mistyped model and an unreachable host identical.
+
+    A workshop participant has the portal and nothing else: no shell, no log. If the card does not
+    say which of the three it is, the only way forward is to ask the instructor.
+    """
+    from app.agent import provider_error
+
+    assert "401" in provider_error(Exception("Error code: 401 - Unauthorized"), "openai")
+    assert "404" in provider_error(Exception("Error code: 404 - model_not_found"), "openai")
+    assert "429" in provider_error(Exception("Error code: 429 - exceeded your quota"), "openai")
+    assert "403" in provider_error(Exception("Error code: 403 - forbidden"), "openai")
+    # The same transport failure means different things depending on where the model is.
+    assert "Ollama" in provider_error(Exception("Connection refused"), "ollama")
+    assert "base URL" in provider_error(Exception("Connection refused"), "openai")
+    # Unrecognised: the class name carries no secret and names the family of fault.
+    assert provider_error(ValueError("something odd"), "openai").startswith("ValueError")
+
+
+def test_provider_error_never_echoes_the_provider_text():
+    """The guard that matters. A 401 body quotes a fragment of the key that was sent, and the
+    presenter password is published in this repository, so anyone who can read this card is not
+    trusted with even part of a key."""
+    from app.agent import provider_error
+
+    leaky = Exception(
+        "Error code: 401 - {'error': {'message': 'Incorrect API key provided: "
+        "sk-proj-SECRETVALUE1234. You can find your API key at https://platform.openai.com/keys'}}"
+    )
+    message = provider_error(leaky, "openai")
+    assert "sk-proj" not in message
+    assert "SECRETVALUE1234" not in message
+    assert "platform.openai.com" not in message
+
+
+def test_a_failed_provider_reads_as_failed_in_the_portal():
+    """Static guard on the card. The reason is useless if nobody looks at the badge, and a `failed`
+    badge rendered in the same muted grey as `connected` is not something anyone looks at."""
+    from pathlib import Path
+
+    root = Path(__file__).resolve().parents[2]
+    admin = (root / "frontend/components/Admin.tsx").read_text()
+    css = (root / "frontend/app/globals.css").read_text()
+
+    # The card must not hardcode the neutral class for a state that can be a failure.
+    assert 'className={providerBadge(status.provider_status.state)}' in admin
+    assert 'state === "failed" ? "badge failed"' in admin
+    assert "status.provider_status.last_error" in admin
+    # And the variant has to exist, or the class name resolves to nothing.
+    assert ".badge.failed {" in css
+    assert "var(--red)" in css.split(".badge.failed {")[1].split("}")[0]
+
+
+def test_the_status_endpoint_carries_the_reason_a_provider_failed(settings):
+    """End to end, because the other two tests prove the halves and not the join.
+
+    A provider that rejects the key has to reach the portal card as a sentence. This drives a real
+    turn through a model that raises what OpenAI raises, then reads the card's own endpoint.
+    """
+    from conftest import FakeModel
+    from fastapi.testclient import TestClient
+
+    from app.main import create_app
+
+    class Rejecting(FakeModel):
+        def _generate(self, messages, stop=None, run_manager=None, **kwargs):
+            raise RuntimeError(
+                "Error code: 401 - {'error': {'message': 'Incorrect API key provided: sk-proj-LEAK'}}"
+            )
+
+    def builder(s, endpoint=None):
+        return Rejecting()
+
+    with TestClient(create_app(settings, model_builder=builder)) as client:
+        customer = login(client)
+        turn = client.post("/api/chat", headers=customer, json={"message": "What is my balance?"})
+        assert turn.status_code == 503, turn.text
+        admin = login(client, admin=True)
+        provider = client.get("/api/demo-admin/status", headers=admin).json()["provider_status"]
+
+    assert provider["state"] == "failed"
+    assert "401" in provider["last_error"]
+    assert "sk-proj" not in provider["last_error"] and "LEAK" not in provider["last_error"]

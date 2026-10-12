@@ -47,7 +47,7 @@ type Update = {
 type Status = {
   provider: string;
   model: string;
-  provider_status: { state: string };
+  provider_status: { state: string; last_error?: string | null };
   galileo: {
     state: string;
     enabled: boolean;
@@ -264,6 +264,11 @@ export default function Admin() {
   const streamLabel = activeBackend.stream_label.replace(/^./, (c) => c.toUpperCase());
   // Support that is not finished is labelled where it is chosen, not only in the release notes.
   const backendName = (b: { name: string; beta: boolean }) => `${b.name}${b.beta ? " - Beta" : ""}`;
+  // Mapped rather than interpolated: a state string goes straight into className, and only these
+  // two carry a colour. "failed" in the same muted grey as "connected" is not a failure anyone
+  // notices, which is exactly how a mistyped key got as far as the lab.
+  const providerBadge = (state: string) =>
+    state === "failed" ? "badge failed" : state === "connected" ? "badge connected" : "badge";
   // Splunk AO's two deployments are mutually exclusive and need different credentials. Show one
   // set, chosen here, rather than nine fields where six are wrong for whichever you are using.
   const [aoMode, setAoMode] = useState<"o11y" | "standalone">("o11y");
@@ -397,11 +402,16 @@ export default function Admin() {
                     <span className="mini-label">MODEL PROVIDER</span>
                     <h3>{status.provider}</h3>
                     <p>{status.model}</p>
-                    <span className="badge">
+                    <span className={providerBadge(status.provider_status.state)}>
                       {status.provider_status.state}
                     </span>
+                    {status.provider_status.last_error && (
+                      <small>{status.provider_status.last_error}</small>
+                    )}
                     <small>
-                      Provider/model changes require .env edit and restart.
+                      {status.provider_status.state === "failed"
+                        ? "Fix the endpoint under Model endpoint on the Setup tab, then ask a question on the Demo tab to re-check."
+                        : "Change the model under Model endpoint on the Setup tab."}
                     </small>
                   </article>
                   <article className="admin-card">
