@@ -37,7 +37,10 @@ Your instance is yours alone: your own dataset, your own settings. What you do w
 
 ## Step 1 — Create your Galileo project
 
-Do this first. The app cannot connect to a project that does not exist.
+A project is the workspace that holds everything you build today, and the log stream inside it is
+where this app's conversations land. Every later step points at that stream by name: the evaluators
+attach to it, and so does the guardrail. Do this first — the app cannot connect to a project that
+does not exist.
 
 In the Galileo console:
 
@@ -85,7 +88,11 @@ Note the **console URL** and **API URL** for your tenant, and the **Agent Contro
 
 ---
 
-## Step 2 — Point the app at your model and your project
+## Step 2 — Connect the app to your Galileo project
+
+Here you tell the app where to send its traces. Until it is connected the agent still answers
+questions perfectly well, but nothing is recorded, and every later step would have nothing to look
+at. The three URLs come from your instructor and differ per tenant, so copy them exactly.
 
 1. Go to your demo admin portal — `https://<domain>/demo-admin` — and sign in
 
@@ -104,6 +111,11 @@ Note the **console URL** and **API URL** for your tenant, and the **Agent Contro
    <img width="1033" height="585" alt="image" src="https://github.com/user-attachments/assets/d53322a1-8785-4f22-b566-0d26d6fe9640" />
 
 ## Step 3 — Connect My Bank Agent to your LLM
+
+Now give the agent a model to think with: your provider, your key, and the model identifier your
+provider expects. The last sub-steps ask one real question and then go looking for it in Galileo,
+which proves both halves at once — the agent can reach the model, and the trace reaches your stream.
+If the message does not appear in Galileo here, fix it now rather than in Step 6.
 
 1. Go to your demo admin portal — `https://<domain>/demo-admin` — and sign in
 
@@ -143,7 +155,11 @@ Note the **console URL** and **API URL** for your tenant, and the **Agent Contro
 
 ## Step 4 — Configure Galileo Evaluators
 
-Now the app is connected, configure the Galileo evaluators.
+An evaluator is a judge that reads a finished turn and scores one property of it — whether the answer
+stayed with the evidence it was given, for example, or followed the instructions it was under. You
+are defining them here in the console; they do not run until Step 5 attaches them to your stream.
+This is the detective half of the lab: it tells you an answer was wrong *after* the customer has read
+it.
 
 1. Click on your username in the top right and select **Integrations**
 
@@ -288,6 +304,11 @@ rather than failing it.
  
 ## Step 5 — Configure Galileo Evaluators in My Bank Agent
 
+Defining an evaluator does not make it run — it has to be attached to the log stream the app writes
+to. This step binds the ones you just created to your stream, so they score every turn that arrives
+from now on. An evaluator left unattached scores nothing and reports no error, which is the easiest
+way to lose twenty minutes in this lab.
+
 1. Go to Project select your project and select your **Agent Stream**
 
    <img width="1471" height="454" alt="image" src="https://github.com/user-attachments/assets/affecf5b-e74c-4e9e-958a-49057ebf125c" />
@@ -305,6 +326,10 @@ rather than failing it.
     <img width="535" height="309" alt="image" src="https://github.com/user-attachments/assets/23dc25f9-aa4f-4e9e-9955-775f67d425d7" />
 
 ## Step 6 — Test the evaluators
+
+A judge that never fires and a judge that scores a bad answer as fine look identical from the
+console. So you deliberately break an answer and check that the score moves — that is the only thing
+that proves an evaluator is doing its job.
 
 The evaluators score real turns, so you need to produce one. The faults are injected from the
 presenter portal; the question is asked from the banking app.
@@ -353,6 +378,10 @@ a metric that only ever fails is not measuring anything.
 
 Evaluators are detective controls: they tell you afterwards, which is fine for a wrong number and
 useless for money that has already left. Now build something preventive.
+
+A control is created in the console and attached to your log stream. The app declares its own agent
+when it starts, so there is nothing to register by hand — the stream is what ties your rules to your
+instance.
 
 Two things decide whether a control works, and both are easy to get wrong:
 
@@ -423,6 +452,10 @@ Two things decide whether a control works, and both are easy to get wrong:
 
 
 ## Step 8 — Test the guardrails
+
+You are checking two things here, not one: that the unsafe request is refused, and that ordinary
+questions about your own accounts still work. A guardrail that blocks everything passes the first
+check and fails the lab, so both halves matter.
 
 The guardrail runs **before** the tool, so it has to be armed on the connected banking session. It is
 not enough to create the controls: nothing is gated until the scenario is enabled in the portal.
