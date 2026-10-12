@@ -6,36 +6,28 @@ Versions mark states worth returning to. Tags are annotated, so `git tag -n` and
 Open defects are tracked as [GitHub issues](https://github.com/roadtrip123/splunky-finance/issues);
 planned work is in [TODO.md](TODO.md).
 
-## v0.6.8 — What the first real install found
+## v1.0.5 — The port 443 redirect no longer survives a reboot
 
-Three defects, all in the install path, all found by running it on a fresh instance rather than by
-reading it.
+The redirect lives in the image's `/etc/iptables/rules.v4`, and `netfilter-persistent` restores it on
+every boot, so deleting it by hand never lasted. A box in that state is healthy by every internal
+measure — Caddy bound to 443, containers passing their healthchecks, a certificate that validates —
+and completely unreachable from a browser, because arriving packets are redirected to a port nothing
+listens on. v0.6.8 made `install.sh` warn about exactly this; a warning on a box that was already an
+image was not enough.
 
-- **The shared update directory locked out the host.** It was given to the container's uid outright,
-  so the account running the updater could no longer write the state file beside the container's
-  request file. It is now `<owner>:10001` with mode `0770` — user for the host, group for the
-  container. The symptom was `selfupdate.py` reporting it could not record what it did, after a
-  successful build.
-- **The proxy was verified the instant after `systemctl restart`.** Caddy provisions its internal
-  certificate authority and binds after systemd reports the restart complete, so the check failed on
-  a proxy that was already about to serve — and the installer reported a working deployment as
-  broken. It now retries for twenty seconds, and if the local check still fails it says that the
-  check goes through loopback and names the command to confirm from another machine, rather than
-  asserting the proxy is down.
-- **`[ ... ] && break` inside the retry loop** would have taken the script down under `set -e` on the
-  first retry, which is the same trap already fixed once in the egress check.
-- **`install.sh` now warns when a redirect for the chosen port is still in `/etc/iptables/rules.v4`
-  or `/etc/rc.local`.** A rule deleted by hand comes back on the next boot, and on a box destined to
-  become an AMI that means every clone starts with the port broken.
-
-## v0.6.14 — The customer password loses its leading dash
-
-- `DEMO_PASSWORD` is now `AlexDemo1234!`, without the leading hyphen. A password read aloud to a room
-  should not begin with a character people hear as punctuation or as part of the sentence. Still 13
-  characters, so it clears the twelve-character minimum.
-- **An existing box keeps its old password**, because `.env` is not in the repository. Change it in
-  place and restart: `sed -i 's|^DEMO_PASSWORD=.*|DEMO_PASSWORD=AlexDemo1234!|' .env`. Do this before
-  taking an image, or every clone carries the old one.
+- **`scripts/fix_ports.py`** removes the rule from the running nat table and, with `--persist`, from
+  the saved file that restores it. It matches on what a rule does rather than how it is spelled: the
+  saved copy carries `-m tcp`, a rule added by hand may not, the destination port has varied, and one
+  box carried two identical copies — `iptables -D` removes one match, so a single delete looked like
+  it had worked.
+- **`splunky-finance-ports.service`** runs it `After=netfilter-persistent.service`, which is the
+  entire point: anything earlier is undone a moment later. `Before=splunky-finance.service` as well,
+  so the stack is never reported healthy on a box no browser can reach. It is the only unit here that
+  runs as root, because it edits the nat table.
+- The script reports rather than fails when a rule cannot be parsed, so a box that is already
+  reachable never fails to boot over this.
+- **A test of the workshop provisioner hardcoded `/srv/splunk-finance`** and so could only ever pass
+  on one checkout. It now derives the path, which means the suite runs on a deployed box.
 
 ## v1.0.4 — The policy corpus denied the transfer tool existed
 
@@ -267,6 +259,15 @@ the stream as target context, and the server returns the controls bound to that 
   from — and this one was missing from the hand-written view, so it saved correctly and showed as
   empty. A test now asserts all three agree.
 
+## v0.6.14 — The customer password loses its leading dash
+
+- `DEMO_PASSWORD` is now `AlexDemo1234!`, without the leading hyphen. A password read aloud to a room
+  should not begin with a character people hear as punctuation or as part of the sentence. Still 13
+  characters, so it clears the twelve-character minimum.
+- **An existing box keeps its old password**, because `.env` is not in the repository. Change it in
+  place and restart: `sed -i 's|^DEMO_PASSWORD=.*|DEMO_PASSWORD=AlexDemo1234!|' .env`. Do this before
+  taking an image, or every clone carries the old one.
+
 ## v0.6.13 — Workspace Setup and Control
 
 - The presenter portal's heading reads **Workspace Setup and Control** rather than "Demo workspace",
@@ -345,6 +346,28 @@ someone else's API key.
   volume rather than editing it, then proves `galileo-settings.json` is gone and lists what the image
   will still carry, warning about a provider key in `.env` that the volume wipe would not touch.
   Clearing fields in the portal is not equivalent: a field forgotten is a field every clone inherits.
+
+## v0.6.8 — What the first real install found
+
+Three defects, all in the install path, all found by running it on a fresh instance rather than by
+reading it.
+
+- **The shared update directory locked out the host.** It was given to the container's uid outright,
+  so the account running the updater could no longer write the state file beside the container's
+  request file. It is now `<owner>:10001` with mode `0770` — user for the host, group for the
+  container. The symptom was `selfupdate.py` reporting it could not record what it did, after a
+  successful build.
+- **The proxy was verified the instant after `systemctl restart`.** Caddy provisions its internal
+  certificate authority and binds after systemd reports the restart complete, so the check failed on
+  a proxy that was already about to serve — and the installer reported a working deployment as
+  broken. It now retries for twenty seconds, and if the local check still fails it says that the
+  check goes through loopback and names the command to confirm from another machine, rather than
+  asserting the proxy is down.
+- **`[ ... ] && break` inside the retry loop** would have taken the script down under `set -e` on the
+  first retry, which is the same trap already fixed once in the egress check.
+- **`install.sh` now warns when a redirect for the chosen port is still in `/etc/iptables/rules.v4`
+  or `/etc/rc.local`.** A rule deleted by hand comes back on the next boot, and on a box destined to
+  become an AMI that means every clone starts with the port broken.
 
 ## v0.6.7 — One command
 
