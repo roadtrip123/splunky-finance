@@ -353,6 +353,17 @@ status under the scenario reads *"Applied to connected banking session"* once th
 | Banking app | the URL your instructor gave you, signed in as customer `12345678` |
 | Presenter portal | the same URL with `/demo-admin`, **Demo** tab |
 
+1. Log into the Banking App
+<img width="1789" height="829" alt="image" src="https://github.com/user-attachments/assets/94b76a62-94c1-4062-863e-9e1001b2156e" />
+
+2.  In **another** tab log into the the Demo Admin portal (Keep this portal open during the testing)
+<img width="1707" height="825" alt="image" src="https://github.com/user-attachments/assets/df995195-dc4d-4b8f-b92c-a94a0bbad966" />
+
+3. Go back to the banking portal and click **My Bank Angent** you should see it "Demo Connection" green. You can also see this in the demo-admin portal. If it isn't green, just log out of both portals and log in again.
+
+<img width="430" height="766" alt="image" src="https://github.com/user-attachments/assets/dd55ab8e-1adf-4141-bacf-3a9960b4c34a" />
+
+
 ### Run one fault at a time
 
 For each row: click **Enable …** in the portal, ask the question in the banking tab, then look at the
