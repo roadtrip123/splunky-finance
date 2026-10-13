@@ -79,7 +79,7 @@ In the Galileo console:
 
    <img width="1366" height="140" alt="image" src="https://github.com/user-attachments/assets/db5404c3-1a47-45e4-81fc-1e129e349b23" />
 
-8. Give it a Project Name and click **Create Project**
+8. Give it a Project Name for example 'splunk-finance-<initials>' and click **Create Project**
 
    <img width="358" height="164" alt="image" src="https://github.com/user-attachments/assets/3f3054ce-6781-44d7-aaa1-6722485f5f3f" />
 
