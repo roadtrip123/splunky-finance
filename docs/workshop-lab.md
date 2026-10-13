@@ -363,6 +363,10 @@ status under the scenario reads *"Applied to connected banking session"* once th
 
 <img width="430" height="766" alt="image" src="https://github.com/user-attachments/assets/dd55ab8e-1adf-4141-bacf-3a9960b4c34a" />
 
+Or
+
+<img width="1022" height="514" alt="image" src="https://github.com/user-attachments/assets/086965f7-4e90-482e-a122-7a70fde0407c" />
+
 
 ### Run one fault at a time
 
