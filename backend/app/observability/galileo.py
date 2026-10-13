@@ -1045,7 +1045,7 @@ class Telemetry:
             self.status["last_error"] = "A telemetry event could not be recorded"
             return 0
 
-    def fault_span(self, turn, scenario, prompt, candidate, evidence=None, usage=None):
+    def fault_span(self, turn, scenario, prompt, candidate, evidence=None, usage=None, duration_ns=None):
         """Log the controlled fault writer as its own named span.
 
         Named after the chat model class so it reads as an ordinary model call in the trace: the
@@ -1068,6 +1068,9 @@ class Telemetry:
                 output=candidate,
                 model=self.settings.model_name,
                 name=self.model_span_name(),
+                duration_ns=duration_ns,
+                # These stay. The injection pass runs with callbacks deliberately off, so this span
+                # is the only record of what that model call cost.
                 num_input_tokens=(usage or {}).get("input_tokens"),
                 num_output_tokens=(usage or {}).get("output_tokens"),
                 total_tokens=(usage or {}).get("total_tokens"),
@@ -1075,7 +1078,7 @@ class Telemetry:
         except Exception:  # noqa: BLE001 - isolate SDK failures without exposing credential-bearing errors
             self.status["last_error"] = "A telemetry event could not be recorded"
 
-    def answer_span(self, turn, prompt, candidate, evidence=None, usage=None):
+    def answer_span(self, turn, prompt, candidate, evidence=None, duration_ns=None):
         """Log the delivered candidate as a named LLM span.
 
         Carries the same evidence the agent answered from, so span-level evaluators can judge the
@@ -1096,9 +1099,12 @@ class Telemetry:
                 output=candidate,
                 model=self.settings.model_name,
                 name="customer-visible-answer",
-                num_input_tokens=(usage or {}).get("input_tokens"),
-                num_output_tokens=(usage or {}).get("output_tokens"),
-                total_tokens=(usage or {}).get("total_tokens"),
+                # duration_ns is optional and Galileo computes nothing in its absence: the span
+                # simply has no latency, which made the one span this demo points at the only one
+                # in the trace without a number beside it.
+                duration_ns=duration_ns,
+                # Deliberately no token counts. The LangChain callback logs every model call the
+                # agent made, so reporting the turn's total here counted the same usage twice.
             )
         except Exception:  # noqa: BLE001 - isolate SDK failures without exposing credential-bearing errors
             self.status["last_error"] = "A telemetry event could not be recorded"

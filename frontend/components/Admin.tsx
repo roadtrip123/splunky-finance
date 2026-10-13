@@ -48,6 +48,7 @@ type Status = {
   provider: string;
   model: string;
   provider_status: { state: string; last_error?: string | null };
+  preferences: { demo_chip: boolean };
   galileo: {
     state: string;
     enabled: boolean;
@@ -1106,6 +1107,58 @@ export default function Admin() {
                           : ""}
                       </small>
                     )}
+                  </section>
+                  )}
+                  {status.demo_mode !== "workshop" && (
+                  <section className="admin-card">
+                    <h2>Demo chip</h2>
+                    <p className="muted">
+                      Adds a small <strong>Demo</strong> control to the banking
+                      chat that arms a scenario and asks its question in one
+                      click, so a presenter on a single screen does not have to
+                      switch to this portal mid-demo. Off by default, and
+                      invisible to anyone using the banking app while it is off.
+                    </p>
+                    <div className="admin-controls">
+                      <label className="switch" htmlFor="demo-chip">
+                        <input
+                          id="demo-chip"
+                          type="checkbox"
+                          checked={status.preferences.demo_chip}
+                          disabled={busy}
+                          onChange={async (e) => {
+                            const enabled = e.target.checked;
+                            setBusy(true);
+                            setError("");
+                            try {
+                              await mutate(
+                                "demo-admin/preferences",
+                                { name: "demo_chip", enabled },
+                                true,
+                                "PUT",
+                              );
+                              await refresh();
+                              setNotice(
+                                enabled
+                                  ? "Demo chip enabled. It appears in the banking chat within a second."
+                                  : "Demo chip disabled.",
+                              );
+                            } catch (err) {
+                              setError((err as Error).message);
+                            } finally {
+                              setBusy(false);
+                            }
+                          }}
+                        />
+                        <span>Demo Chip Enabled</span>
+                      </label>
+                    </div>
+                    <small>
+                      Arming clears the agent&apos;s memory of the conversation,
+                      as switching scenario from this portal does. The chip is
+                      stored per box and resets when the runtime volume is
+                      destroyed, so a cloned image starts with it off.
+                    </small>
                   </section>
                   )}
                   {status.demo_mode !== "workshop" && (

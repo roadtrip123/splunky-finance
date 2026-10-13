@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import { Citation, mutate } from "@/lib/api";
-import { useDemoConnection, demoRequest } from "@/lib/demo-connection";
+import { useDemoConnection, demoRequest, Preset } from "@/lib/demo-connection";
 type Message = {
   role: "user" | "assistant";
   text: string;
@@ -26,6 +26,7 @@ export default function Chat({
   const [conversation, setConversation] = useState<string>();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [chipOpen, setChipOpen] = useState(false);
   const panel = useRef<HTMLDivElement>(null);
   const field = useRef<HTMLTextAreaElement>(null);
   const bottom = useRef<HTMLDivElement>(null);
@@ -43,6 +44,32 @@ export default function Chat({
   useEffect(() => {
     bottom.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, busy]);
+  // Arm the scenario and the guardrail, then ask the question, so a presenter on one screen never
+  // leaves this page. send() already syncs before posting, so the revision bump this causes cannot
+  // produce the 409 that a bare post would.
+  async function arm(preset: Preset) {
+    if (busy || pairBusy) return;
+    setChipOpen(false);
+    setError("");
+    try {
+      await mutate("demo-admin/arm", { preset_id: preset.id }, true);
+      // send() forces its own sync, so only the prompt-less presets need one here.
+      if (preset.prompt) await send(preset.prompt);
+      else await demo.sync(true);
+    } catch (e) {
+      const message = (e as Error).message;
+      // Only an auth failure means a missing presenter session. Attributing every failure to that
+      // sent a presenter to sign in again over a settings race, which is the one thing they could
+      // not fix by signing in.
+      const unauthorized = /401|403|forbidden|unauthori|session/i.test(message);
+      setError(
+        unauthorized
+          ? `${message}. The presets need a presenter session: sign in to /demo-admin once in another tab.`
+          : message,
+      );
+    }
+  }
+
   async function send(text: string) {
     if (!text.trim() || busy || !demo.ready || pairBusy) return;
     setError("");
@@ -50,7 +77,9 @@ export default function Chat({
     setMessages((m) => [...m, { role: "user", text, at: sentAt }]);
     setBusy(true);
     try {
-      const confirmed = await demo.sync();
+      // Forced: a preset has just changed the settings, and the poll's in-flight answer predates
+      // that change.
+      const confirmed = await demo.sync(true);
       if (confirmed.expired) throw new Error("Demo session expired. Disconnect or pair again.");
       const result = await mutate<{
         answer: string;
@@ -118,13 +147,63 @@ export default function Chat({
             <h2 id="chat-title">My Bank Agent</h2>
             <span className="muted">A clearer view of your banking</span>
           </div>
-          <button
-            className="icon-button"
-            onClick={close}
-            aria-label="Close My Bank Agent"
-          >
-            ×
-          </button>
+          <div className="chat-heading-actions">
+            {demo.state?.demo_chip && !!demo.state.presets?.length && (
+              <div className="demo-chip-wrap">
+                <button
+                  type="button"
+                  className={`demo-chip${demo.tone === "fault" ? " armed" : ""}`}
+                  aria-expanded={chipOpen}
+                  aria-haspopup="menu"
+                  title={demo.description}
+                  onClick={() => setChipOpen((open) => !open)}
+                >
+                  Demo {chipOpen ? "\u25b4" : "\u25be"}
+                </button>
+                {chipOpen && (
+                  <div
+                    className="demo-chip-menu"
+                    role="menu"
+                    onKeyDown={(e) => {
+                      if (e.key === "Escape") setChipOpen(false);
+                    }}
+                  >
+                    {demo.state.presets.map((preset) => (
+                      <div key={preset.id}>
+                        {preset.group && (
+                          <span className="demo-chip-group">{preset.group}</span>
+                        )}
+                      <button
+                        type="button"
+                        role="menuitem"
+                        className="demo-chip-item"
+                        disabled={busy || !demo.ready || pairBusy}
+                        onClick={() => arm(preset)}
+                      >
+                        <span className="demo-chip-question">
+                          {preset.prompt ?? preset.label}
+                        </span>
+                        <span className="demo-chip-note">
+                          {preset.note}
+                          {preset.scenario === demo.state?.scenario &&
+                            preset.protection === !!demo.state?.protection &&
+                            preset.prompt && <strong className="demo-chip-live"> armed now</strong>}
+                        </span>
+                      </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+            <button
+              className="icon-button"
+              onClick={close}
+              aria-label="Close My Bank Agent"
+            >
+              ×
+            </button>
+          </div>
         </div>
         <div className="chat-messages">
           {!messages.length && (

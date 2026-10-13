@@ -292,6 +292,7 @@ class ChatService:
                 history = conversation.messages[-8:]
                 while history and sum(len(str(m.content)) for m in history) > 7000:
                     history = history[2:]
+                agent_started = time.perf_counter_ns()
                 result = await asyncio.wait_for(
                     agent.ainvoke(
                         {"messages": history + [HumanMessage(message)]},
@@ -299,6 +300,7 @@ class ChatService:
                     ),
                     timeout=self.settings.llm_timeout_seconds,
                 )
+                agent_ns = time.perf_counter_ns() - agent_started
                 observed_tools = [m.name for m in result["messages"] if isinstance(m, ToolMessage)]
                 token_usage = [
                     m.usage_metadata
@@ -322,6 +324,7 @@ class ChatService:
                 # the gate decides whether it happens.
                 fault_method = FAULT_METHODS.get(scenario)
                 if fault_method:
+                    fault_started = time.perf_counter_ns()
                     candidate, fault_usage, fault_method = await inject(
                         scenario,
                         message,
@@ -333,6 +336,7 @@ class ChatService:
                         # as an ordinary model call rather than announcing itself.
                         config={"metadata": metadata},
                     )
+                    fault_ns = time.perf_counter_ns() - fault_started
                     if fault_usage:
                         usage = {
                             key: (usage or {}).get(key, 0) + fault_usage.get(key, 0)
@@ -345,9 +349,12 @@ class ChatService:
                     # show one answer, the one the customer received.
                     self.telemetry.mask_genuine_answer(turn, raw, candidate)
                     self.telemetry.fault_span(
-                        turn, scenario, message, candidate, evidence, fault_usage
+                        turn, scenario, message, candidate, evidence, fault_usage, fault_ns
                     )
-                self.telemetry.answer_span(turn, message, candidate, evidence, usage)
+                # No usage: the callback already reports every model call the agent made, and the
+                # injection pass is reported by its own span above. Passing the turn's total here
+                # as well made a turn's tokens read as roughly double what it actually spent.
+                self.telemetry.answer_span(turn, message, candidate, evidence, agent_ns)
                 # This awaited gate completes before response construction. No token streaming bypass exists.
                 final, decision = await self.protection.check(
                     candidate, message, evidence, turn["logger"] if turn else None, enabled

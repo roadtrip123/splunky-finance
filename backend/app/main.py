@@ -15,9 +15,10 @@ from app.agent import ChatService
 from app.auth import Authentication, Session
 from app.config import Settings
 from app.demo.connections import Connections
-from app.demo.scenarios import SCENARIOS
+from app.demo.scenarios import PRESENTER_PRESETS, PRESETS_BY_ID, SCENARIOS
 from app.observability.galileo import Telemetry
 from app.observability.protection import Protection
+from app.preferences import Preferences
 from app.schemas import ChatInput, DatasetReset, Login, ProtectionSetting, ScenarioSetting, StrictModel
 from app.storage import Storage
 from app.tools import Banking
@@ -100,6 +101,15 @@ class Binding(StrictModel):
     token: str = Field(min_length=1, max_length=80)
 
 
+class PreferenceSetting(StrictModel):
+    name: str = Field(max_length=40)
+    enabled: bool
+
+
+class ArmPreset(StrictModel):
+    preset_id: str = Field(max_length=40)
+
+
 def create_app(settings=None, model_builder=None, protection_adapter=None):
     settings = settings or Settings()
     storage = Storage(settings)
@@ -111,6 +121,7 @@ def create_app(settings=None, model_builder=None, protection_adapter=None):
     )
     links = Connections(auth, chat)
     updates = Updates(settings.update_state_dir, settings.update_repo)
+    preferences = Preferences(settings.data_dir)
     jobs = {}
 
     @asynccontextmanager
@@ -311,7 +322,19 @@ def create_app(settings=None, model_builder=None, protection_adapter=None):
     async def demo_sync(request: Request):
         customer = session(request, changing=True)
         links.auto(customer, auth.get(request, "admin", required=False))
-        return envelope(request, links.state(customer))
+        chip = preferences.all()["demo_chip"]
+        active = chat.run(customer)
+        return envelope(
+            request,
+            {
+                **links.state(customer),
+                "protection": bool(active and active["protection"]),
+                "demo_chip": chip,
+                # Sent only when on, so a box with the chip off never ships the fault catalogue to
+                # a customer page at all.
+                "presets": PRESENTER_PRESETS if chip else [],
+            },
+        )
 
     @app.post("/api/chat/demo-ack")
     async def demo_ack(request: Request, payload: DemoVersion):
@@ -418,6 +441,48 @@ def create_app(settings=None, model_builder=None, protection_adapter=None):
         links.attach(customer, run)
         chat.clear(customer)
         return envelope(request, {"status": "bound"})
+
+    @app.post("/api/demo-admin/arm")
+    async def arm_preset(request: Request, payload: ArmPreset):
+        """Arm a preset from whichever page the presenter is on.
+
+        Both sessions are read, which is the same condition /api/demo-admin/bind already requires
+        before fault mode can be activated: "token alone cannot activate fault mode". A request
+        from the banking page carries both cookies, so this can create the run, set the scenario and
+        attach the session without the manual pairing round trip -- the same authority, fewer steps.
+
+        No expected_revision, unlike the scenario and protection settings. Those guard a form
+        against another tab; this one exists to make the state what the presenter just asked for.
+        """
+        admin = session(request, "admin", True)
+        preset = PRESETS_BY_ID.get(payload.preset_id)
+        if not preset:
+            raise HTTPException(422, "Unknown preset")
+        run = chat.run(admin) or chat.new_run(admin)
+        run.update(
+            scenario=preset["scenario"],
+            protection=preset["protection"],
+            revision=run["revision"] + 1,
+            replay=None,
+        )
+        # Attach the browser's own banking session if it has one, so the first click works on a box
+        # where the portal was never paired. Absent, the next demo-sync links it anyway.
+        customer = auth.get(request, "customer", required=False)
+        if customer and not customer.run_id and not run.get("customer_id"):
+            links.attach(customer, run)
+        for linked in auth.sessions.values():
+            if linked.run_id == run["id"]:
+                chat.clear(linked)
+        return envelope(request, {"run": run, "prompt": preset["prompt"]})
+
+    @app.put("/api/demo-admin/preferences")
+    async def set_preference(request: Request, payload: PreferenceSetting):
+        session(request, "admin", True)
+        try:
+            current = preferences.set(payload.name, payload.enabled)
+        except (KeyError, TypeError):
+            raise HTTPException(422, "Unknown preference") from None
+        return envelope(request, {"preferences": current})
 
     @app.put("/api/demo-admin/scenario")
     async def set_scenario(request: Request, payload: ScenarioSetting):
@@ -598,6 +663,7 @@ def create_app(settings=None, model_builder=None, protection_adapter=None):
             request,
             {
                 "banking_connection": links.status(run),
+                "preferences": preferences.all(),
                 "provider": settings.llm_provider,
                 "model": settings.model_name,
                 "provider_status": chat.provider_status,

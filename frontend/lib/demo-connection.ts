@@ -1,7 +1,9 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import { api } from "./api";
-export type DemoState = { version: string; scenario: string; connected: boolean; expired: boolean };
+export type Preset = { id: string; label: string; note: string; group?: string; scenario: string; protection: boolean; prompt: string | null };
+export type DemoState = { version: string; scenario: string; connected: boolean; expired: boolean;
+  protection?: boolean; demo_chip?: boolean; presets?: Preset[] };
 export async function demoRequest<T>(path: string, body: unknown = {}): Promise<T> {
   const session = await api<{ csrf_token: string }>("auth/session", { signal: AbortSignal.timeout(4000) });
   return api<T>(path, { method: "POST", body: JSON.stringify(body),
@@ -12,21 +14,41 @@ export function useDemoConnection(visible: boolean) {
   const [ready, setReady] = useState(false);
   const alive = useRef(false);
   const pending = useRef<Promise<DemoState> | null>(null);
-  async function sync(): Promise<DemoState> {
-    if (pending.current) return pending.current;
-    pending.current = (async () => {
+  // Identifies which sync owns `pending`, so a superseded one does not clear its replacement's slot.
+  const owner = useRef<object | null>(null);
+  // `force` skips the in-flight request rather than awaiting it. The poll below runs every second,
+  // so a caller that has just changed the demo settings would otherwise be handed the answer to a
+  // request made *before* that change, send the stale version, and get a 409 back.
+  async function sync(force = false): Promise<DemoState> {
+    if (pending.current && !force) return pending.current;
+    const token = {};
+    const mine: Promise<DemoState> = (async () => {
       try {
         const next = await demoRequest<DemoState>("chat/demo-sync");
         if (alive.current) setState(next);
-        await demoRequest("chat/demo-ack", { version: next.version });
+        // Advisory: it tells the portal the banking session has caught up. A 409 here means a
+        // newer version already exists, which the next poll acknowledges, so it is not an error
+        // for the caller and must not take `ready` down with it.
+        try {
+          await demoRequest("chat/demo-ack", { version: next.version });
+        } catch {
+          /* superseded */
+        }
         if (alive.current) setReady(!next.expired);
         return next;
       } catch (e) {
         if (alive.current) setReady(false);
         throw e;
-      } finally { pending.current = null; }
+      } finally {
+        if (owner.current === token) {
+          owner.current = null;
+          pending.current = null;
+        }
+      }
     })();
-    return pending.current;
+    owner.current = token;
+    pending.current = mine;
+    return mine;
   }
   useEffect(() => {
     alive.current = visible;

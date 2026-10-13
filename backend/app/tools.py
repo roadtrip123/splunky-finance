@@ -300,6 +300,11 @@ def build_tools(banking: Banking, evidence: dict):
         internal = source_is_ours and destination_is_ours
         pair_id = f"syn-pair-{uuid4().hex[:8]}" if internal else None
 
+        # The reference date, never the real one. Dataset.ledger rejects any transaction dated
+        # after the manifest's reference date, so stamping a transfer with today's date on a
+        # dataset seeded earlier makes the write fail validation: the transfer is lost and the
+        # model reports a tool error. A presenter who wants today's date on new rows wants the
+        # dataset reseeded with today as its reference date, which the portal does.
         def row(account, other_name, amount):
             return Transaction(
                 id=f"syn-tx-xfer-{uuid4().hex[:8]}",

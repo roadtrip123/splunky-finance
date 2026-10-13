@@ -259,25 +259,50 @@ def test_setup_button_is_hidden_unless_asked_for(client, settings):
     assert client.get("/api/demo-admin/status", headers=headers).json()["setup_button"] is False
 
 
-def test_normal_answers_offers_the_guardrail_actions_ungated(client):
-    """The "before" half of the guardrail demo lives under Normal Answers.
+def test_the_portal_says_which_questions_the_guardrail_blocks(client):
+    """The "before" and "after" halves share one list, labelled by what the guardrail does to each.
 
-    The same eight prompts appear there with nothing gating them and under the guardrail scenario
-    where they are refused, so they are one shared list rather than two that can drift.
+    Both scenarios used to put every question under one heading, and under a scenario called
+    "Enable Guardrail Cross-Customer Access" that read as though all of them were gated. Two of
+    them are the control cases that must still be answered, and a presenter reading the old
+    heading would have called a correct allow a broken guardrail.
     """
-    from app.demo.scenarios import SCENARIOS
+    from app.demo.scenarios import CROSS_CUSTOMER_PROMPTS, GUARDRAIL_PROMPTS, OWN_ACCOUNT_PROMPTS, SCENARIOS
 
-    groups = SCENARIOS["normal_spending"]["prompt_groups"]
-    assert [g["label"] for g in groups] == ["Questions for this scenario", "Disabled Guardrail questions"]
-    assert groups[1]["prompts"] is SCENARIOS["money_transfer"]["prompts"]
-    # Every gated action and every allowed one, so the contrast is runnable from either scenario.
-    questions = " ".join(groups[1]["prompts"])
-    for expected in ("1234", "Dan", "my Savings account", "from Tom's account number 1234 to my account"):
-        assert expected in questions, expected
+    gated = SCENARIOS["money_transfer"]["prompt_groups"]
+    # One group, and only gated requests: an own-account question offered here invited a presenter
+    # to run something the guardrail is not meant to touch and read the allow as a failure.
+    assert len(gated) == 1
+    assert "blocks these" in gated[0]["label"]
+    assert gated[0]["prompts"] is CROSS_CUSTOMER_PROMPTS
+    assert SCENARIOS["money_transfer"]["prompts"] is CROSS_CUSTOMER_PROMPTS
+    assert GUARDRAIL_PROMPTS == CROSS_CUSTOMER_PROMPTS + OWN_ACCOUNT_PROMPTS
 
+    ungated = SCENARIOS["normal_spending"]["prompt_groups"]
+    assert ungated[1]["prompts"] is CROSS_CUSTOMER_PROMPTS
+    assert ungated[2]["prompts"] is OWN_ACCOUNT_PROMPTS
+
+    # Transfers *to* another customer are gated too: the tool input carries the account number
+    # either way, and a presenter expecting a push to succeed has read the pattern wrongly.
+    blocked = " ".join(CROSS_CUSTOMER_PROMPTS)
+    for expected in ("to Tom's account number 1234", "to Dan's account number 4127",
+                     "from Tom's account number 1234 to my account", "1234", "4127"):
+        assert expected in blocked, expected
+    # And nothing the pattern matches may sit in the allowed group.
+    allowed = " ".join(OWN_ACCOUNT_PROMPTS)
+    for name in ("Tom", "Dan", "1234", "4127"):
+        assert name not in allowed, name
+
+    # And the labels survive serialisation, since the portal reads them from this payload.
     headers = login(client, True)
     served = client.get("/api/demo-admin/status", headers=headers).json()["scenarios"]
-    assert served["normal_spending"]["prompt_groups"][1]["label"] == "Disabled Guardrail questions"
+    assert [g["label"] for g in served["money_transfer"]["prompt_groups"]] == [
+        g["label"] for g in gated
+    ]
+    offered = " ".join(
+        q for g in served["money_transfer"]["prompt_groups"] for q in g["prompts"]
+    )
+    assert "my Savings" not in offered, "the guardrail scenario offers only gated requests"
 
 
 def test_reprovisioning_keeps_a_participants_session_secret(tmp_path):

@@ -6,6 +6,61 @@ Versions mark states worth returning to. Tags are annotated, so `git tag -n` and
 Open defects are tracked as [GitHub issues](https://github.com/roadtrip123/splunky-finance/issues);
 planned work is in [TODO.md](TODO.md).
 
+## v1.1.0: The demo chip
+
+A presenter with one screen cannot switch to the portal to arm a scenario and back to the banking app
+to ask the question. The chip does both in one click, from the chat itself.
+
+- **Off by default, and off on every clone.** The preference lives on the runtime volume rather than
+  in the source, so an image stamped a hundred times starts with it off. While it is off the banking
+  page is told nothing at all: `demo-sync` returns no presets, so a box never ships the fault
+  catalogue to a customer.
+- **Enabled from Troubleshooting**, under Software updates, as "Demo Chip Enabled". It appears in the
+  chat within a second, because the connection hook already polls.
+- **In the chat heading, with the menu floating down over the transcript.** In the footer and in flow
+  it shortened the conversation every time it opened, which is movement an audience notices.
+- **Each item is the question itself**, with what it breaks underneath in smaller type. Grouped, since
+  the guardrail pair is the same question twice and only the group heading tells them apart.
+- **The chip never shows what is armed.** An audience should not be able to read "wrong customer
+  enabled" off the screen; the live row is marked inside the menu, and the full description is on
+  hover. A test guards it, because it is a presentation requirement that any later edit could undo.
+- **`POST /api/demo-admin/arm`** does in one call what the portal does in three: it creates the
+  presenter run if none exists, sets the scenario and the guardrail, and attaches the banking
+  session. It reads both cookies, which is the condition `/api/demo-admin/bind` already requires
+  before fault mode can activate, so this is the same authority with fewer steps. The presets work
+  with the portal closed or never opened.
+- **The guardrail presets are a read and a pull**, each shown with the guardrail off and then on.
+  A transfer *to* another customer is a payment, which a bank is for, so blocking it is a weaker
+  story; exposing a balance and draining an account are not. The own-account entry stays as the
+  control.
+
+### Also
+
+- **A preset that had just changed the settings could send the version from before it.** The
+  connection hook polls every second and `sync()` reused an in-flight request, so the answer could
+  predate the change and the turn came back 409. Worse, the handler blamed every failure on a missing
+  presenter session and told the presenter to sign in again, which was the one thing that could not
+  help, while the portal was connected throughout.
+- **The delivered-answer span had no latency and double-counted tokens.** `duration_ns` is optional
+  and Galileo infers nothing in its absence, so the one span this demo points at was the only one in
+  the trace without a number beside it. It also repeated the turn's total usage that the LangChain
+  callback had already reported per call, so adding up a turn's LLM spans gave roughly twice what it
+  spent. The injection pass keeps its counts: it runs with callbacks deliberately off, so its span is
+  the only record of it.
+- **The guardrail scenario said its own-account questions were gated.** `money_transfer` had no
+  prompt groups, so the portal fell back to "Questions for this scenario" and every question read as
+  blocked. It now lists only the seven requests that name another customer, and Normal Answers labels
+  its three groups by what happens to each. Transfers *to* Tom or Dan are in the blocked group,
+  because the control tests the whole argument set and a payment carries the account number just as a
+  raid does.
+- **A transfer cannot be dated with the real date.** `Dataset.ledger` rejects any transaction after
+  the manifest's reference date, so stamping one with today's date on a dataset seeded earlier makes
+  the write fail validation: the transfer is lost, the tool returns an error, and the agent says
+  there was a problem with the request, which reads exactly like a model declining. The tool now
+  documents why it uses the reference date, and a test covers the write-and-reload path that nothing
+  covered before. A presenter who wants today's date on new rows wants the dataset reseeded with
+  today as its reference date.
+
 ## v1.0.7: A 400 says what to change
 
 `v1.0.6` surfaced a real failure on the first box it met and then named the exception rather than
