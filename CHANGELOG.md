@@ -6,6 +6,28 @@ Versions mark states worth returning to. Tags are annotated, so `git tag -n` and
 Open defects are tracked as [GitHub issues](https://github.com/roadtrip123/splunky-finance/issues);
 planned work is in [TODO.md](TODO.md).
 
+## v1.1.1: A preset arms the run the chat is listening to
+
+The first real use of the chip found this: the presets armed a scenario and the chat answered
+normally, with nothing reporting a problem. The footer, which is the only thing a presenter watches,
+stayed its usual colour.
+
+- **Arming now claims the banking session** rather than giving up on it. `arm` attached only when
+  both sides were unbound, so a leftover binding meant it armed a run nothing was listening to.
+  In-memory runs expire after an hour and a restart clears them while cookies survive, so a leftover
+  binding is the ordinary state of a box that has been in use, not an edge case. `Connections.claim`
+  releases whatever holds either side first, because a presenter clicking a preset is stating intent
+  about their own browser. `attach` keeps its refusal, which is right for pairing two people.
+- **A failure to bind now reaches the presenter.** `arm` returns whether anything is listening, and
+  the 409 that `attach` already raised can surface instead of being guarded away.
+- **The footer distinguishes "normal answers" from "nothing reaches this tab".** Both reported
+  scenario `normal_spending`, so they looked identical, which is why this cost a round of testing.
+  It now reads "Not connected to presenter controls: scenarios will not apply", and covers any
+  future cause of the same silence rather than only this one.
+- **Driven by a test rather than asserted on code shape**: bind the banking session to one run, arm
+  from the presenter, drive a turn, and check the fault actually applied. Against the old code it
+  fails with `assert 'normal_spending' == 'incomplete_answer'`, which is the symptom exactly.
+
 ## v1.1.0: The demo chip
 
 A presenter with one screen cannot switch to the portal to arm a scenario and back to the banking app

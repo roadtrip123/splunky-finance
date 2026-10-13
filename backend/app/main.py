@@ -465,15 +465,16 @@ def create_app(settings=None, model_builder=None, protection_adapter=None):
             revision=run["revision"] + 1,
             replay=None,
         )
-        # Attach the browser's own banking session if it has one, so the first click works on a box
-        # where the portal was never paired. Absent, the next demo-sync links it anyway.
+        # Claim rather than attach: a stale binding on either side used to mean the preset armed a
+        # run nothing was listening to, silently. A failure to bind now reaches the presenter.
         customer = auth.get(request, "customer", required=False)
-        if customer and not customer.run_id and not run.get("customer_id"):
-            links.attach(customer, run)
-        for linked in auth.sessions.values():
-            if linked.run_id == run["id"]:
-                chat.clear(linked)
-        return envelope(request, {"run": run, "prompt": preset["prompt"]})
+        connected = links.claim(customer, run)
+        for session_ in auth.sessions.values():
+            if session_.run_id == run["id"]:
+                chat.clear(session_)
+        return envelope(
+            request, {"run": run, "prompt": preset["prompt"], "connected": connected}
+        )
 
     @app.put("/api/demo-admin/preferences")
     async def set_preference(request: Request, payload: PreferenceSetting):

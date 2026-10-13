@@ -58,8 +58,25 @@ export function useDemoConnection(visible: boolean) {
     const timer = setInterval(() => sync().catch(() => {}), 1000);
     return () => { alive.current = false; clearInterval(timer); };
   }, [visible]);
-  const description = !ready ? state?.expired ? "Demo session expired. Disconnect or pair again." : "Synchronizing demo settings or reconnecting…"
-    : state?.scenario === "normal_spending" ? "Normal answers" : `${state?.scenario.replaceAll("_", " ")} enabled`;
-  const tone = !ready ? "pending" : state?.scenario === "normal_spending" ? "normal" : "fault";
+  // "Normal answers" and "nothing I do in the portal will reach this tab" used to look identical,
+  // because both reported scenario normal_spending. They are completely different situations, and
+  // the second one cost a round of testing: a preset armed a run this session was not attached to,
+  // and the only indicator a presenter watches said everything was fine.
+  const description = !ready
+    ? state?.expired
+      ? "Demo session expired. Disconnect or pair again."
+      : "Synchronizing demo settings or reconnecting…"
+    : !state?.connected
+      ? "Not connected to presenter controls: scenarios will not apply"
+      : state?.scenario === "normal_spending"
+        ? "Normal answers"
+        : `${state?.scenario.replaceAll("_", " ")} enabled`;
+  const tone = !ready
+    ? "pending"
+    : !state?.connected
+      ? "unlinked"
+      : state?.scenario === "normal_spending"
+        ? "normal"
+        : "fault";
   return { state, ready, sync, description, tone };
 }

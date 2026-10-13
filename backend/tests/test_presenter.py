@@ -282,3 +282,66 @@ def test_both_explicit_spans_are_timed_from_the_calls_they_describe():
     assert "agent_ns = time.perf_counter_ns() - agent_started" in agent
     assert "fault_ns = time.perf_counter_ns() - fault_started" in agent
     assert "answer_span(turn, message, candidate, evidence, agent_ns)" in agent
+
+
+def test_a_preset_arms_the_run_this_browser_is_actually_listening_to(client):
+    """The failure this exists for, driven end to end rather than asserted on code shape.
+
+    Arming skipped the attach whenever either side was already bound to something else, so the
+    preset armed a run nothing was listening to: the portal showed a scenario enabled, the chat
+    answered normally, and nothing reported a problem. In-memory runs expire after an hour and a
+    restart clears them while cookies survive, so a leftover binding is the ordinary state of a box
+    that has been in use.
+    """
+    admin = login(client, admin=True)
+    customer = login(client)
+
+    # A first run, which the banking session links itself to on its next poll.
+    first = client.post("/api/demo-admin/run", headers=admin).json()
+    state = client.post("/api/chat/demo-sync", headers=customer).json()
+    assert state["connected"] is True, state
+
+    # A second run supersedes it for the presenter, leaving the banking session bound to the first.
+    second = client.post("/api/demo-admin/run", headers=admin).json()
+    assert second["id"] != first["id"]
+
+    armed = client.post(
+        "/api/demo-admin/arm", headers=admin, json={"preset_id": "incomplete"}
+    )
+    assert armed.status_code == 200, armed.text
+    body = armed.json()
+    assert body["run"]["id"] == second["id"]
+    assert body["run"]["scenario"] == "incomplete_answer"
+
+    # The point: the turn genuinely runs under that scenario, which is what the presenter watches
+    # for. Asserted before the `connected` flag, so a regression reads as "the fault did not
+    # apply" rather than as a missing field.
+    synced = client.post("/api/chat/demo-sync", headers=customer).json()
+    assert synced["connected"] is True
+    assert synced["scenario"] == "incomplete_answer"
+    answered = client.post(
+        "/api/chat",
+        headers=customer,
+        json={"message": body["prompt"], "demo_version": synced["version"]},
+    )
+    assert answered.status_code == 200, answered.text
+    assert answered.json()["scenario"] == "incomplete_answer"
+    # And it reports whether anything was listening, rather than arming into the void.
+    assert body["connected"] is True
+
+
+def test_the_footer_tells_a_presenter_when_nothing_is_listening(client):
+    """"Normal answers" and "nothing reaches this tab" reported the same scenario, so the one
+    indicator a presenter watches could not tell them apart."""
+    from pathlib import Path as FilePath
+
+    hook = (FilePath(__file__).resolve().parents[2] / "frontend/lib/demo-connection.ts").read_text()
+    assert "Not connected to presenter controls" in hook
+    assert '"unlinked"' in hook
+    css = (FilePath(__file__).resolve().parents[2] / "frontend/app/globals.css").read_text()
+    assert ".demo-footer-unlinked" in css
+
+    # The state the hook reads has to be in the payload the banking page is actually served.
+    customer = login(client)
+    state = client.post("/api/chat/demo-sync", headers=customer).json()
+    assert "connected" in state and state["connected"] is False

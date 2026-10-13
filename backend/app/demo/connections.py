@@ -42,6 +42,40 @@ class Connections:
         self.blocked.discard(customer.id)
         self.seen.pop(customer.id, None)
 
+    def claim(self, customer, run):
+        """Bind this banking session to this run, taking it from whatever currently holds it.
+
+        `attach` refuses when either side is already bound, which is correct for pairing: two people
+        must not silently take each other's session. A presenter clicking a preset is stating intent
+        about their own browser, so here a stale binding is released rather than reported.
+
+        Without this, arming skipped the attach whenever either side was already bound, and a preset
+        armed a run nothing was listening to: the portal showed a scenario enabled, the chat answered
+        normally, and no error appeared anywhere. In-memory runs expire after an hour and a restart
+        clears them while cookies survive, so a leftover binding is the ordinary state of a box that
+        has been in use, not an edge case.
+
+        Returns False only when there is no banking session in this browser to bind.
+        """
+        if not customer:
+            return False
+        self.stale(customer)
+        if customer.run_id == run["id"] and run.get("customer_id") == customer.id:
+            return True
+        if customer.run_id and customer.run_id != run["id"]:
+            self.disconnect(customer)
+        holder = run.get("customer_id")
+        if holder and holder != customer.id:
+            other = self.auth.sessions.get(holder)
+            if other:
+                self.disconnect(other, run)
+            else:
+                run.pop("customer_id", None)
+        # Both sides are free now, so this cannot raise. If it ever does, the caller lets it reach
+        # the presenter rather than arming a run with nothing attached.
+        self.attach(customer, run)
+        return True
+
     def auto(self, customer, admin):
         if not customer or not admin or customer.id in self.blocked:
             return
