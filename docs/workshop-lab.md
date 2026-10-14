@@ -184,6 +184,8 @@ customer has read it.
 
 **Custom LLM:** You'll need your URL Details, Model, Model Name, and API Key. See **example** below:
 <img width="627" height="719" alt="image" src="https://github.com/user-attachments/assets/81b1aacf-b573-49ef-a7b4-6da76a4eea64" />
+
+ Code Snippet:
  ```
 {
   "authentication_type": "api_key",
