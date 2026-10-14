@@ -232,7 +232,7 @@ OpenAI: API key and Organization ID from OpenAI Developer portal
 
    <img width="1313" height="245" alt="image" src="https://github.com/user-attachments/assets/08aec3ad-ce9d-44af-a6e6-7cb73ec32243" />
 
-3. Click on the name at the top and call it `SplunkyAnswerWholeQuestion-<your initials>`. Change the **LLM Model** 'GPT-4.1 mini', **Modality** 'Text', **Apply to** 'trace', and **Input style** 'Full Trace'. This evaluator checks whether the answer addressed the whole question.
+3. Click on the name at the top and call it `SplunkyAnswerWholeQuestion-<your initials>`. Select the **LLM Model** that you configured in Step 4 Eg 'GPT-4.1 mini' or 'bedrock-claude', **Modality** 'Text', **Apply to** 'trace', and **Input style** 'Full Trace'. This evaluator checks whether the answer addressed the whole question.
 
    <img width="1135" height="617" alt="image" src="https://github.com/user-attachments/assets/df6fe363-7d99-4446-92c7-671ad7500d44" />
 
@@ -281,7 +281,7 @@ rather than failing it.
 
    <img width="1313" height="245" alt="image" src="https://github.com/user-attachments/assets/08aec3ad-ce9d-44af-a6e6-7cb73ec32243" />
 
-3. Click on the name at the top and call it `SplunkyNumericalCorrectness-<your initials>`. Change the **LLM Model** 'GPT-4.1 mini', **Modality** 'Text', **Apply to** 'trace', and **Input style** 'Full Trace'. This evaluator checks whether the numbers match the ledger.
+3. Click on the name at the top and call it `SplunkyNumericalCorrectness-<your initials>`. Select the **LLM Model** that you configured in Step 4 Eg 'GPT-4.1 mini' or 'bedrock-claude', **Modality** 'Text', **Apply to** 'trace', and **Input style** 'Full Trace'. This evaluator checks whether the numbers match the ledger.
 
    <img width="1434" height="659" alt="image" src="https://github.com/user-attachments/assets/0fda7777-7102-4675-8cfa-18df79e36556" />
 
@@ -328,7 +328,7 @@ is obviously wrong for some other reason, and say so in your reasoning rather th
 
    <img width="1313" height="245" alt="image" src="https://github.com/user-attachments/assets/08aec3ad-ce9d-44af-a6e6-7cb73ec32243" />
 
-3. Click on the name at the top and call it `SplunkyRightCustomer-<your initials>`. Change the **LLM Model** 'GPT-4.1 mini', **Modality** 'Text', **Apply to** 'trace', and **Input style** 'Full Trace'. This evaluator checks whether the answer is about the right customer.
+3. Click on the name at the top and call it `SplunkyRightCustomer-<your initials>`. Select the **LLM Model** that you configured in Step 4 Eg 'GPT-4.1 mini' or 'bedrock-claude', **Modality** 'Text', **Apply to** 'trace', and **Input style** 'Full Trace'. This evaluator checks whether the answer is about the right customer.
 
    <img width="586" height="609" alt="image" src="https://github.com/user-attachments/assets/8ecf6930-ed40-407b-bd79-8c44561b6825" />
 
