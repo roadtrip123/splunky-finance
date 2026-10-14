@@ -491,14 +491,13 @@ Two things decide whether a control works, and both are easy to get wrong:
 | --- | --- |
 | Control Name | `splunky-account-lookup-deny-<your initials>` |
 | Action | Deny |
-| Step Name | `get_account_balance` |
 | Control Expression | regex 1 |
 | Evaluator type | regex |
 | Path | `input` |
 | Stages | **pre** |
 | Pattern | `\b([Dd][Aa][Nn]\s+[Ww][Hh][Ii][Tt][Ff][Ii][Ee][Ll][Dd]\|[Tt][Oo][Mm]\s+[Ww][Hh][Ii][Tt][Ff][Ii][Ee][Ll][Dd]\|1234\|4127\|[Dd][Aa][Nn]\|[Tt][Oo][Mm])\b` |
 
-<img width="1455" height="756" alt="image" src="https://github.com/user-attachments/assets/766b2c37-542c-4ea8-bbf6-aa5033f1e056" />
+<img width="1472" height="723" alt="image" src="https://github.com/user-attachments/assets/dda5e76d-c4da-44bf-91d2-eb4a42696cd6" />
 
 4. Click **Save Changes**
 5. Create another **Control**
@@ -507,14 +506,14 @@ Two things decide whether a control works, and both are easy to get wrong:
 | --- | --- |
 | Control Name | `splunky-transfer-deny-<your initials>` |
 | Action | Deny |
-| Step Name | `transfer_funds` |
 | Control Expression | regex 1 |
 | Evaluator type | regex |
 | Path | `input` |
 | Stages | **pre** |
 | Pattern | `\b([Dd][Aa][Nn]\s+[Ww][Hh][Ii][Tt][Ff][Ii][Ee][Ll][Dd]\|[Tt][Oo][Mm]\s+[Ww][Hh][Ii][Tt][Ff][Ii][Ee][Ll][Dd]\|1234\|4127\|[Dd][Aa][Nn]\|[Tt][Oo][Mm])\b` |
 
-<img width="1454" height="761" alt="image" src="https://github.com/user-attachments/assets/0b2883bf-4754-4c88-80c6-a1f02c720ad4" />
+<img width="1478" height="733" alt="image" src="https://github.com/user-attachments/assets/7cb2189d-bbd2-4325-954b-706151abb456" />
+
 
 6.  Click **Save Changes**
 7.  Go back to **Project > Agent Stream > Controls**
@@ -525,11 +524,21 @@ Two things decide whether a control works, and both are easy to get wrong:
 
      <img width="1345" height="298" alt="image" src="https://github.com/user-attachments/assets/de5a87d5-69b6-4f55-82af-d99fe5af2bd4" />
 
-9. Once complete, you should see both controls in your stream
+9. You should see both controls in your stream make sure they are enabled and then click **Edit** on 'splunky-account-lookup-deny-initials'.
 
-   <img width="1540" height="330" alt="image" src="https://github.com/user-attachments/assets/b90363d9-4d97-4bae-a046-b87a40acb176" />
+   <img width="1560" height="269" alt="image" src="https://github.com/user-attachments/assets/4ce8f737-4afe-4725-a951-4c442ac4400a" />
 
-10. Go back to Splunky Finance Admin portal and you need to make sure the "agent control" URL is in the Galileo settings.
+
+10. In the **Step Name** put in 'get_account_balance' and click save
+<img width="528" height="612" alt="image" src="https://github.com/user-attachments/assets/61c5c530-7598-4558-8036-606950602b27" />
+
+11. Click **Edit** for 'splunky-transfer-deny-initials'
+<img width="1603" height="338" alt="image" src="https://github.com/user-attachments/assets/68eb71c5-a4a0-40dd-aebe-142156d2339c" />
+
+12. In the **Step Name** put in 'transfer_funds' and click save
+<img width="423" height="619" alt="image" src="https://github.com/user-attachments/assets/5c51fd42-f906-4540-b8ee-c64346092ebe" />
+
+13. Last step go back to Splunky Finance Admin portal and you need to make sure the "agent control" URL is in the Galileo settings.
 
     <img width="586" height="733" alt="image" src="https://github.com/user-attachments/assets/88ea4763-235c-4d3d-8cc2-2e1fddc2db6a" />
 
