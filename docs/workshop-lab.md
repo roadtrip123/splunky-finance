@@ -79,7 +79,7 @@ In the Galileo console:
 
    <img width="1366" height="140" alt="image" src="https://github.com/user-attachments/assets/db5404c3-1a47-45e4-81fc-1e129e349b23" />
 
-8. Give it a Project Name for example `splunky-fiance-<your initials>` and click **Create Project**
+8. Give it a Project Name for example `splunky-finance-<your initials>` and click **Create Project**
 
    <img width="358" height="164" alt="image" src="https://github.com/user-attachments/assets/3f3054ce-6781-44d7-aaa1-6722485f5f3f" />
 
@@ -133,6 +133,12 @@ If the message does not appear in Galileo here, fix it now rather than in Step 6
     <img width="1520" height="723" alt="image" src="https://github.com/user-attachments/assets/cd0e18c3-91d1-44f1-98b4-a8324116071d" />
 
 3. Scroll down to the **Model endpoint** section. Enter a **Model name**, then choose the **Provider** and fill in the **API key** and **Model**. The model is the specific model identifier your provider expects. Click **Add endpoint**
+
+   > **Using an OpenAI-compatible service** such as LiteLLM or Sharon AI: choose **Custom
+   > (OpenAI-compatible)** as the Provider, which reveals a **Base URL** field. Enter the URL
+   > ending in `/v1` with no trailing space, and put the service's own model alias in **Model**
+   > rather than the vendor's model id. A stray space is encoded into the request path, the
+   > provider answers 404, and it reads as a wrong model name.
 
    <img width="1092" height="693" alt="image" src="https://github.com/user-attachments/assets/c50566a7-c8c2-4124-b66d-06d13fc8bae5" />
 
@@ -218,8 +224,11 @@ customer has read it.
 }
  ```
 
+`supports_json_schema` is `false` here, which is the safe default. If your evaluators come back
+with no score, or with reasoning that will not parse, that is the first field to try as `true`.
 
-OpenAI: API key and Organization ID from OpenAI Developer portal
+
+OpenAI: API key from the OpenAI developer portal, plus the Organization ID if your account requires one
    <img width="552" height="310" alt="image" src="https://github.com/user-attachments/assets/e0e51974-fb7a-49aa-87f5-7b9e0ccf13fc" />
 
 
@@ -232,7 +241,7 @@ OpenAI: API key and Organization ID from OpenAI Developer portal
 
    <img width="1313" height="245" alt="image" src="https://github.com/user-attachments/assets/08aec3ad-ce9d-44af-a6e6-7cb73ec32243" />
 
-3. Click on the name at the top and call it `SplunkyAnswerWholeQuestion-<your initials>`. Select the **LLM Model** that you configured in Step 4 Eg 'GPT-4.1 mini' or 'bedrock-claude', **Modality** 'Text', **Apply to** 'trace', and **Input style** 'Full Trace'. This evaluator checks whether the answer addressed the whole question.
+3. Click on the name at the top and call it `SplunkyAnswerWholeQuestion-<your initials>`. Select the **LLM Model** that you configured earlier in this step, **Modality** 'Text', **Apply to** 'trace', and **Input style** 'Full Trace'. The model picker lists the `alias` from your integration, for example 'GPT-4.1 mini', or whatever you called your custom model, rather than the model name. This evaluator checks whether the answer addressed the whole question.
 
    <img width="1135" height="617" alt="image" src="https://github.com/user-attachments/assets/df6fe363-7d99-4446-92c7-671ad7500d44" />
 
@@ -281,7 +290,7 @@ rather than failing it.
 
    <img width="1313" height="245" alt="image" src="https://github.com/user-attachments/assets/08aec3ad-ce9d-44af-a6e6-7cb73ec32243" />
 
-3. Click on the name at the top and call it `SplunkyNumericalCorrectness-<your initials>`. Select the **LLM Model** that you configured in Step 4 Eg 'GPT-4.1 mini' or 'bedrock-claude', **Modality** 'Text', **Apply to** 'trace', and **Input style** 'Full Trace'. This evaluator checks whether the numbers match the ledger.
+3. Click on the name at the top and call it `SplunkyNumericalCorrectness-<your initials>`. Select the **LLM Model** that you configured earlier in this step, **Modality** 'Text', **Apply to** 'trace', and **Input style** 'Full Trace'. The model picker lists the `alias` from your integration, for example 'GPT-4.1 mini', or whatever you called your custom model, rather than the model name. This evaluator checks whether the numbers match the ledger.
 
    <img width="1434" height="659" alt="image" src="https://github.com/user-attachments/assets/0fda7777-7102-4675-8cfa-18df79e36556" />
 
@@ -328,7 +337,7 @@ is obviously wrong for some other reason, and say so in your reasoning rather th
 
    <img width="1313" height="245" alt="image" src="https://github.com/user-attachments/assets/08aec3ad-ce9d-44af-a6e6-7cb73ec32243" />
 
-3. Click on the name at the top and call it `SplunkyRightCustomer-<your initials>`. Select the **LLM Model** that you configured in Step 4 Eg 'GPT-4.1 mini' or 'bedrock-claude', **Modality** 'Text', **Apply to** 'trace', and **Input style** 'Full Trace'. This evaluator checks whether the answer is about the right customer.
+3. Click on the name at the top and call it `SplunkyRightCustomer-<your initials>`. Select the **LLM Model** that you configured earlier in this step, **Modality** 'Text', **Apply to** 'trace', and **Input style** 'Full Trace'. The model picker lists the `alias` from your integration, for example 'GPT-4.1 mini', or whatever you called your custom model, rather than the model name. This evaluator checks whether the answer is about the right customer.
 
    <img width="586" height="609" alt="image" src="https://github.com/user-attachments/assets/8ecf6930-ed40-407b-bd79-8c44561b6825" />
 
@@ -407,10 +416,10 @@ in another tab of the same browser and sign in.
 1. Log into the Banking App
 <img width="1789" height="829" alt="image" src="https://github.com/user-attachments/assets/94b76a62-94c1-4062-863e-9e1001b2156e" />
 
-2.  In **another** tab log into the the Demo Admin portal (Keep this portal open during the testing)
+2.  In **another** tab log into the Demo Admin portal (Keep this portal open during the testing)
 <img width="1707" height="825" alt="image" src="https://github.com/user-attachments/assets/df995195-dc4d-4b8f-b92c-a94a0bbad966" />
 
-3. Go back to the banking portal and click **My Bank Angent** you should see it "Demo Connection" green. You can also see this in the demo-admin portal. If it isn't green, just log out of both portals and log in again.
+3. Go back to the banking portal and click **My Bank Agent** you should see it "Demo Connection" green. You can also see this in the demo-admin portal. If it isn't green, just log out of both portals and log in again.
 
 <img width="430" height="766" alt="image" src="https://github.com/user-attachments/assets/dd55ab8e-1adf-4141-bacf-3a9960b4c34a" />
 
@@ -447,7 +456,7 @@ a metric that only ever fails is not measuring anything.
 | No scores at all | The evaluator is not enabled on this agent stream. Step 5 |
 | Scores on some turns only | Sampling is below 100% on your stream |
 | An evaluator scores everything green | It is enabled but was created against a different stream, or the trace predates enabling it |
-| `SplunkyAnswerWholeQuestion` passes an answer you can see is incomplete | It is 90%+ accurate Eval. Re-run rather than debugging your prompt |
+| `SplunkyAnswerWholeQuestion` passes an answer you can see is incomplete | It is 90%+ accurate in testing. Re-run rather than debugging your prompt |
 | Nothing arrives in Galileo | The answer failed before it was logged. Check the portal says **Connected** |
 | All three Evaluators are marked Failed | Correct behaviour This is because the wrong customer has come back and it fails all three evals |
 
@@ -524,7 +533,7 @@ Two things decide whether a control works, and both are easy to get wrong:
 
      <img width="1345" height="298" alt="image" src="https://github.com/user-attachments/assets/de5a87d5-69b6-4f55-82af-d99fe5af2bd4" />
 
-9. You should see both controls in your stream make sure they are enabled and then click **Edit** on 'splunky-account-lookup-deny-initials'.
+9. You should see both controls in your stream. Make sure they are enabled, then click **Edit** on 'splunky-account-lookup-deny-initials'. Edit the copy in your stream rather than the control you created above: the **Step Name** has to be set on the copy that is attached to your agent.
 
    <img width="1560" height="269" alt="image" src="https://github.com/user-attachments/assets/4ce8f737-4afe-4725-a951-4c442ac4400a" />
 
@@ -538,7 +547,7 @@ Two things decide whether a control works, and both are easy to get wrong:
 12. In the **Step Name** put in 'transfer_funds' and click save
 <img width="423" height="619" alt="image" src="https://github.com/user-attachments/assets/5c51fd42-f906-4540-b8ee-c64346092ebe" />
 
-13. Last step go back to Splunky Finance Admin portal and you need to make sure the "agent control" URL is in the Galileo settings.
+13. Last step, go back to the Splunky Finance Admin portal and make sure the "agent control" URL is in the Galileo settings.
 
     <img width="586" height="733" alt="image" src="https://github.com/user-attachments/assets/88ea4763-235c-4d3d-8cc2-2e1fddc2db6a" />
 
@@ -589,12 +598,17 @@ In the portal, open the turn and read **action_decisions**:
 | What it says | Meaning |
 | --- | --- |
 | `"verified": true` with your control named | **Working.** Agent Control evaluated and denied |
+| `"decision": "not_covered"` | Nothing was evaluated, so the request went through. No control is scoped to this step: usually a **Step Name** that does not match the tool, or a control that was never attached to this stream |
 | `"decision": "unavailable"` | The app failed closed. The gate never got an answer, which is not a guardrail |
 | `"decision": "disabled"` | The scenario is not enabled, or the banking tab is not linked |
-| Nothing blocked at all | The control's **Stages** is `post`, not `pre`, or its pattern does not match |
+| Nothing blocked at all | The control's **Stages** is `post`, not `pre`, its **Step Name** does not match the tool, or its pattern does not match |
 
-The **Agent Observability Status** card also reports `protection`, which reads `verified` once a real decision
-has been made, `failed` if the gate could not reach the gateway.
+`not_covered` is the one to watch for. The request succeeds and nothing reports a problem, so it
+looks exactly like an app with no guardrail. Check the **Step Name** against the tool first,
+before the pattern or the stage.
+
+The **Demo** tab reports the same thing under the scenario: **Guardrail armed** reads *previously
+verified* once a real decision has been made, and *not yet verified* until the first one.
 
 ### The before-and-after
 
