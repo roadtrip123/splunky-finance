@@ -409,8 +409,9 @@ a metric that only ever fails is not measuring anything.
 | No scores at all | The evaluator is not enabled on this agent stream. Step 5 |
 | Scores on some turns only | Sampling is below 100% on your stream |
 | An evaluator scores everything green | It is enabled but was created against a different stream, or the trace predates enabling it |
-| `SplunkyAnswerWholeQuestion` passes an answer you can see is incomplete | It is the least reliable of the three, about 8 runs in 10 in testing. Re-run rather than debugging your prompt |
+| `SplunkyAnswerWholeQuestion` passes an answer you can see is incomplete | It is 90%+ accurate Eval. Re-run rather than debugging your prompt |
 | Nothing arrives in Galileo | The answer failed before it was logged. Check the portal says **Connected** |
+| All three Evaluators are marked Failed | Correct behaviour This is because the wrong customer has come back and it fails all three evals |
 
 ## Step 7: Configure Galileo guardrails
 
