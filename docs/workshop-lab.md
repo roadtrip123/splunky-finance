@@ -182,10 +182,10 @@ customer has read it.
 
 3. Enter your information, then click **Save**
 
-**Custom LLM:** You'll need your URL Details, Model, Model Name, and API Key.
+**Custom LLM:** You'll need your URL Details, Model, Model Name, and API Key. See **example** below:
 <img width="627" height="719" alt="image" src="https://github.com/user-attachments/assets/81b1aacf-b573-49ef-a7b4-6da76a4eea64" />
-
-'''{
+ ```
+{
   "authentication_type": "api_key",
   "endpoint": "ENDPOINT_URL",
   "default_model": "LLM_MODEL",
@@ -213,7 +213,8 @@ customer has read it.
   "custom_llm_config": null,
   "custom_header_mapping": null,
   "multi_modal_config": null
-}'''
+}
+ ```
 
 
 OpenAI: API key and Organization ID from OpenAI Developer portal
