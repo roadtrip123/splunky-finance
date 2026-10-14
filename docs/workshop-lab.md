@@ -229,6 +229,11 @@ rather than failing it.
 
 <img width="1526" height="757" alt="image" src="https://github.com/user-attachments/assets/c430f991-5a73-48ef-8735-10d41abb19fe" />
 
+6. Select your project name and click **Create evaluator**
+
+<img width="557" height="549" alt="image" src="https://github.com/user-attachments/assets/f77804e7-dc84-4a13-884d-2d6505c3d417" />
+
+
 **Evaluator SplunkyNumericalCorrectness Question**
 1. Click on **Evaluators** on the right side menu in Galileo
 
@@ -272,6 +277,9 @@ is obviously wrong for some other reason, and say so in your reasoning rather th
 
 <img width="1433" height="670" alt="image" src="https://github.com/user-attachments/assets/c7128a49-7210-460e-adf3-659bebd3ed17" />
 
+6. Select your project name and click **Create evaluator**
+
+<img width="557" height="549" alt="image" src="https://github.com/user-attachments/assets/f77804e7-dc84-4a13-884d-2d6505c3d417" />
 
 **Evaluator SplunkyRightCustomer Question**
 1. Click on **Evaluators** on the right side menu in Galileo
@@ -310,6 +318,10 @@ rather than failing it.
 ```
 
 <img width="1432" height="680" alt="image" src="https://github.com/user-attachments/assets/0a871468-7745-4c03-9f05-593bcfcd791e" />
+
+6. Select your project name and click **Create evaluator**
+
+<img width="557" height="549" alt="image" src="https://github.com/user-attachments/assets/f77804e7-dc84-4a13-884d-2d6505c3d417" />
 
  
 ## Step 5: Configure Galileo Evaluators in My Bank Agent
