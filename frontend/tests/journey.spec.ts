@@ -49,15 +49,20 @@ test("presenter controls apply directly without customer login", async ({ page }
   await expect(page.getByRole("button", { name: "Enable Incomplete Answer", exact: true })).toHaveAttribute("aria-pressed", "true");
   await page.reload();
   await expect(page.getByRole("button", { name: "Enable Incomplete Answer", exact: true })).toHaveAttribute("aria-pressed", "true");
-  await page.getByRole("button", { name: "Run example question" }).click();
+  // One Run button per offered question, so the row is the selector. The first row is the
+  // scenario's own question in both scenarios this test walks through.
+  const runFirstQuestion = page.locator(".scenario-question").first().getByRole("button", { name: "Run", exact: true });
+  await runFirstQuestion.click();
   await expect(page.locator(".demo-response").last()).toContainText("Your spending is recorded.");
   await expect(page.locator(".demo-response").last()).toContainText("Scenario used: Incomplete Answer");
   await page.getByRole("button", { name: "Enable Guardrail Cross-Customer Access", exact: true }).click();
   // Selecting the scenario arms the guardrail, so the transfer is gated before the tool runs.
   await expect(page.getByText("Guardrail armed")).toBeVisible();
-  await page.getByRole("button", { name: "Run example question" }).click();
+  await runFirstQuestion.click();
+  // The gate's own fallback, which is what a blocked request delivers. The first gated
+  // question is a balance read rather than a transfer: both are blocked by the same control.
   await expect(page.locator(".demo-response").last()).toContainText(
-    "Transfer option is not available",
+    "That request is not available from My Bank Agent.",
   );
   await expect(page.locator(".demo-response").first()).toContainText("Scenario used: Incomplete Answer");
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBeTruthy();
@@ -80,20 +85,25 @@ test("presenter can enable and disable Galileo with honest missing-key status", 
     .getByLabel("Password", { exact: true })
     .fill("test-presenter-password-only");
   await page.getByRole("button", { name: "Log in" }).click();
+  // Labelled with the active backend. The switch is saved across restarts and the browser-test
+  // data directory survives between runs, so the starting position is whatever the last run left.
   const enable = page.getByRole("button", {
-    name: "Enable Galileo",  // labelled with the active backend
+    name: "Enable Galileo",
     exact: true,
   });
   const disable = page.getByRole("button", {
     name: "Disable Galileo",
     exact: true,
   });
+  // isVisible() does not retry. Read it only once one of the two is on the page, or a status
+  // fetch still in flight looks like "already disabled" and the next assertion fails.
+  await expect(enable.or(disable)).toBeVisible();
   if (await disable.isVisible()) await disable.click();
   await expect(enable).toBeVisible();
   await enable.click();
   await expect(disable).toBeVisible();
   await expect(
-    page.getByText("Galileo API key missing", { exact: true }),
+    page.getByText("Galileo credentials missing", { exact: true }),
   ).toBeVisible();
   await page.reload();
   await expect(disable).toBeVisible();
@@ -114,7 +124,7 @@ async function verifyLiveSwitch(admin: import("@playwright/test").Page, bank: im
   await expect(footer).toHaveClass(/demo-footer-normal/);
   await admin.getByRole('button', { name: 'Enable Incomplete Answer', exact: true }).click();
   await expect(footer).toHaveClass(/demo-footer-fault/);
-  await expect(admin.getByText('Applied to connected banking session', { exact: true })).toBeVisible();
+  await expect(admin.getByTestId('banking-link')).toHaveText('connected');
   await bank.getByLabel('Ask My Bank Agent', { exact: true }).fill(completePrompt);
   await bank.getByRole('button', { name: 'Send message', exact: true }).click();
   await expect(bank.locator('.message.assistant').last()).toContainText('Your spending is recorded.');
@@ -150,7 +160,7 @@ test('another computer pairs once and receives live scenario changes', async ({ 
     await bank.getByText('Demo connection', { exact: true }).click();
     await bank.getByLabel('Pairing code', { exact: true }).fill(code);
     await bank.getByRole('button', { name: 'Connect demo', exact: true }).click();
-    await expect(page.getByText('Applied to connected banking session', { exact: true })).toBeVisible();
+    await expect(page.getByTestId('banking-link')).toHaveText('connected');
     await bank.getByText('Demo connection', { exact: true }).click();
     await verifyLiveSwitch(page, bank);
     await page.getByRole('button', { name: 'Disconnect banking session' }).click();
@@ -160,20 +170,30 @@ test('another computer pairs once and receives live scenario changes', async ({ 
   } finally { await remote.close(); }
 });
 
-test('opening suggestions include the full spending question and faults accept free questions', async ({ page, context }) => {
+test('opening suggestions include the multi-part spending question and faults accept free questions', async ({ page, context }) => {
   await login(page);
   await page.getByRole('button', { name: 'Open My Bank Agent' }).click();
-  await expect(page.getByRole('button', { name: completePrompt, exact: false })).toBeVisible();
+  // The multi-part question is what the Incomplete Answer fault visibly truncates, so it has
+  // to be one click away. `completePrompt` is longer still and is typed, not offered.
+  await expect(
+    page.getByRole('button', {
+      name: 'How much did I spend on restaurants last month and what was the largest purchase?',
+      exact: false,
+    }),
+  ).toBeVisible();
   const admin = await context.newPage();
   await presenter(admin);
-  for (const scenario of ['Incomplete Answer', 'Incorrect Total', 'Hallucinated Policy']) {
+  // The three answer faults. Named once: the loop and the message count read from the same list.
+  const faults = ['Incomplete Answer', 'Incorrect Total', 'Wrong Customer'];
+  for (const [index, scenario] of faults.entries()) {
     await admin.getByRole('button', { name: `Enable ${scenario}`, exact: true }).click();
-    await expect(admin.getByText('Applied to connected banking session', { exact: true })).toBeVisible();
+    await expect(admin.getByTestId('banking-link')).toHaveText('connected');
     await page.getByLabel('Ask My Bank Agent', { exact: true }).fill('What is my savings balance?');
     await page.getByRole('button', { name: 'Send message', exact: true }).click();
-    const count = ['Incomplete Answer', 'Incorrect Total', 'Hallucinated Policy'].indexOf(scenario) + 1;
-    await expect(page.locator('.message.assistant')).toHaveCount(count);
+    await expect(page.locator('.message.assistant')).toHaveCount(index + 1);
     await expect(page.locator('.message.assistant').last()).not.toContainText('$754.19');
-    await expect(page.getByRole('alert')).toHaveCount(0);
+    // The error banner itself, not role=alert: Next's route announcer is an alert and holds
+    // the page heading, so it is always present after a client navigation.
+    await expect(page.locator('p.error')).toHaveCount(0);
   }
 });

@@ -1,8 +1,11 @@
+import re
 import time
+from pathlib import Path
 
 from conftest import login
 from fastapi.testclient import TestClient
 
+from app.demo import connections
 from app.demo.scenarios import SCENARIOS
 
 
@@ -197,3 +200,62 @@ def test_pairing_recovers_a_session_bound_to_a_deleted_run(client):
     ).json()["code"]
     response = client.post("/api/chat/demo-pair", headers=customer, json={"code": code})
     assert response.status_code == 200, response.text
+
+
+def test_the_admin_card_has_a_face_for_every_connection_state(client):
+    """`Connections.status` returns five states and the card colours three outcomes.
+
+    A state nobody mapped falls into the disconnected branch and renders red, which would call a
+    working link broken. This fails if a sixth state is added without giving it a face.
+    """
+    # Scoped to `status`, the only method that names a connection state. The scenario names in
+    # `state` are a different vocabulary and must not be scraped into this one.
+    source = Path(connections.__file__).read_text()
+    reported = source[source.index("def status(self, run)") :]
+    states = (
+        set(re.findall(r'"state": "(\w+)"', reported))
+        | set(re.findall(r'state = "(\w+)"', reported))
+        | set(re.findall(r'else "(\w+)"', reported))
+    )
+    assert states == {"unlinked", "disconnected", "applied", "updating", "waiting"}
+
+    root = Path(__file__).resolve().parents[2]
+    admin = (root / "frontend/components/Admin.tsx").read_text()
+    mapping = admin[admin.index("function bankingLink") : admin.index("function BankingCard")]
+    for state in ("applied", "updating", "waiting"):
+        assert f'"{state}"' in mapping, f"{state} has no face in the admin card"
+    assert "BANKING CONNECTION" in admin
+    # Between observability and the dataset, which is where the presenter was told to look.
+    assert (
+        admin.index("AGENT OBSERVABILITY STATUS")
+        < admin.index("<BankingCard")
+        < admin.index('"mini-label">DATASET')
+    )
+    # Read it and fix it in one place: the controls moved off the Demo tab with the status.
+    workspace = (root / "frontend/components/DemoWorkspace.tsx").read_text()
+    for control in ("Disconnect banking session", "Connect using pairing code", "pairing-code"):
+        assert control in admin, f"{control} is missing from the card"
+        assert control not in workspace, f"{control} is still on the Demo tab"
+    # Pairing needs the presenter's run, which the workspace creates on mount. Inside that
+    # component the button could not be clicked before then; here it has to be gated.
+    assert "disabled={busy || !ready}" in admin
+    # Four tiles, one row.
+    css = (root / "frontend/app/globals.css").read_text()
+    grid = css[css.index(".admin-status-grid {") :]
+    assert "repeat(4, 1fr)" in grid[: grid.index("}")]
+
+
+def test_the_banking_disclosure_shows_its_state_without_relying_on_colour():
+    """Green and red are for the presenter glancing at one screen. The accessible name carries the
+    same reading, because colour alone is unreadable to part of any workshop room."""
+    root = Path(__file__).resolve().parents[2]
+    chat = (root / "frontend/components/Chat.tsx").read_text()
+    css = (root / "frontend/app/globals.css").read_text()
+
+    start = chat.index("demo-pairing demo-pairing-")
+    block = chat[start : chat.index("</details>", start)]
+    assert "aria-label=" in block
+    for tone in ("connected", "disconnected", "pending"):
+        assert f".demo-pairing-{tone} summary" in css, f"{tone} has no colour"
+    # Equal specificity to the muted default, so source order is what makes these win.
+    assert css.index(".demo-pairing summary {") < css.index(".demo-pairing-connected summary")

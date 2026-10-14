@@ -345,8 +345,9 @@ The evaluators score real turns, so you need to produce one. The faults are inje
 presenter portal; the question is asked from the banking app.
 
 **Have both tabs open in the same browser profile.** They link automatically. In the portal the
-status under the scenario reads *"Applied to connected banking session"* once they have. If it says
-*"No banking session connected"*, open `/banking` in another tab of the same browser and sign in.
+**Banking connection** card at the top reads **connected** once they have, and in the banking tab
+**Demo connection** under the chat turns green. If the card reads **disconnected**, open `/banking`
+in another tab of the same browser and sign in.
 
 | | |
 | --- | --- |
@@ -492,7 +493,7 @@ The guardrail runs **before** the tool, so it has to be armed on the connected b
 not enough to create the controls: nothing is gated until the scenario is enabled in the portal.
 
 1. In the portal, **Demo** tab, click **Enable Guardrail Cross-Customer Access**
-2. Confirm the status underneath reads *"Applied to connected banking session"*
+2. Confirm the **Banking connection** card at the top of the portal reads **connected**
 3. Ask each question below in the **banking** tab
 
 > **Restarting or updating the app disarms this.** The scenario lives in memory, so after a restart

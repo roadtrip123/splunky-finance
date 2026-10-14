@@ -322,8 +322,14 @@ export default function Chat({
             <span className={`demo-footer demo-footer-${demo.tone}`} title={demo.description} aria-label={`Fictional banking data only. ${demo.description}`}>Fictional banking data only</span>
           </div>
         </form>
-        <details className="demo-pairing">
-          <summary>Demo connection</summary>
+        <details
+          className={`demo-pairing demo-pairing-${!demo.ready ? "pending" : demo.state?.connected ? "connected" : "disconnected"}`}
+        >
+          {/* The word stays neutral so the room is not reading demo state off the banking page.
+              Colour tells the presenter, and the accessible name tells anyone who cannot use it. */}
+          <summary aria-label={`Demo connection: ${demo.ready ? (demo.state?.connected ? "connected" : "not connected") : "checking"}`}>
+            Demo connection
+          </summary>
           <p>{demo.state?.connected ? "Connected to presenter controls." : "Same-browser linking is automatic. For another computer, enter the presenter’s pairing code."}</p>
           <label htmlFor="demo-pair-code">Pairing code</label>
           <input id="demo-pair-code" value={pairCode} maxLength={32} onChange={(e) => setPairCode(e.target.value)} />

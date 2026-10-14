@@ -6,6 +6,40 @@ Versions mark states worth returning to. Tags are annotated, so `git tag -n` and
 Open defects are tracked as [GitHub issues](https://github.com/roadtrip123/splunky-finance/issues);
 planned work is in [TODO.md](TODO.md).
 
+## v1.1.2: The connection is readable at a glance on both portals
+
+Yesterday's fix made a dead link visible in the chat footer. This makes the same reading obvious
+from either side, so a presenter checking before a demo does not have to hover anything.
+
+- **The banking page's Demo connection disclosure is now coloured**: green when the portal can
+  reach that tab, red when it cannot, amber while the first poll is still in flight. The visible
+  word stays "Demo connection", because the room should not be reading demo state off the banking
+  page, and the accessible name carries the same reading for anyone who cannot use colour.
+- **A Banking connection card sits in the admin status grid**, between agent observability and the
+  dataset. It reads connected, not responding, or disconnected, names the session's first eight
+  characters, and says what to do about it. The data was already in the status payload and nothing
+  outside the Demo tab showed it.
+- **The session line, Disconnect and the pairing code moved into that card** from the Demo tab, so
+  reading the link and fixing it are one job in one place. The pairing button is gated on the
+  presenter's run existing, which the demo workspace creates on mount: inside that component the
+  button could not be clicked before then, and in the card it could.
+- **Four tiles across, not three plus an orphan.** The grid pairs them up below 1280px and stacks
+  them below 1000px rather than squeezing four columns onto a laptop.
+- **"waiting" gets its own face rather than being folded into either outcome.** The binding exists
+  but the tab has not polled for ten seconds, so nothing armed will reach it. Calling that
+  connected or disconnected would send a presenter to the wrong fix.
+- Two guards: every state `Connections.status` can return has a face in the card, and the
+  disclosure carries its state in something other than colour.
+- **Three browser tests repaired.** All three had been failing against the product rather than
+  finding anything, which is worse than having no test: `Run example question` became one Run
+  button per offered question, the blocked answer is the gate's own fallback text, the missing-key
+  status reads "credentials missing", `Hallucinated Policy` was replaced by `Wrong Customer`, the
+  opening suggestion is the multi-part question rather than the longer typed one, and two
+  assertions were made precise: the Galileo toggle waits for a settled card before reading which
+  way it points, because `isVisible` does not retry and the saved switch survives between runs,
+  and "no error banner" now looks for the banner instead of `role=alert`, which Next's route
+  announcer always satisfies. The full suite passes twice in a row on desktop and mobile.
+
 ## v1.1.1: A preset arms the run the chat is listening to
 
 The first real use of the chip found this: the presets armed a scenario and the chat answered

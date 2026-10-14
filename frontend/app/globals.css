@@ -1062,9 +1062,11 @@ td small {
   max-width: 480px;
   margin: 40px auto;
 }
+/* Four across: provider, observability, banking link, dataset. Everything a presenter checks
+   before starting, without scrolling. */
 .admin-status-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(4, 1fr);
   gap: 20px;
 }
 .admin-card {
@@ -1271,6 +1273,12 @@ pre {
   }
   .everyday-art {
     left: 15px;
+  }
+}
+/* Four columns of 230px start truncating the version strings, so pair them up first. */
+@media (max-width: 1280px) {
+  .admin-status-grid {
+    grid-template-columns: repeat(2, 1fr);
   }
 }
 @media (max-width: 1000px) {
@@ -1563,6 +1571,11 @@ pre {
 .demo-footer-unlinked { color: #6f7780; text-decoration: underline dotted; }
 .demo-pairing { padding: 0.5rem 1rem; font-size: 0.75rem; }
 .demo-pairing summary { cursor: pointer; color: var(--muted); }
+/* Green only when the portal can actually reach this tab. Same three readings as the
+   footer beside it, in the one place a presenter opens to fix a broken link. */
+.demo-pairing-connected summary { color: var(--green); }
+.demo-pairing-disconnected summary { color: var(--red); }
+.demo-pairing-pending summary { color: var(--amber); }
 .demo-pairing input { max-width: 12rem; }
 
 /* Three readings side by side: what is running, what is published, what state the box is in.

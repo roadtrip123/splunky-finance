@@ -48,6 +48,7 @@ type Status = {
   provider: string;
   model: string;
   provider_status: { state: string; last_error?: string | null };
+  banking_connection: { state: string; session: string | null };
   preferences: { demo_chip: boolean };
   galileo: {
     state: string;
@@ -121,6 +122,88 @@ type Status = {
     transaction_count: number;
   };
 };
+// "applied" and "updating" both mean the banking chat is listening. "waiting" means the binding
+// exists but that tab has not polled for ten seconds, so nothing armed here reaches it: calling
+// that either connected or disconnected sends a presenter to the wrong fix, so it gets its own face.
+function bankingLink(state: string, workshop: boolean) {
+  if (state === "applied" || state === "updating") {
+    return {
+      label: "connected",
+      badge: "badge connected",
+      hint: "Scenarios and guardrails armed on the Demo tab apply to that session.",
+    };
+  }
+  if (state === "waiting") {
+    return {
+      label: "not responding",
+      badge: "badge pending",
+      hint: "Linked, but that tab has stopped polling. Open My Bank Agent and leave it open.",
+    };
+  }
+  return {
+    label: "disconnected",
+    badge: "badge failed",
+    // Pairing is a presenter feature, so workshop mode is not sent looking for a button it has not got.
+    hint: workshop
+      ? "Open My Bank Agent in another tab of this browser."
+      : "Open My Bank Agent in this browser, or pair another computer with a code.",
+  };
+}
+
+// Reading and fixing the link are one job, so they are one card: the status, the session it names,
+// and the two buttons that change it. Splitting them across tabs meant checking in one place and
+// acting in another.
+function BankingCard({
+  connection,
+  workshop,
+  busy,
+  ready,
+  pairing,
+  onPairingCode,
+  onDisconnect,
+}: {
+  connection: { state: string; session: string | null };
+  workshop: boolean;
+  busy: boolean;
+  ready: boolean;
+  pairing?: { code: string; expires_at: number };
+  onPairingCode: () => void;
+  onDisconnect: () => void;
+}) {
+  const link = bankingLink(connection.state, workshop);
+  return (
+    <article className="admin-card" aria-label="Banking connection">
+      <span className="mini-label">BANKING CONNECTION</span>
+      {/* The face, not the raw state: "disconnected" contains "connected", so a test or a reader
+          skimming for the word needs the exact one. */}
+      <h3 aria-live="polite" data-testid="banking-link">
+        {link.label}
+      </h3>
+      <span className={link.badge}>{connection.state}</span>
+      {connection.session && <p>Session: {connection.session}</p>}
+      <small>{link.hint}</small>
+      {connection.session ? (
+        <button className="text-button" disabled={busy} onClick={onDisconnect}>
+          Disconnect banking session
+        </button>
+      ) : (
+        !workshop && (
+          <button className="button outline small" disabled={busy || !ready} onClick={onPairingCode}>
+            Connect using pairing code
+          </button>
+        )
+      )}
+      {pairing && !connection.session && (
+        <small>
+          Pairing code: <strong data-testid="pairing-code">{pairing.code}</strong> · Expires{" "}
+          {new Date(pairing.expires_at * 1000).toLocaleTimeString()}. Enter it under Demo connection
+          in My Bank Agent.
+        </small>
+      )}
+    </article>
+  );
+}
+
 export default function Admin() {
   const [logged, setLogged] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -152,6 +235,10 @@ export default function Admin() {
   const [endpoint, setEndpoint] = useState<EndpointKey>("openai");
   const [model, setModel] = useState({ id: "", name: "", api_key: "", model: "", base_url: "" });
   const [tab, setTab] = useState<"demo" | "setup" | "tools">("demo");
+  const [pairing, setPairing] = useState<{ code: string; expires_at: number }>();
+  // The demo workspace polls the same endpoint every 1.5s against this component's 7s. Taking
+  // its reading costs no extra request and keeps the card from lagging a pairing by six seconds.
+  const [link, setLink] = useState<{ state: string; session: string | null }>();
   const landed = useRef(false);
   const [conn, setConn] = useState({
     galileo_api_key: "",
@@ -499,6 +586,30 @@ export default function Admin() {
                       </a>
                     )}
                   </article>
+                  <BankingCard
+                    connection={link ?? status.banking_connection}
+                    workshop={status.demo_mode === "workshop"}
+                    busy={busy}
+                    ready={Boolean(status.run)}
+                    pairing={pairing}
+                    onPairingCode={() =>
+                      action(async () =>
+                        setPairing(
+                          await mutate<{ code: string; expires_at: number }>(
+                            "demo-admin/pairing",
+                            {},
+                            true,
+                          ),
+                        ),
+                      )
+                    }
+                    onDisconnect={() =>
+                      action(async () => {
+                        await mutate("demo-admin/disconnect", {}, true);
+                        setPairing(undefined);
+                      })
+                    }
+                  />
                   <article className="admin-card">
                     <span className="mini-label">DATASET</span>
                     <h3>Version {status.dataset.dataset_version}</h3>
@@ -613,7 +724,7 @@ export default function Admin() {
                       </button>
                     ))}
                   </div>
-                  <DemoWorkspace onEvidence={refresh} />
+                  <DemoWorkspace onEvidence={refresh} onConnection={setLink} />
                 </div>
                 <div role="tabpanel" hidden={tab !== "setup"}>
                   <section className="admin-card">

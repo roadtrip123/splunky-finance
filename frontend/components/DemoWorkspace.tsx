@@ -24,8 +24,8 @@ function decision(result: Answer) {
     default: return "Could not be checked — fallback delivered";
   }
 }
-export default function DemoWorkspace({ onEvidence }: { onEvidence: () => Promise<void> }) {
-  const [pairing, setPairing] = useState<{ code: string; expires_at: number }>();
+export default function DemoWorkspace({ onEvidence, onConnection }: { onEvidence: () => Promise<void>; onConnection?: (c: { state: string; session: string | null }) => void }) {
+  const reported = useRef<string>("");
   const [status, setStatus] = useState<Status>();
   const [busy, setBusy] = useState(false);
   const active = useRef(false);
@@ -43,6 +43,12 @@ export default function DemoWorkspace({ onEvidence }: { onEvidence: () => Promis
     }
     current.current = next.run;
     setStatus(next);
+    // Only on a change, so the parent is not re-rendered every 1.5 seconds for nothing.
+    const seen = JSON.stringify(next.banking_connection);
+    if (onConnection && seen !== reported.current) {
+      reported.current = seen;
+      onConnection(next.banking_connection);
+    }
     return next;
   }
   useEffect(() => {
@@ -62,7 +68,7 @@ export default function DemoWorkspace({ onEvidence }: { onEvidence: () => Promis
       current.current = run;
       setStatus({ ...status, run });
       setConversation(undefined);
-      setNotice(`${label(scenario)} enabled. Protection ${protection ? "on" : "off"}. Saved for your next message. Check the banking connection confirmation below.`);
+      setNotice(`${label(scenario)} enabled. Protection ${protection ? "on" : "off"}. Saved for your next message. The Banking connection card at the top says whether it reaches your banking session.`);
       await onEvidence();
     } catch (e) {
       setError((e as Error).message);
@@ -102,20 +108,8 @@ export default function DemoWorkspace({ onEvidence }: { onEvidence: () => Promis
     {error && <p role="alert" className="error">{error}</p>}
     {notice && <p role="status" className="notice">{notice}</p>}
     {!run ? <p role="status">Connecting your demo chat…</p> : <>
-      <div className="prompt-box">
-        <h3>Banking connection</h3>
-        <p role="status">{status?.banking_connection.state === "applied" ? "Applied to connected banking session" : status?.banking_connection.state === "updating" ? "Applying settings to banking session…" : status?.banking_connection.state === "waiting" ? "Waiting for banking chat to acknowledge settings — open My Bank Agent" : status?.banking_connection.state === "disconnected" ? "Banking session disconnected or expired" : (status?.demo_mode === "workshop" ? "No banking session connected. Open banking in another tab of this browser." : "No banking session connected. Open banking in this browser, or pair another computer.")}</p>
-        {status?.banking_connection.session && <p>Session: {status.banking_connection.session}</p>}
-        {!status?.banking_connection.session && status?.demo_mode !== "workshop" && <button className="button outline small" disabled={busy} onClick={async () => {
-          try { setPairing(await mutate("demo-admin/pairing", {}, true)); setError(""); }
-          catch (e) { setError((e as Error).message); }
-        }}>Connect using pairing code</button>}
-        {pairing && !status?.banking_connection.session && <p>Pairing code: <strong data-testid="pairing-code">{pairing.code}</strong> · Expires {new Date(pairing.expires_at * 1000).toLocaleTimeString()}. Enter it under Demo connection in My Bank Agent.</p>}
-        {status?.banking_connection.session && <button className="text-button" disabled={busy} onClick={async () => {
-          try { await mutate("demo-admin/disconnect", {}, true); setPairing(undefined); await refresh(); }
-          catch (e) { setError((e as Error).message); }
-        }}>Disconnect banking session</button>}
-      </div>
+      {/* Banking connection, its session and the pairing controls live in the Banking
+          connection card at the top of this portal: one place to read it and fix it. */}
       <div className="demo-scenarios">
         {Object.entries(status!.scenarios).map(([key]) => <button key={key}
           className={`button ${run.scenario === key ? "" : "outline"}`}
