@@ -175,13 +175,48 @@ customer has read it.
 
    <img width="375" height="441" alt="image" src="https://github.com/user-attachments/assets/c5c88fed-9abc-487a-ab62-36ce92b125ce" />
 
-2. Select the integration you want to use for your LLM judge
+2. Select the integration you want to use for your LLM judge for example OpenAI or Custom
 
    <img width="1488" height="788" alt="image" src="https://github.com/user-attachments/assets/2931097d-4a47-4ce2-8ebd-695e58193fb8" />
 
 
-3. Enter your API key and Organization ID (the Organization ID applies if you are using OpenAI), then click **Save**
+3. Enter your information, then click **Save**
 
+**Custom LLM:** You'll need your URL Details, Model, Model Name, and API Key.
+<img width="627" height="719" alt="image" src="https://github.com/user-attachments/assets/81b1aacf-b573-49ef-a7b4-6da76a4eea64" />
+
+'''{
+  "authentication_type": "api_key",
+  "endpoint": "ENDPOINT_URL",
+  "default_model": "LLM_MODEL",
+  "model_properties": [
+    {
+      "name": "LLM_MODEL",
+      "alias": "LLM_MODEL_NAME",
+      "based_on": null,
+      "supported_parameters": [
+        "max_tokens",
+        "stop_sequences",
+        "temperature",
+        "tool_choice",
+        "tools"
+      ],
+      "supports_json_schema": false
+    }
+  ],
+  "token": null,
+  "api_key_header": "Authorization",
+  "api_key_value": "Bearer YOUR_TOKEN",
+  "authentication_scope": null,
+  "oauth2_token_url": null,
+  "headers": null,
+  "custom_llm_config": null,
+  "custom_header_mapping": null,
+  "multi_modal_config": null
+}'''
+
+
+OpenAI: API key and Organization ID from OpenAI Developer portal
    <img width="552" height="310" alt="image" src="https://github.com/user-attachments/assets/e0e51974-fb7a-49aa-87f5-7b9e0ccf13fc" />
 
 
