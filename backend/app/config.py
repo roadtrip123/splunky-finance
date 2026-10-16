@@ -17,6 +17,9 @@ AGENT_NAME_FALLBACK = "splunky-finance-agent"
 
 PRIVATE_LAN_NETWORKS = tuple(ip_network(x) for x in ("10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16"))
 
+# One hostname label: letters, digits and hyphens, not beginning or ending with a hyphen.
+HOST_LABEL = re.compile(r"[a-z0-9](?:[a-z0-9-]*[a-z0-9])?", re.IGNORECASE)
+
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file="../.env", extra="ignore", case_sensitive=False)
@@ -125,6 +128,18 @@ class Settings(BaseSettings):
             raise ValueError("APP_ORIGIN must be an HTTP(S) origin")
         if origin.username or origin.password or origin.query or origin.fragment:
             raise ValueError("APP_ORIGIN must not include credentials, query, or fragment")
+        if origin.hostname.startswith("*."):
+            # One instance per participant, each reached at a name assigned when it boots, which an
+            # image cannot carry. The wildcard is deliberately the leftmost label only, and needs a
+            # registrable domain beneath it, so "https://*.show" or a bare "*" cannot be set by
+            # accident and widen the Origin check to most of the internet.
+            labels = origin.hostname[2:].split(".")
+            if len(labels) < 2 or not all(HOST_LABEL.fullmatch(label) for label in labels):
+                raise ValueError("A wildcard APP_ORIGIN must be https://*.<domain>.<tld> or deeper")
+            if origin.scheme != "https":
+                raise ValueError("A wildcard APP_ORIGIN requires HTTPS")
+        elif "*" in origin.hostname:
+            raise ValueError("APP_ORIGIN may use a wildcard only as its leftmost label")
         local = origin.hostname in ("localhost", "127.0.0.1", "::1")
         private_lan = False
         try:
@@ -142,6 +157,37 @@ class Settings(BaseSettings):
         if self.galileo_protection_enabled and not self.galileo_enabled:
             raise ValueError("Protection requires Galileo")
         return self
+
+    def origin_allows(self, origin):
+        """Whether a browser's Origin header is one this deployment answers to.
+
+        Exact equality for a named origin. A wildcard origin matches exactly one leftmost label, so
+        a sibling instance in the same lab domain is accepted while a deeper name, the bare domain,
+        or another domain entirely is not. Scheme and port must still match: the wildcard concerns
+        the host and nothing else.
+
+        This is the third layer, not the only one. Session cookies are host-scoped, HttpOnly,
+        Secure and SameSite=Strict, so a page on a sibling host sends no cookie at all, and every
+        mutating request still has to carry the session's own CSRF token.
+        """
+        expected = self.app_origin.rstrip("/")
+        candidate = (origin or "").rstrip("/")
+        if not candidate:
+            return False
+        if "*" not in expected:
+            return candidate == expected
+        wanted = urlparse(expected)
+        try:
+            got = urlparse(candidate)
+            port = got.port
+        except ValueError:  # a malformed port in the header, which is not ours to interpret
+            return False
+        if not got.hostname or got.scheme != wanted.scheme or port != wanted.port:
+            return False
+        if "*" in got.hostname:
+            return False
+        label, _, rest = got.hostname.partition(".")
+        return bool(label) and rest == wanted.hostname[2:]
 
     @property
     def resolved_agent_name(self):

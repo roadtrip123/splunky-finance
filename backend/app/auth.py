@@ -87,7 +87,7 @@ class Authentication:
     def csrf(self, request, session=None):
         origin = request.headers.get("origin", "").rstrip("/")
         expected = self.settings.app_origin.rstrip("/")
-        if origin != expected:
+        if not self.settings.origin_allows(origin):
             # The expected origin is named, because the bare rejection is undiagnosable: it fires
             # both for a stale container still holding a previous APP_ORIGIN and for a browser on a
             # different address than the one configured, and those need opposite fixes. It is the

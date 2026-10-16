@@ -23,6 +23,7 @@ sys.path.insert(0, str(ROOT / "scripts"))
 # Imported after the path above is set, which is why these are not at the top.
 import fix_ports
 import install_service
+import serve_any_host
 import serve_redirect_port
 
 SAVED = "-A PREROUTING -p tcp -m tcp --dport 443 -j REDIRECT --to-ports 8443"
@@ -201,8 +202,9 @@ def test_an_occupied_second_port_is_skipped_rather_than_fatal():
 
 def test_the_installer_verifies_the_redirected_path_and_not_only_the_direct_one():
     """With the Host header a browser sends, into the port the redirect lands on. Binding a port
-    proves nothing about whether the site is matched on it."""
-    assert '--connect-to "$HOST:$PORT:127.0.0.1:$EXTRA"' in installer()
+    proves nothing about whether the site is matched on it. The host is the probe name, which for
+    a wildcard deployment is a name the proxy was never told about."""
+    assert '--connect-to "$PROBE_HOST:$PORT:127.0.0.1:$EXTRA"' in installer()
 
 
 def test_the_unit_is_documented_as_insurance_rather_than_the_mechanism():
@@ -312,3 +314,73 @@ def test_an_unrecognised_address_is_left_alone_rather_than_guessed_at():
     updated, changed = serve(odd)
     assert changed == []
     assert updated == odd
+
+
+# The lab platform names each instance when it boots, so the proxy cannot be told the name in
+# advance. Serving by port alone, under a wildcard certificate, is what makes one image work
+# everywhere with nothing to run at boot.
+NAMED_BOTH_PORTS = """i-09c3ad076563d756c.splunk.show:443, i-09c3ad076563d756c.splunk.show:8443 {
+\ttls /etc/caddy/tls.crt /etc/caddy/tls.key
+\treverse_proxy 127.0.0.1:3000
+}
+"""
+
+
+def any_host(text, public_port=443, destination=8443):
+    return serve_any_host.rewrite(text, public_port, destination)
+
+
+def test_the_name_is_dropped_so_every_instance_is_served():
+    updated, changed = any_host(NAMED_BOTH_PORTS)
+    assert changed == ["i-09c3ad076563d756c.splunk.show"]
+    assert updated.splitlines()[0] == ":443, :8443 {"
+    assert updated.splitlines()[1:] == NAMED_BOTH_PORTS.splitlines()[1:]
+
+
+def test_a_named_site_on_one_port_gains_the_second_and_loses_the_name():
+    updated, changed = any_host(THEIRS)
+    assert changed == ["splunkyfinance.splunk.show"]
+    assert updated.splitlines()[0] == ":443, :8443 {"
+
+
+def test_the_host_is_reported_once_not_once_per_address():
+    """Both addresses carry the same name, and saying it twice reads like two sites."""
+    _, changed = any_host(NAMED_BOTH_PORTS)
+    assert len(changed) == 1
+
+
+def test_serving_by_port_leaves_a_port_per_participant_alone():
+    assert any_host(WORKSHOP) == (WORKSHOP, [])
+
+
+def test_serving_by_port_leaves_plain_http_alone():
+    """A wildcard origin requires HTTPS, so this box cannot use one."""
+    assert any_host(LAN_HTTP) == (LAN_HTTP, [])
+
+
+def test_serving_by_port_is_idempotent():
+    once, changed = any_host(NAMED_BOTH_PORTS)
+    assert changed
+    assert any_host(once) == (once, [])
+
+
+def test_the_installer_serves_by_port_for_a_wildcard_host():
+    """`--host '*.example.com'` writes a site block with no name in it at all."""
+    source = installer()
+    assert 'is_wildcard() { case "$1" in "*."*) return 0 ;; *) return 1 ;; esac; }' in source
+    assert 'SITE=":$PORT"' in source
+    assert 'if is_wildcard "$HOST"; then SITE="$SITE, :$EXTRA"' in source
+
+
+def test_the_installer_refuses_to_issue_a_wildcard_certificate_itself():
+    """ACME needs a DNS challenge for a wildcard, which this script does not do."""
+    source = installer()
+    assert "--acme cannot issue for $HOST here" in source
+
+
+def test_the_installer_verifies_a_wildcard_with_a_name_it_was_never_told():
+    """Nothing can connect to "*.example.com", and a name under it is the better test anyway."""
+    source = installer()
+    assert 'PROBE_HOST="probe.${HOST#\\*.}"' in source
+    assert '--connect-to "$PROBE_HOST:$PORT:127.0.0.1:$PORT"' in source
+    assert '--connect-to "$PROBE_HOST:$PORT:127.0.0.1:$EXTRA"' in source

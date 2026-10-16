@@ -167,16 +167,63 @@ trusted certificate instead. `--lan-http` drops TLS altogether, and works only f
 because the application refuses plain HTTP anywhere else; anything pasted into the portal, including a
 participant's own API keys, then crosses the network in cleartext.
 
+### A platform that names every instance
+
+Some lab platforms assign each instance its own name when it boots, such as
+`i-0abc123def456.example.com`, and give you no `cloud-init` and no SSH for participants. The name
+cannot be baked into an image, and nothing on the box knows it until it is running. A boot-time unit
+that writes the address is the obvious answer and the wrong one: the unit that already exists for the
+port redirect did not run on the first box this was tried on, and a hundred boxes is the wrong place
+to find that out.
+
+So configure no address at all. Two things make one image work on every name:
+
+```bash
+sudo ./scripts/install.sh --host '*.example.com' --cert /path/fullchain.pem --key /path/key.pem
+```
+
+- **The proxy serves by port, not by name.** The site block becomes `:443, :8443` with no hostname
+  in it, so Caddy answers whatever `Host` arrives. A wildcard certificate covers every instance, and
+  because TLS is terminated with a supplied certificate there is no issuance step per name. This is
+  why `--acme` is refused for a wildcard: a public CA needs a DNS challenge, which this script does
+  not do.
+- **`APP_ORIGIN` becomes `https://*.example.com`.** The one place the application used the address
+  is an Origin check on mutating requests, which now accepts exactly one label under that domain.
+  `https://*.com` and `https://a.*.example.com` are both refused at startup, as is anything deeper
+  than one label at runtime, including a name that merely ends with the domain.
+
+What that check is worth is unchanged for everything else: session cookies stay host-scoped,
+`HttpOnly`, `Secure` and `SameSite=Strict`, so a page on a sibling instance sends no cookie at all,
+and every mutating request still carries the session's own CSRF token. The Origin comparison is the
+third layer, and the wildcard widens it to your own lab domain rather than to the internet.
+
+The install verifies it with a name it was never told about, which is the right test: a request for
+`probe.example.com` must be served, on the public port and on the redirect's destination.
+
+Nothing is left to do per instance, so a snapshot taken here comes up working on whatever name the
+platform hands the clone. The one thing lost is the per-clone `SESSION_SECRET` rotation, which has
+to run somewhere; with it shared, a session cookie minted on one box is accepted by another. For
+synthetic data behind a password published in this repository that is a fair trade, and
+`python3 scripts/setup_env.py --rotate-secret` is there if you would rather not take it.
+
 ### A box that is already running
 
 `install.sh` writes the proxy's config at install time and nothing in the update path touches that
-file again, so a box built from an older image does not get the second address from a release. It is
-one script, and it needs no arguments:
+file again, so a box built from an older image does not get either arrangement from a release. One
+script each, and neither needs arguments:
 
 ```bash
-sudo python3 scripts/serve_redirect_port.py --dry-run     # what it would write, changing nothing
+sudo python3 scripts/serve_redirect_port.py --dry-run     # add the redirect's destination port
 sudo python3 scripts/serve_redirect_port.py
+
+sudo python3 scripts/serve_any_host.py --dry-run          # also stop matching on the hostname
+sudo python3 scripts/serve_any_host.py
 ```
+
+Use the second one where the platform names every instance, as above. It does what the first does
+and drops the hostname as well, sets `APP_ORIGIN` to the wildcard, restarts the stack, which is what
+applies it, and then checks two names the proxy has never been told about plus the Origin check
+behind them. The domain comes from the current `APP_ORIGIN` unless `--domain` says otherwise.
 
 It reads the destination out of the rule, in the live nat table and in the saved file, defaults to
 8443 when there is no rule to read, adds that address to every site serving the public port, keeps a

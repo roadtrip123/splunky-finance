@@ -11,7 +11,12 @@
 #
 # Where it is reached:
 #   --host <addr>   Hostname or IP participants browse to. Default: this instance's public IP from
-#                   EC2 metadata. Required anywhere without EC2 metadata, such as a home lab
+#                   EC2 metadata. Required anywhere without EC2 metadata, such as a home lab.
+#                   May be a wildcard, '*.example.com', for a platform that gives every instance
+#                   its own name when it boots: the proxy then serves whatever name arrives and
+#                   APP_ORIGIN accepts one label under that domain, so the image carries no
+#                   address and nothing has to run at boot. Needs a wildcard certificate, so
+#                   --cert, not --acme
 #   --port <n>      Public HTTPS port. Default 443
 #   --also-port <n> Serve the same site on a second port as well, for a network that redirects the
 #                   public port elsewhere. Default 8443 when the public port is 443, which is where
@@ -55,6 +60,8 @@ warn() { printf '    \033[1;33m%s\033[0m\n' "$*"; }
 die() { printf '\n\033[1;31mFAILED: %s\033[0m\n' "$*" >&2; exit 1; }
 
 is_ip() { case "$1" in *:*) return 0 ;; *[!0-9.]*) return 1 ;; *) return 0 ;; esac; }
+# A wildcard host means the proxy serves by port alone and never matches on a name.
+is_wildcard() { case "$1" in "*."*) return 0 ;; *) return 1 ;; esac; }
 is_private_lan() {
   case "$1" in
     10.*|192.168.*) return 0 ;;
@@ -146,6 +153,11 @@ else
   note "using $HOST"
 fi
 
+# A concrete name to verify with. Nothing can connect to "*.example.com", so a local check of a
+# wildcard deployment uses a name under it, which is also the better test: it proves the proxy
+# serves a host it has never been told about.
+if is_wildcard "$HOST"; then PROBE_HOST="probe.${HOST#\*.}"; else PROBE_HOST="$HOST"; fi
+
 # Decide the TLS mode once, here, so every later step reads one variable rather than re-deriving it.
 if [ "$WITH_PROXY" -eq 0 ]; then
   MODE="external"
@@ -160,6 +172,20 @@ else
 fi
 note "TLS: $MODE"
 
+if is_wildcard "$HOST"; then
+  if [ "$MODE" = "acme" ]; then
+    die "--acme cannot issue for $HOST here: a wildcard needs a DNS challenge.
+       Supply the wildcard certificate with --cert and --key instead."
+  fi
+  if [ "$MODE" = "lan-http" ]; then
+    die "--lan-http and a wildcard host are alternatives: a wildcard origin requires HTTPS."
+  fi
+  if [ "$MODE" = "internal" ]; then
+    warn "WARNING: a self-signed certificate is issued per name, and this proxy will not know the"
+    warn "         name in advance, so visitors may see a certificate for the wrong host."
+    warn "         Supply the wildcard certificate with --cert and --key."
+  fi
+fi
 if [ "$MODE" = "acme" ] && is_ip "$HOST"; then
   die "--acme needs a hostname, not an IP: a public certificate authority will not issue for one.
        Use a hostname, or drop --acme for a self-signed certificate."
@@ -297,13 +323,23 @@ if [ "$WITH_PROXY" -eq 1 ]; then
   # config reads the way someone would write it by hand.
   DEFAULT_PORT=443
   if [ "$MODE" = "lan-http" ]; then DEFAULT_PORT=80; fi
-  if [ "$PORT" = "$DEFAULT_PORT" ]; then SITE="$HOST"; else SITE="$HOST:$PORT"; fi
+  if is_wildcard "$HOST"; then
+    # No name in the address at all: Caddy then matches on the port and serves every Host that
+    # arrives, which is what a per-instance name assigned at boot requires.
+    SITE=":$PORT"
+  elif [ "$PORT" = "$DEFAULT_PORT" ]; then
+    SITE="$HOST"
+  else
+    SITE="$HOST:$PORT"
+  fi
   if [ "$MODE" = "lan-http" ]; then SITE="http://$SITE"; fi
   # Comma-separated addresses in one site block. Caddy binds the port in each address and selects
   # the site by the Host header's hostname with the port stripped, so a browser asking for the
   # public port is served by the listener the redirect lands on without any URL carrying it.
   for EXTRA in ${ALSO_PORTS:-}; do
-    if [ "$MODE" = "lan-http" ]; then SITE="$SITE, http://$HOST:$EXTRA"; else SITE="$SITE, $HOST:$EXTRA"; fi
+    if is_wildcard "$HOST"; then SITE="$SITE, :$EXTRA"
+    elif [ "$MODE" = "lan-http" ]; then SITE="$SITE, http://$HOST:$EXTRA"
+    else SITE="$SITE, $HOST:$EXTRA"; fi
   done
   {
     case "$MODE" in
@@ -352,7 +388,7 @@ if [ "$BUILD" -eq 1 ]; then
     PROXY="000"
     for _ in 1 2 3 4 5 6 7 8 9 10; do
       PROXY="$(curl -sk -o /dev/null -w '%{http_code}' --max-time 5 \
-        --connect-to "$HOST:$PORT:127.0.0.1:$PORT" "$SCHEME://$HOST:$PORT/" || true)"
+        --connect-to "$PROBE_HOST:$PORT:127.0.0.1:$PORT" "$SCHEME://$PROBE_HOST:$PORT/" || true)"
       # `if`, not `[ ... ] && break`: an AND-list whose test fails returns non-zero and `set -e`
       # would take the script down on the first retry.
       if [ "$PROXY" = "200" ]; then break; fi
@@ -361,7 +397,7 @@ if [ "$BUILD" -eq 1 ]; then
     note "proxy on $PORT -> $PROXY"
     if [ "$PROXY" != "200" ]; then
       note "this check goes through loopback, and the proxy may still be serving correctly."
-      note "Confirm from another machine before treating it as broken:  curl -I $ORIGIN/"
+      note "Confirm from another machine before treating it as broken:  curl -I $SCHEME://$PROBE_HOST/"
       die "Could not verify the proxy locally. Check: journalctl -u caddy -n 30"
     fi
     # The redirected path, with the Host header a browser actually sends. This is the shape
@@ -369,22 +405,34 @@ if [ "$BUILD" -eq 1 ]; then
     # proves the second address is matched rather than merely bound.
     for EXTRA in ${ALSO_PORTS:-}; do
       VIA="$(curl -sk -o /dev/null -w '%{http_code}' --max-time 5 \
-        --connect-to "$HOST:$PORT:127.0.0.1:$EXTRA" "$SCHEME://$HOST:$PORT/" || true)"
+        --connect-to "$PROBE_HOST:$PORT:127.0.0.1:$EXTRA" "$SCHEME://$PROBE_HOST:$PORT/" || true)"
       note "redirected path $PORT via $EXTRA -> $VIA"
       [ "$VIA" = "200" ] \
-        || warn "WARNING: $EXTRA is bound but did not serve the site for host $HOST."
+        || warn "WARNING: $EXTRA is bound but did not serve the site for host $PROBE_HOST."
     done
   fi
 fi
 
 say "Installed"
-cat <<EOF
+if is_wildcard "$HOST"; then
+  cat <<EOF
+
+  This box answers on any single name under ${HOST#\*.}, so there is no address to
+  write down: browse whatever name the platform gives the instance.
+
+  Presenter       <this instance's name>/demo-admin
+  Customer login  12345678
+
+EOF
+else
+  cat <<EOF
 
   Open            $ORIGIN
   Presenter       $ORIGIN/demo-admin
   Customer login  12345678
 
 EOF
+fi
 case "$MODE" in
   cert)     note "Serving the certificate you supplied. No warning if a public CA signed it." ;;
   acme)     note "Certificate from Let's Encrypt, renewed automatically. No warning." ;;
@@ -397,8 +445,8 @@ cat <<EOF
 Still to do, and neither can be done from this box:
 
   1. Allow inbound TCP $PORT to this machine, in its security group or firewall.
-  2. Browse the address above from another machine. A cloud instance cannot reach
-     its own public address, so testing from here proves nothing.
+  2. Browse it from another machine. A cloud instance cannot reach its own public
+     address, so testing from here proves nothing.
 
 Then set the model endpoint in the presenter portal -- not in .env.
 

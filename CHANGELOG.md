@@ -6,6 +6,45 @@ Versions mark states worth returning to. Tags are annotated, so `git tag -n` and
 Open defects are tracked as [GitHub issues](https://github.com/roadtrip123/splunky-finance/issues);
 planned work is in [TODO.md](TODO.md).
 
+## v1.1.5: One image, any instance name, nothing configured per box
+
+The lab platform names each instance when it boots, `i-09c3ad076563d756c.splunk.show`, and the
+image cannot carry that. A new instance came up on a name the proxy had never heard of and served a
+blank page, because Caddy had one site block for the name the image was built with and nothing
+matched. The obvious fix is a boot-time unit that writes the address, and the obvious fix is wrong
+here: the unit that already exists for the port redirect did not run on that box, and a hundred
+instances is the wrong place to discover that.
+
+So nothing is configured per instance at all.
+
+- **The proxy serves by port rather than by name.** A site block of `:443, :8443` answers whatever
+  `Host` arrives, which a wildcard certificate covers. `install.sh --host '*.example.com'` writes
+  it, refuses `--acme` because a wildcard needs a DNS challenge, and warns that a self-signed
+  certificate cannot work for names it will never be told. Verified with real Caddy against two
+  instance names and a third unrelated one.
+- **`APP_ORIGIN` accepts a wildcard leftmost label**, `https://*.example.com`. That address was
+  used in exactly one place, the Origin check on mutating requests, and it now matches exactly one
+  label under the domain. `https://*.show`, a bare `*` and `https://a.*.example.com` are refused at
+  startup; at runtime the bare domain, a deeper name, another scheme, another port and a name that
+  merely ends with the domain are all refused, that last one being the attack this has to resist.
+  Session cookies remain host-scoped, `HttpOnly`, `Secure` and `SameSite=Strict`, and every mutating
+  request still carries the session's own CSRF token, so the Origin comparison is the third layer
+  and the wildcard widens it to one lab domain rather than to the internet.
+- **`scripts/serve_any_host.py`** applies both to a box whose Caddyfile is already written. It
+  drops the hostname, sets the wildcard origin, restarts the stack, which is what applies it, then
+  proves the result against two names it was never told and reads the Origin check through the login
+  endpoint, where a 401 means accepted and a 403 means still refusing. It leaves alone a workshop
+  config serving a port per participant and a plain-HTTP site, neither of which can use a wildcard.
+- **Fifteen guards** across `test_config.py` and `test_ports.py`, including a real login accepted
+  from two different instance names under one wildcard origin. The ones covering the origin check
+  and the installer were proved failing against the previous code, twenty-one parametrised cases of
+  them; the ones covering the new script could not be, since the script did not exist before.
+
+What is given up is the per-clone `SESSION_SECRET` rotation, since nothing now runs at boot: a
+cookie minted on one box is accepted by another. Behind a password published in this repository, on
+synthetic data, that is a fair trade, and `setup_env.py --rotate-secret` remains for anyone who
+would rather not take it.
+
 ## v1.1.4: One script applies the port arrangement to a box already built
 
 v1.1.3 put it in `install.sh`, which runs once when an image is made. The box in front of you has
