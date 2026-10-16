@@ -23,6 +23,7 @@ sys.path.insert(0, str(ROOT / "scripts"))
 # Imported after the path above is set, which is why these are not at the top.
 import fix_ports
 import install_service
+import serve_redirect_port
 
 SAVED = "-A PREROUTING -p tcp -m tcp --dport 443 -j REDIRECT --to-ports 8443"
 
@@ -207,3 +208,107 @@ def test_the_installer_verifies_the_redirected_path_and_not_only_the_direct_one(
 def test_the_unit_is_documented_as_insurance_rather_than_the_mechanism():
     """So that a later reader does not conclude the portal depends on this unit running."""
     assert "Insurance, not the mechanism" in unit("splunky-finance-ports.service")
+
+
+# The Caddyfile shapes this project generates. Editing the wrong one is the risk: a workshop box
+# serves a port per participant and a LAN box serves plain HTTP, and neither is this fault.
+THEIRS = """splunkyfinance.splunk.show {
+	tls /etc/caddy/tls.crt /etc/caddy/tls.key
+	reverse_proxy 127.0.0.1:3000
+}
+"""
+SELF_SIGNED = """{
+	auto_https disable_redirects
+	default_sni 203.0.113.10
+	skip_install_trust
+}
+203.0.113.10 {
+	tls internal
+	reverse_proxy 127.0.0.1:3000
+}
+"""
+WORKSHOP = """{
+	auto_https disable_redirects
+}
+203.0.113.10:3101 {
+	reverse_proxy 127.0.0.1:4101
+}
+203.0.113.10:3102 {
+	reverse_proxy 127.0.0.1:4102
+}
+"""
+LAN_HTTP = """{
+	auto_https off
+}
+http://192.168.1.50 {
+	reverse_proxy 127.0.0.1:3000
+}
+"""
+
+
+def serve(text, public_port=443, destination=8443):
+    return serve_redirect_port.rewrite(text, public_port, destination)
+
+
+def test_the_destination_is_read_from_the_rule():
+    assert serve_redirect_port.destinations(SAVED, 443) == [8443]
+    assert serve_redirect_port.destinations(
+        "-A PREROUTING -p tcp -m tcp --dport 443 -j REDIRECT --to-ports 9443", 443
+    ) == [9443]
+
+
+def test_unrelated_rules_name_no_destination():
+    for rule in (
+        "-A PREROUTING -p tcp -m tcp --dport 80 -j REDIRECT --to-ports 8080",
+        "-A PREROUTING -p tcp -m tcp --dport 443 -j DNAT --to-destination 10.0.0.5:8443",
+        "-A POSTROUTING -s 172.17.0.0/16 ! -o docker0 -j MASQUERADE",
+    ):
+        assert serve_redirect_port.destinations(rule, 443) == []
+
+
+def test_a_hostname_site_gains_the_second_address():
+    """The shape on the box this was written for: a hostname, a supplied certificate, no port."""
+    updated, changed = serve(THEIRS)
+    assert changed == ["splunkyfinance.splunk.show"]
+    assert updated.splitlines()[0] == (
+        "splunkyfinance.splunk.show:443, splunkyfinance.splunk.show:8443 {"
+    )
+    # Everything else is left exactly as it was, tabs and all.
+    assert updated.splitlines()[1:] == THEIRS.splitlines()[1:]
+
+
+def test_an_ip_site_keeps_its_global_options():
+    updated, changed = serve(SELF_SIGNED)
+    assert changed == ["203.0.113.10"]
+    assert "203.0.113.10:443, 203.0.113.10:8443 {" in updated
+    assert "default_sni 203.0.113.10" in updated
+    # The global options block opens with a bare brace and must never be treated as an address.
+    assert updated.startswith("{\n")
+
+
+def test_a_port_per_participant_is_left_alone():
+    """Fifty stacks on 3101 upward have nothing to do with a redirect of 443."""
+    updated, changed = serve(WORKSHOP)
+    assert changed == []
+    assert updated == WORKSHOP
+
+
+def test_plain_http_is_left_alone():
+    updated, changed = serve(LAN_HTTP)
+    assert changed == []
+    assert updated == LAN_HTTP
+
+
+def test_running_it_twice_changes_nothing_the_second_time():
+    once, changed = serve(THEIRS)
+    assert changed
+    twice, changed_again = serve(once)
+    assert changed_again == []
+    assert twice == once
+
+
+def test_an_unrecognised_address_is_left_alone_rather_than_guessed_at():
+    odd = "*.demo.example.com, :443 {\n\treverse_proxy 127.0.0.1:3000\n}\n"
+    updated, changed = serve(odd)
+    assert changed == []
+    assert updated == odd

@@ -6,6 +6,24 @@ Versions mark states worth returning to. Tags are annotated, so `git tag -n` and
 Open defects are tracked as [GitHub issues](https://github.com/roadtrip123/splunky-finance/issues);
 planned work is in [TODO.md](TODO.md).
 
+## v1.1.4: One script applies the port arrangement to a box already built
+
+v1.1.3 put it in `install.sh`, which runs once when an image is made. The box in front of you has
+its Caddyfile already written, and nothing in the update path touches that file, so the release on
+its own changed nothing for it. Editing four lines by hand is also where a copied heredoc arrives
+mangled in a terminal.
+
+- **`scripts/serve_redirect_port.py`** reads the redirect's destination out of the live nat table
+  and the saved rules, defaults to 8443 when there is no rule to read, and adds that address to
+  every site serving the public port. It keeps a `.bak`, validates before restarting Caddy, and
+  restores the previous file if Caddy rejects the result or will not start. Then it checks the
+  direct and the redirected path with the `Host` header a browser sends.
+- **It knows what not to touch**: a workshop config serving a port per participant, a plain-HTTP LAN
+  site, an address shape it does not recognise, and a file that already serves the destination.
+  Running it twice changes nothing the second time.
+- **Eight guards** in `backend/tests/test_ports.py` covering each of those shapes, including the exact
+  Caddyfile the first box was found with.
+
 ## v1.1.3: The portal answers whether the port redirect is there or not
 
 A fresh instance came up unreachable again, with `--dport 443 -j REDIRECT --to-ports 8443` live in

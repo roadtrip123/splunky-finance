@@ -167,6 +167,26 @@ trusted certificate instead. `--lan-http` drops TLS altogether, and works only f
 because the application refuses plain HTTP anywhere else; anything pasted into the portal, including a
 participant's own API keys, then crosses the network in cleartext.
 
+### A box that is already running
+
+`install.sh` writes the proxy's config at install time and nothing in the update path touches that
+file again, so a box built from an older image does not get the second address from a release. It is
+one script, and it needs no arguments:
+
+```bash
+sudo python3 scripts/serve_redirect_port.py --dry-run     # what it would write, changing nothing
+sudo python3 scripts/serve_redirect_port.py
+```
+
+It reads the destination out of the rule, in the live nat table and in the saved file, defaults to
+8443 when there is no rule to read, adds that address to every site serving the public port, keeps a
+`.bak`, validates before restarting Caddy, puts the old file back if Caddy rejects or will not start,
+and then checks both the direct and the redirected path. Running it twice changes nothing the second
+time. It leaves alone a workshop config serving a port per participant, and a plain-HTTP LAN config,
+because a redirect of 443 is not those boxes' problem.
+
+Make the same edit in the image before snapshotting, or every clone needs it by hand.
+
 ## Installing by hand
 
 The script is the recommended path. This is what it does, for a box where some step has to differ.
