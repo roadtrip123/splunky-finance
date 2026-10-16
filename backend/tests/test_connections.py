@@ -293,3 +293,25 @@ def test_a_failure_reason_on_a_status_card_reads_as_a_failure():
     assert admin.count('<small className="problem">') == 2, "both status cards"
     block = css[css.index(".admin-card small.problem"):]
     assert "var(--red)" in block[: block.index("}")]
+
+
+def test_the_endpoint_picker_offers_no_named_third_party_service():
+    """A preset saves one paste, then has to be maintained, and it implies the service is known to
+    work here. For the one that was listed that was not true: it answered chat requests and emitted
+    no tool call, so every scenario failed on an endpoint the portal appeared to endorse. Any
+    OpenAI-compatible service is Custom, which is also what the lab tells participants to pick."""
+    root = Path(__file__).resolve().parents[2]
+    admin = (root / "frontend" / "components" / "Admin.tsx").read_text()
+    presets = admin[admin.index("const endpoints = {") : admin.index("type EndpointKey")]
+    assert "sharonai" not in presets
+    assert "sharonai.cloud" not in admin
+    for expected in ("openai:", "anthropic:", "ollama:", "custom:"):
+        assert expected in presets, expected
+
+
+def test_a_saved_endpoint_with_a_base_url_still_edits_as_custom():
+    """Including one saved while a preset for its host existed. Without this the Edit button would
+    seed the form with a preset key that no longer exists."""
+    root = Path(__file__).resolve().parents[2]
+    admin = (root / "frontend" / "components" / "Admin.tsx").read_text()
+    assert ": e.base_url\n                                      ? \"custom\"" in admin

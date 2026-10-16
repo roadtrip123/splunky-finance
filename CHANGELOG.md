@@ -6,6 +6,19 @@ Versions mark states worth returning to. Tags are annotated, so `git tag -n` and
 Open defects are tracked as [GitHub issues](https://github.com/roadtrip123/splunky-finance/issues);
 planned work is in [TODO.md](TODO.md).
 
+## v1.1.14: No named third-party service in the endpoint picker
+
+Sharon AI had a preset in the Setup tab. A preset saves one paste and then has to be maintained,
+and it implies the service is known to work here. For that one it was not: it answers chat requests
+and emits no tool call when one is offered, so every scenario in the demo fails on an endpoint the
+portal appeared to endorse.
+
+- **The picker is OpenAI, Anthropic, Ollama (local) and Custom.** Any OpenAI-compatible service,
+  LiteLLM included, is Custom, which is already what lab step 13 tells participants to pick.
+- **A saved endpoint with a base URL still edits as Custom**, including one saved while a preset
+  for its host existed, so nothing already configured breaks.
+- The README's endpoint list follows, and says why there is no preset.
+
 ## v1.1.13: A fresh install persists the egress bypass instead of warning about it
 
 `install.sh` inserted the bridge bypasses when its own probe found container egress hijacked, then

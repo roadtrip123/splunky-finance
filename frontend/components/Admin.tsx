@@ -216,7 +216,11 @@ export default function Admin() {
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState(false);
-  // Sharon AI and "custom" are OpenAI-compatible endpoints: same provider, different base URL.
+  // "custom" is any OpenAI-compatible endpoint: the openai provider with somebody else's base
+  // URL. There is deliberately no preset for a particular such service. A preset saves one paste
+  // and then has to be maintained, and it implies the service is known to work here, which for
+  // one of them was not true: it answered chat requests and emitted no tool call, so every
+  // scenario in the demo failed on an endpoint the portal appeared to endorse.
   const endpoints = {
     openai: { label: "OpenAI", provider: "openai", url: "", needsUrl: false, needsKey: true },
     anthropic: { label: "Anthropic", provider: "anthropic", url: "", needsUrl: false, needsKey: true },
@@ -226,13 +230,6 @@ export default function Admin() {
       url: "http://host.docker.internal:11434",
       needsUrl: true,
       needsKey: false,
-    },
-    sharonai: {
-      label: "Sharon AI",
-      provider: "openai",
-      url: "https://inference.sharonai.cloud/api/v1",
-      needsUrl: true,
-      needsKey: true,
     },
     custom: { label: "Custom (OpenAI-compatible)", provider: "openai", url: "", needsUrl: true, needsKey: true },
   } as const;
@@ -750,8 +747,8 @@ export default function Admin() {
                   <section className="admin-card">
                     <h2>Model endpoint</h2>
                   <p className="muted">
-                    Which model the agent calls. Sharon AI and other OpenAI-compatible services
-                    use the OpenAI protocol with their own base URL.
+                    Which model the agent calls. An OpenAI-compatible service, such as LiteLLM,
+                    is Custom: the OpenAI protocol with its own base URL.
                   </p>
                   <ul className="endpoint-list">
                     {status.endpoints.endpoints.length === 0 && (
@@ -791,16 +788,16 @@ export default function Admin() {
                                 model: e.model,
                                 base_url: e.base_url,
                               });
+                              // Any saved endpoint with a base URL edits as Custom, including
+                              // ones saved when a preset existed for their host.
                               setEndpoint(
                                 e.provider === "anthropic"
                                   ? "anthropic"
                                   : e.provider === "ollama"
                                     ? "ollama"
-                                    : e.base_url.startsWith("https://inference.sharonai.cloud")
-                                      ? "sharonai"
-                                      : e.base_url
-                                        ? "custom"
-                                        : "openai",
+                                    : e.base_url
+                                      ? "custom"
+                                      : "openai",
                               );
                             }}
                           >

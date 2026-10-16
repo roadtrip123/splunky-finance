@@ -153,7 +153,7 @@ Within one model the agent keeps the last 8 messages as conversation history, an
 
 ## Providers
 
-Choose the endpoint in the presenter portal under **Setup**: OpenAI, Anthropic, Ollama (local), Sharon AI, or a custom OpenAI-compatible URL. That applies immediately and needs no restart. Sharon AI and custom use the OpenAI protocol with their own base URL, set through `OPENAI_BASE_URL`.
+Choose the endpoint in the presenter portal under **Setup**: OpenAI, Anthropic, Ollama (local), or Custom for any OpenAI-compatible URL. That applies immediately and needs no restart. Custom uses the OpenAI protocol with somebody else's base URL, set through `OPENAI_BASE_URL`, which is how LiteLLM and similar services are reached. There is deliberately no preset for a particular such service: a preset implies it is known to work here, and one of them answered chat requests while emitting no tool call, which fails every scenario in the demo.
 
 The same settings can be preset in `.env` with `LLM_PROVIDER=openai|anthropic|ollama` and the corresponding model and key; changes made that way need a backend restart. Defaults: OpenAI `gpt-4o-mini-2024-07-18`, Anthropic `claude-haiku-4-5-20251001`, and local Ollama `gemma4:e2b`. Calls have bounded time, output, model iterations, and tool iterations. Provider errors are reported safely without exposing keys. No fallback provider is selected automatically.
 
