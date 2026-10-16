@@ -9,7 +9,7 @@ from uuid import uuid4
 from fastapi import FastAPI, HTTPException, Request, Response
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
-from pydantic import Field
+from pydantic import ConfigDict, Field
 
 from app.agent import ChatService
 from app.auth import Authentication, Session
@@ -35,7 +35,14 @@ class ModelEndpoint(StrictModel):
 
     Sharon AI and other OpenAI-compatible services use the openai provider with a base URL, so
     several endpoints can share a provider and differ only by host and model.
+
+    Whitespace is stripped from every field. A base URL pasted with a trailing space is
+    percent-encoded by httpx into `/v1%20/chat/completions`, which the provider answers with a 404
+    that reads exactly like a wrong model name, and the guard below only checks the scheme. It cost
+    an afternoon once; it must not cost a workshop a hundred times.
     """
+
+    model_config = ConfigDict(str_strip_whitespace=True)
 
     id: str = Field(default="", max_length=64)
     name: str = Field(default="", max_length=120)
@@ -54,7 +61,15 @@ class GalileoConnection(StrictModel):
 
     Blank fields are left unchanged, so the API key can stay as it is while a project or log
     stream is corrected.
+
+    Whitespace is stripped from every field. A key copied out of a document or a chat window
+    arrives with a trailing space or newline often enough to matter, the tenant rejects it as a bad
+    credential, and the portal cannot show the difference: the mask is eight dots and the last four
+    characters, so a trailing space is invisible. Two boxes with "exactly the same settings" then
+    behave differently and there is nothing on screen to explain why.
     """
+
+    model_config = ConfigDict(str_strip_whitespace=True)
 
     galileo_api_key: str = Field(default="", max_length=400)
     galileo_project: str = Field(default="", max_length=200)

@@ -165,6 +165,12 @@ class Telemetry:
             secret = getattr(s, field).get_secret_value()
             view[f"{field}_set"] = bool(secret)
             view[f"{field}_masked"] = self.mask(secret)
+            # The length as well, because a mask of eight dots and the last four characters cannot
+            # show a key that was pasted short. A truncated key is rejected as a bad credential,
+            # looks identical in the form to a whole one, and is the remaining way two boxes with
+            # "exactly the same settings" behave differently. The length of a credential is not
+            # itself a secret, and it is the only thing that makes the two comparable.
+            view[f"{field}_length"] = len(secret)
         return view
 
     def _saved(self):

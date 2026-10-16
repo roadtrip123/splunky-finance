@@ -1064,3 +1064,66 @@ def test_test_connection_is_guarded_and_forces_a_fresh_check(client):
     assert first.json()["galileo"]["state"]
     source = (Path(__file__).resolve().parents[1] / "app" / "main.py").read_text()
     assert "await telemetry.check_connection(force=True)}" in source
+
+
+def test_a_pasted_credential_is_stripped_of_whitespace(client, settings):
+    """A key copied out of a document or a chat window arrives with a trailing space or newline
+    often enough to matter. The tenant rejects it as a bad credential, and the portal cannot show
+    the difference: the mask is eight dots and the last four characters, so a trailing space is
+    invisible. Two boxes with "exactly the same settings" then behave differently with nothing on
+    screen to explain it."""
+    headers = login(client, True)
+    response = client.put(
+        "/api/demo-admin/galileo/connection",
+        headers=headers,
+        json={
+            "galileo_api_key": "  gal-key-pasted-with-whitespace  \n",
+            "galileo_project": " participant-07\t",
+            "galileo_log_stream": "\ntheir-stream ",
+            "galileo_api_url": " https://api.galileo.example/v1 ",
+        },
+    )
+    assert response.status_code == 200, response.text
+    assert settings.galileo_api_key.get_secret_value() == "gal-key-pasted-with-whitespace"
+    assert settings.galileo_project == "participant-07"
+    assert settings.galileo_log_stream == "their-stream"
+    assert settings.galileo_api_url == "https://api.galileo.example/v1"
+
+
+def test_a_pasted_endpoint_is_stripped_of_whitespace(client):
+    """The same fault one layer along. A base URL with a trailing space is percent-encoded into
+    /v1%20/chat/completions, which the provider answers with a 404 that reads exactly like a wrong
+    model name, and the URL guard only checks the scheme."""
+    headers = login(client, True)
+    response = client.put(
+        "/api/demo-admin/endpoints",
+        headers=headers,
+        json={
+            "name": " LiteLLM ",
+            "provider": "openai",
+            "api_key": " sk-pasted-with-space ",
+            "model": " bedrock-claude ",
+            "base_url": "https://litellm.example/v1 ",
+        },
+    )
+    assert response.status_code == 200, response.text
+    saved = [e for e in response.json()["endpoints"] if e["name"] == "LiteLLM"]
+    assert saved, response.text
+    assert saved[0]["base_url"] == "https://litellm.example/v1"
+    assert saved[0]["model"] == "bedrock-claude"
+
+
+def test_the_connection_view_reports_a_credential_length(client, settings):
+    """The remaining way two boxes differ invisibly is a key pasted short. It is rejected as a bad
+    credential and looks identical in the form to a whole one. A length is not itself a secret and
+    is the only thing that makes the two comparable."""
+    headers = login(client, True)
+    client.put(
+        "/api/demo-admin/galileo/connection",
+        headers=headers,
+        json={"galileo_api_key": "gal-key-of-known-length-123456"},
+    )
+    view = client.get("/api/demo-admin/status", headers=headers).json()["connection"]
+    assert view["galileo_api_key_length"] == len("gal-key-of-known-length-123456")
+    assert view["galileo_api_key_masked"].endswith("3456")
+    assert "gal-key-of-known-length" not in str(view), "the key itself must never be echoed"

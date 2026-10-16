@@ -6,6 +6,25 @@ Versions mark states worth returning to. Tags are annotated, so `git tag -n` and
 Open defects are tracked as [GitHub issues](https://github.com/roadtrip123/splunky-finance/issues);
 planned work is in [TODO.md](TODO.md).
 
+## v1.1.9: A pasted credential is stripped, and its length is visible
+
+"The settings are exactly the same as this box" and one of them answers 401. The portal could not
+have shown the difference: nothing stripped whitespace from a pasted field, and the mask is eight
+dots and the last four characters, so a key carrying a trailing space or a newline looks identical
+to a clean one. This is the third time this class of fault has cost a session, after a base URL
+that became `/v1%20/chat/completions` and answered 404 like a wrong model name.
+
+- **Every field on both pasted-configuration payloads is stripped on save.** `GalileoConnection`
+  and `ModelEndpoint` carry `str_strip_whitespace`, so a key, a project, a stream, a URL or a model
+  name copied out of a document or a chat window cannot reach a provider with whitespace attached.
+  The URL guards see the clean value, since validation runs first.
+- **The stored length of a credential is reported and shown**, beside the mask, for the field that
+  is set. The remaining invisible failure is a key pasted short: rejected as a bad credential,
+  identical in the form to a whole one. A length is not itself a secret, and it is the only thing
+  that makes two boxes comparable. The key itself is still never echoed, on either backend.
+- Three guards, each proved failing against the previous code, plus the em dash removed from the
+  one placeholder this touched.
+
 ## v1.1.8: The portal says why the connection failed, and the clean script clears the project
 
 Two findings from the first real workshop rehearsal. A Galileo connection was failing with no

@@ -77,16 +77,20 @@ type Status = {
     agent_control_url: string;
     galileo_api_key_set: boolean;
     galileo_api_key_masked: string;
+    galileo_api_key_length: number;
     splunk_ao_console_url: string;
     splunk_ao_api_url: string;
     splunk_ao_realm: string;
     splunk_ao_agent_control_url: string;
     splunk_ao_api_key_set: boolean;
     splunk_ao_api_key_masked: string;
+    splunk_ao_api_key_length: number;
     splunk_ao_o11y_token_set: boolean;
     splunk_ao_o11y_token_masked: string;
+    splunk_ao_o11y_token_length: number;
     splunk_ao_o11y_api_token_set: boolean;
     splunk_ao_o11y_api_token_masked: string;
+    splunk_ao_o11y_api_token_length: number;
   };
   observability: {
     active: "galileo" | "splunk_ao";
@@ -424,10 +428,12 @@ export default function Admin() {
             "Needed only for the guardrail. Your instructor has it."],
         ];
   function secretPlaceholder(key: string) {
-    const connection = status?.connection as Record<string, string | boolean> | undefined;
+    const connection = status?.connection as Record<string, string | boolean | number> | undefined;
     const set = connection?.[`${key}_set`];
     if (set === undefined) return "";
-    return set ? `${String(connection?.[`${key}_masked`])} — leave blank to keep` : "paste your key";
+    return set
+      ? `${String(connection?.[`${key}_masked`])}, leave blank to keep`
+      : "paste your key";
   }
   const keySummary =
     activeId === "splunk_ao"
@@ -1025,16 +1031,39 @@ export default function Admin() {
                           />
                           <small className="field-hint" id={`${key}-hint`}>
                             {hint}
+                            {/* The stored length, for a secret that is set. The mask is eight dots
+                                and the last four characters, so it cannot show a key pasted short,
+                                and a short key is rejected as a bad credential while looking
+                                identical in the form to a whole one. Comparing this against a box
+                                that works is the only way to see it. */}
+                            {type === "password" &&
+                              (status.connection as Record<string, string | boolean | number>)[
+                                `${key}_set`
+                              ] === true && (
+                                <>
+                                  {" "}
+                                  Stored:{" "}
+                                  {String(
+                                    (
+                                      status.connection as Record<
+                                        string,
+                                        string | boolean | number
+                                      >
+                                    )[`${key}_length`],
+                                  )}{" "}
+                                  characters.
+                                </>
+                              )}
                             {/* Offered for every saved field, not only secrets. A blank field is
                                 deliberately left unchanged so a key survives editing a project
                                 name, which meant a URL or project name could be overwritten but
                                 never removed. A secret reports `<field>_set`, because its value is
                                 never echoed back; everything else reports the value itself. */}
                             {(type === "password"
-                              ? (status.connection as Record<string, string | boolean>)[
+                              ? (status.connection as Record<string, string | boolean | number>)[
                                   `${key}_set`
                                 ] === true
-                              : !!(status.connection as Record<string, string | boolean>)[
+                              : !!(status.connection as Record<string, string | boolean | number>)[
                                   key
                                 ]) && (
                                 <>
