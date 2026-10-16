@@ -6,6 +6,21 @@ Versions mark states worth returning to. Tags are annotated, so `git tag -n` and
 Open defects are tracked as [GitHub issues](https://github.com/roadtrip123/splunky-finance/issues);
 planned work is in [TODO.md](TODO.md).
 
+## v1.1.7: The origin check's own check was proving nothing
+
+On the first real run, `serve_any_host.py` reported `origin check -> 422 (unexpected)`. The
+deployment was correct; the probe was not. It posted `customer_number`, the schema wants
+`account_number`, and FastAPI validates the body before the endpoint runs, so the origin was never
+looked at. The same 422 came back for an accepted origin and a refused one, which is the worst kind
+of check: one that reads as a result.
+
+- **The probe now posts a body the `Login` schema accepts**, with credentials that cannot work, so
+  401 means the origin was accepted and 403 means it was refused. Anything else now says plainly
+  that the check proved nothing, rather than printing "unexpected" and moving on.
+- **A guard parses the payload out of the script and validates it against the schema**, so the two
+  cannot drift apart again, and a second guard pins the order they depend on: the origin is checked
+  before the password, which is what makes 401 the pass.
+
 ## v1.1.6: serve_any_host refuses to run where it would break logins
 
 Setting a wildcard `APP_ORIGIN` against a backend that compares origins as strings is accepted at

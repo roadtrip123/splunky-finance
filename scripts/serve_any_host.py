@@ -179,7 +179,11 @@ def verify(domain, public_port, destination):
             ["curl", "-sk", "-o", "/dev/null", "-w", "%{http_code}", "--max-time", "10",
              "-X", "POST", "-H", "Content-Type: application/json",
              "-H", f"Origin: https://{host}",
-             "-d", '{"customer_number":"0","password":"0"}',
+             # Shaped exactly as the Login schema expects, with credentials that cannot work.
+             # FastAPI validates the body before the endpoint runs, so a payload the schema
+             # rejects answers 422 for an accepted and a refused origin alike, and the check
+             # reads as passing while proving nothing.
+             "-d", '{"account_number":"00000000","password":"not-the-password"}',
              "--connect-to", f"{host}:{public_port}:127.0.0.1:{public_port}",
              f"https://{host}:{public_port}/api/auth/login"],
             capture_output=True, text=True,
@@ -188,6 +192,9 @@ def verify(domain, public_port, destination):
         note(f"origin check for {host} -> {code} ({verdict})")
         if code == "403":
             warn("the backend is still configured for one exact address. Did the stack restart?")
+        elif code != "401":
+            warn("this check proved nothing. 422 means the payload no longer matches the Login")
+            warn("schema, and the body is validated before the origin is ever looked at.")
 
 
 def main():

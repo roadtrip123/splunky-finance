@@ -155,3 +155,43 @@ def test_login_accepts_any_instance_name_under_a_wildcard_origin(settings):
         )
         assert refused.status_code == 403
         assert "*.splunk.show" in refused.json()["error"]["message"]
+
+
+def test_the_origin_probe_payload_still_matches_the_login_schema():
+    """scripts/serve_any_host.py proves the Origin check by POSTing to the login endpoint and
+    reading 401 against 403. FastAPI validates the body before the endpoint runs, so a payload the
+    schema rejects answers 422 either way and the check reports success while proving nothing. That
+    happened once, with a field named customer_number. This pins the two together."""
+    import json
+    import re
+    from pathlib import Path
+
+    from app.schemas import Login
+
+    source = (Path(__file__).resolve().parents[2] / "scripts" / "serve_any_host.py").read_text()
+    bodies = re.findall(r"\"-d\", '(\{.*?\})'", source)
+    assert bodies, "the probe no longer posts a body"
+    for body in bodies:
+        Login(**json.loads(body))
+    assert '"401": "origin accepted"' in source
+    assert '"403": "ORIGIN REJECTED"' in source
+
+
+def test_a_rejected_origin_outranks_bad_credentials(settings):
+    """Which is what makes 401 a pass and 403 a failure in that probe: the origin is checked
+    before the password, so a wrong password reaching 401 means the origin was accepted."""
+    from fastapi.testclient import TestClient
+
+    from app.main import create_app
+
+    configured = configure(settings, app_origin=WILDCARD, session_cookie_secure=True)
+    wrong = {"account_number": "00000000", "password": "not-the-password"}
+    with TestClient(create_app(configured)) as client:
+        accepted = client.post(
+            "/api/auth/login", json=wrong, headers={"Origin": "https://i-probe1.splunk.show"}
+        )
+        refused = client.post(
+            "/api/auth/login", json=wrong, headers={"Origin": "https://evil.example"}
+        )
+    assert accepted.status_code == 401
+    assert refused.status_code == 403
