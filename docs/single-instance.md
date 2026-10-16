@@ -206,6 +206,37 @@ to run somewhere; with it shared, a session cookie minted on one box is accepted
 synthetic data behind a password published in this repository that is a fair trade, and
 `python3 scripts/setup_env.py --rotate-secret` is there if you would rather not take it.
 
+### When the redirect hijacks the containers too
+
+`PREROUTING` catches traffic arriving on *any* interface, the Docker bridges included, so the same
+rule that hides the box from a browser also redirects every container's own outbound HTTPS. It
+leaves the backend bound for an observability tenant and lands on whatever listens on 8443 locally,
+which, since the proxy was made to serve both ports, is this application. The SDK reports
+
+```
+[SSL: CERTIFICATE_VERIFY_FAILED] Hostname mismatch, certificate is not valid for
+'api.multitenant.galileocloud.io'
+```
+
+which carries no status code, so it reads as a generic connection failure and sends a presenter to
+check credentials that were always fine. One script, no arguments:
+
+```bash
+sudo python3 scripts/allow_container_egress.py --dry-run
+sudo python3 scripts/allow_container_egress.py
+```
+
+It inserts a `RETURN` for `docker0` and `br+` ahead of the redirect, writes them into
+`/etc/iptables/rules.v4` **above** the redirect line, since `iptables-restore` applies the file top
+to bottom and a bypass after the redirect is never reached, then probes from inside the backend
+container. That last part matters: traffic the host originates goes through `OUTPUT` and never meets
+`PREROUTING`, so a probe run on the host passes whether or not containers are affected, which is
+exactly what made this fault look like a credential problem.
+
+Persisting into the saved ruleset rather than a boot unit is deliberate. `netfilter-persistent` is
+demonstrably running on these images: it is what restores the redirect every boot. Riding the
+mechanism that already works beats adding one that has not been shown to fire.
+
 ### A box that is already running
 
 `install.sh` writes the proxy's config at install time and nothing in the update path touches that

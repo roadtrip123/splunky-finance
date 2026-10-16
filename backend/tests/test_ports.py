@@ -460,3 +460,78 @@ def test_tenant_urls_are_kept_unless_asked_for():
     assert "--blank-urls) BLANK_URLS=1" in source
     assert 'if [ "$BLANK_URLS" -eq 1 ]; then' in source
     assert "kept       $FIELD=$VALUE" in source
+
+
+def egress():
+    import allow_container_egress
+
+    return allow_container_egress
+
+
+def test_the_bypass_is_saved_ahead_of_the_redirect(tmp_path):
+    """iptables-restore applies the file top to bottom, so a RETURN written after the REDIRECT is
+    never reached. Ordering is the whole of this fix."""
+    rules = tmp_path / "rules.v4"
+    rules.write_text(
+        "*nat\n"
+        ":PREROUTING ACCEPT [0:0]\n"
+        ":POSTROUTING ACCEPT [0:0]\n"
+        f"{SAVED}\n"
+        "-A POSTROUTING -s 172.17.0.0/16 ! -o docker0 -j MASQUERADE\n"
+        "COMMIT\n"
+    )
+    assert egress().persist(443, False, rules) == 2
+    lines = rules.read_text().splitlines()
+    returns = [index for index, line in enumerate(lines) if "-j RETURN" in line]
+    redirect = next(index for index, line in enumerate(lines) if "REDIRECT" in line)
+    assert returns, "the bypasses were not written"
+    assert max(returns) < redirect, "a RETURN after the REDIRECT is never reached"
+    assert "docker0" in lines[returns[0]] or "br+" in lines[returns[0]]
+
+
+def test_saving_the_bypass_twice_changes_nothing(tmp_path):
+    rules = tmp_path / "rules.v4"
+    rules.write_text(f"*nat\n:PREROUTING ACCEPT [0:0]\n{SAVED}\nCOMMIT\n")
+    assert egress().persist(443, False, rules) == 2
+    once = rules.read_text()
+    assert egress().persist(443, False, rules) == 0
+    assert rules.read_text() == once
+
+
+def test_the_bypass_goes_after_the_chain_declarations_when_no_redirect_is_saved(tmp_path):
+    """A box whose live rule was added by hand, or whose redirect arrives from elsewhere. The
+    bypasses still have to precede whatever else the nat table does."""
+    rules = tmp_path / "rules.v4"
+    rules.write_text(
+        "*nat\n:PREROUTING ACCEPT [0:0]\n"
+        "-A PREROUTING -m addrtype --dst-type LOCAL -j DOCKER\n"
+        "COMMIT\n"
+    )
+    assert egress().persist(443, False, rules) == 2
+    lines = rules.read_text().splitlines()
+    assert lines[1].startswith(":PREROUTING")
+    assert "-j RETURN" in lines[2]
+    assert lines[-2].endswith("-j DOCKER")
+
+
+def test_a_ruleset_without_a_nat_table_is_left_alone(tmp_path):
+    rules = tmp_path / "rules.v4"
+    rules.write_text("*filter\n:INPUT ACCEPT [0:0]\nCOMMIT\n")
+    before = rules.read_text()
+    assert egress().persist(443, False, rules) == 0
+    assert rules.read_text() == before
+
+
+def test_the_bypass_covers_both_docker_bridge_shapes():
+    """docker0 is the default bridge; br+ is a prefix match covering the br-xxxxxxx bridges
+    compose creates per project."""
+    assert egress().BRIDGES == ("docker0", "br+")
+
+
+def test_the_egress_probe_runs_inside_the_container():
+    """Traffic the host originates goes through OUTPUT and never meets PREROUTING, so a probe run
+    on the host passes whether or not containers are affected. That is what made this fault look
+    like a credential problem."""
+    source = (ROOT / "scripts" / "allow_container_egress.py").read_text()
+    assert '"exec", "-T", "backend"' in source
+    assert "Hostname mismatch" in source

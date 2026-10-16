@@ -6,6 +6,28 @@ Versions mark states worth returning to. Tags are annotated, so `git tag -n` and
 Open defects are tracked as [GitHub issues](https://github.com/roadtrip123/splunky-finance/issues);
 planned work is in [TODO.md](TODO.md).
 
+## v1.1.12: The redirect was hijacking the containers' own outbound HTTPS
+
+With v1.1.11 logging the real cause, the rehearsal's unexplained Galileo failure named itself in one
+line: `Hostname mismatch, certificate is not valid for 'api.multitenant.galileocloud.io'`.
+`PREROUTING` catches traffic arriving on any interface, the Docker bridges included, so the same
+rule that hides the box from a browser was redirecting the backend's own outbound HTTPS into the
+proxy on 8443, which answered with this deployment's certificate. The credentials were never wrong.
+
+- **`scripts/allow_container_egress.py`** inserts a `RETURN` for `docker0` and `br+` ahead of the
+  redirect and writes them into `/etc/iptables/rules.v4` above the redirect line, because
+  `iptables-restore` applies the file top to bottom and a bypass below the redirect is never
+  reached. `install.sh` already added these rules when its own egress probe failed, and warned that
+  they do not survive a reboot, which on an image means they do not survive at all.
+- **Persisted into the saved ruleset rather than a boot unit**, deliberately. `netfilter-persistent`
+  is demonstrably running on these images, since it is what restores the redirect every boot. Riding
+  a mechanism that works beats adding one that has not been shown to fire on this platform.
+- **It probes from inside the backend container.** Traffic the host originates goes through `OUTPUT`
+  and never meets `PREROUTING`, so a probe run on the host passes whether or not containers are
+  affected. That is precisely why this looked like a credential fault for an hour.
+- Six guards, on the ordering, the idempotency, both bridge shapes, a ruleset with no nat table, and
+  that the probe runs in the container.
+
 ## v1.1.11: A connection failure nobody recognised left nothing to diagnose
 
 A rehearsal hit "Galileo connection failed; check credentials, endpoint, and project permissions"
