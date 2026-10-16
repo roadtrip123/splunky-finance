@@ -305,7 +305,16 @@ if printf '%s' "$EGRESS" | grep -qiE 'certificate|SSLError|hostname mismatch'; t
   if printf '%s' "$EGRESS" | grep -qiE 'certificate|SSLError|hostname mismatch'; then
     die "Container egress is still redirected. See docs/workshop.md, 'When containers cannot reach the internet'."
   fi
-  warn "fixed -- this does NOT survive a reboot; see docs/workshop.md"
+  # Live rules alone die on the next boot, and on a box destined for an image that means every
+  # clone starts with its containers unable to reach an observability tenant, reporting a
+  # certificate error that reads as a rejected credential. The script writes them into the saved
+  # ruleset, ahead of the redirect, so netfilter-persistent restores them with everything else.
+  if python3 "$ROOT/scripts/allow_container_egress.py" >/dev/null 2>&1; then
+    note "bypass persisted to /etc/iptables/rules.v4; it survives a reboot and an image"
+  else
+    warn "fixed live, but it could NOT be persisted. It will not survive a reboot:"
+    warn "  sudo python3 scripts/allow_container_egress.py"
+  fi
 fi
 # A 401 is the expected answer: the request arrived and was rejected for having no key.
 printf '%s' "$EGRESS" | grep -qE '401|200' || die "Containers cannot reach api.openai.com:

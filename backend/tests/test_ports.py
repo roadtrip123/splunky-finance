@@ -535,3 +535,14 @@ def test_the_egress_probe_runs_inside_the_container():
     source = (ROOT / "scripts" / "allow_container_egress.py").read_text()
     assert '"exec", "-T", "backend"' in source
     assert "Hostname mismatch" in source
+
+
+def test_a_fresh_install_persists_the_egress_bypass():
+    """install.sh inserted the bridge bypasses live and warned they would not survive a reboot,
+    which on a box destined for an image means they do not survive at all: every clone would start
+    with its containers unable to reach an observability tenant, reporting a certificate error that
+    reads as a rejected credential."""
+    source = installer()
+    assert "scripts/allow_container_egress.py" in source
+    block = source[source.index("exempting Docker's bridges") :]
+    assert "allow_container_egress.py" in block[: block.index("say ")]

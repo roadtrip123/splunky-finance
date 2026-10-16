@@ -6,6 +6,17 @@ Versions mark states worth returning to. Tags are annotated, so `git tag -n` and
 Open defects are tracked as [GitHub issues](https://github.com/roadtrip123/splunky-finance/issues);
 planned work is in [TODO.md](TODO.md).
 
+## v1.1.13: A fresh install persists the egress bypass instead of warning about it
+
+`install.sh` inserted the bridge bypasses when its own probe found container egress hijacked, then
+warned that they would not survive a reboot. On a box destined to become an image that means they
+do not survive at all, and every clone starts with its containers unable to reach an observability
+tenant, reporting a certificate error that reads as a rejected credential. Which is the whole of
+the afternoon this cost.
+
+- It now calls `allow_container_egress.py` to write them into the saved ruleset, and says plainly
+  which of the two happened rather than leaving a warning to be read.
+
 ## v1.1.12: The redirect was hijacking the containers' own outbound HTTPS
 
 With v1.1.11 logging the real cause, the rehearsal's unexplained Galileo failure named itself in one
