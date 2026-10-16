@@ -13,6 +13,9 @@
 #   --host <addr>   Hostname or IP participants browse to. Default: this instance's public IP from
 #                   EC2 metadata. Required anywhere without EC2 metadata, such as a home lab
 #   --port <n>      Public HTTPS port. Default 443
+#   --also-port <n> Serve the same site on a second port as well, for a network that redirects the
+#                   public port elsewhere. Default 8443 when the public port is 443, which is where
+#                   shared lab images send it. `off` binds the public port alone
 #
 # How TLS is terminated -- pick one. Self-signed is the default because it needs nothing:
 #   --cert <f> --key <f>  Serve an existing certificate. The one to use with a wildcard: no
@@ -35,6 +38,7 @@ set -euo pipefail
 
 HOST=""
 PORT=443
+ALSO_PORT=""
 CHANNEL="tags"
 CERT=""
 KEY=""
@@ -63,6 +67,7 @@ while [ $# -gt 0 ]; do
   case "$1" in
     --host) HOST="${2:?--host needs a value}"; shift 2 ;;
     --port) PORT="${2:?--port needs a value}"; shift 2 ;;
+    --also-port) ALSO_PORT="${2:?--also-port needs a value or off}"; shift 2 ;;
     --channel) CHANNEL="${2:?--channel needs a value}"; shift 2 ;;
     --cert) CERT="${2:?--cert needs a path}"; shift 2 ;;
     --key) KEY="${2:?--key needs a path}"; shift 2 ;;
@@ -78,6 +83,7 @@ done
 
 case "$CHANNEL" in tags|branch|off) ;; *) die "--channel must be tags, branch or off" ;; esac
 case "$PORT" in ''|*[!0-9]*) die "--port must be a number" ;; esac
+case "$ALSO_PORT" in ''|off) ;; *[!0-9]*) die "--also-port must be a number, or off" ;; esac
 if { [ -n "$CERT" ] && [ -z "$KEY" ]; } || { [ -z "$CERT" ] && [ -n "$KEY" ]; }; then
   die "--cert and --key go together"
 fi
@@ -186,20 +192,57 @@ if [ "$WITH_PROXY" -eq 1 ]; then
       die "Something other than caddy already listens on $PORT. Use --port <n>, or stop that service."
     fi
   fi
-  if iptables-save -t nat 2>/dev/null | grep -q -- "--dport $PORT .*REDIRECT"; then
-    die "A firewall rule redirects port $PORT elsewhere, so this proxy would never receive traffic.
-       Inspect it with: sudo iptables-save -t nat | grep -- '--dport $PORT'
-       Then either remove that rule or pick a different port with --port <n>."
-  fi
   note "port $PORT is free"
+
+  # A redirect of the public port used to stop the install. Serving the destination port as well is
+  # better: arriving traffic is answered whether the rule is there or not, which is the only
+  # arrangement that survives a shared image where something outside this box keeps restoring it.
+  # Nothing has to run at boot and no privilege is held after this install, because it is config
+  # rather than state.
+  #
+  # Both sources are read. On a box where the boot-time unit has already deleted the live copy, the
+  # saved file still holds the rule, and that box is one reboot away from carrying it again.
+  if [ "$ALSO_PORT" = "off" ]; then
+    ALSO_PORTS=""
+  else
+    ALSO_PORTS="$ALSO_PORT"
+    if [ -z "$ALSO_PORTS" ] && [ "$PORT" = "443" ]; then ALSO_PORTS="8443"; fi
+    REDIRECTED="$( { iptables-save -t nat 2>/dev/null || true
+                     cat /etc/iptables/rules.v4 2>/dev/null || true; } \
+      | sed -n "s/.*--dport $PORT[^0-9].*-j REDIRECT.*--to-ports \([0-9][0-9]*\).*/\1/p" \
+      | sort -u)"
+    for FOUND in $REDIRECTED; do
+      note "port $PORT is redirected to $FOUND here"
+      case " $ALSO_PORTS " in *" $FOUND "*) ;; *) ALSO_PORTS="$ALSO_PORTS $FOUND" ;; esac
+    done
+  fi
+  # A port something else already holds is skipped rather than fatal: the public port still works,
+  # and taking the install down over a secondary address would be the worse trade.
+  KEPT=""
+  for CANDIDATE in $ALSO_PORTS; do
+    if [ "$CANDIDATE" = "$PORT" ]; then continue; fi
+    if ss -ltn "sport = :$CANDIDATE" | grep -q LISTEN \
+      && ! ss -ltnp "sport = :$CANDIDATE" 2>/dev/null | grep -q '"caddy"'; then
+      warn "WARNING: something other than caddy listens on $CANDIDATE; not serving that port."
+      warn "         If port $PORT is redirected there, arriving traffic will not be answered."
+      continue
+    fi
+    KEPT="${KEPT:+$KEPT }$CANDIDATE"
+  done
+  ALSO_PORTS="$KEPT"
+  [ -z "$ALSO_PORTS" ] || note "also serving:$(printf ' %s' $ALSO_PORTS)"
   # A rule removed by hand is still in the persisted ruleset, and comes back on the next boot. On a
   # box destined to become an AMI that means every clone starts with the port broken.
   for FILE in /etc/iptables/rules.v4 /etc/rc.local; do
     if [ -f "$FILE" ] && grep -q -- "--dport $PORT" "$FILE" 2>/dev/null; then
-      warn "WARNING: $FILE still mentions port $PORT, so a reboot may undo this."
-      warn "         Inspect with: grep -n -- '--dport $PORT' $FILE"
-      warn "         Remove it for good with: sudo python3 scripts/fix_ports.py --persist"
-      warn "         scripts/install_service.py also installs a unit that does this every boot."
+      if [ -n "$ALSO_PORTS" ]; then
+        note "$FILE redirects port $PORT, and the destination is served as well; harmless"
+      else
+        warn "WARNING: $FILE still mentions port $PORT, so a reboot may undo this."
+        warn "         Inspect with: grep -n -- '--dport $PORT' $FILE"
+        warn "         Remove it for good with: sudo python3 scripts/fix_ports.py --persist"
+        warn "         scripts/install_service.py also installs a unit that does this every boot."
+      fi
     fi
   done
 fi
@@ -255,6 +298,13 @@ if [ "$WITH_PROXY" -eq 1 ]; then
   DEFAULT_PORT=443
   if [ "$MODE" = "lan-http" ]; then DEFAULT_PORT=80; fi
   if [ "$PORT" = "$DEFAULT_PORT" ]; then SITE="$HOST"; else SITE="$HOST:$PORT"; fi
+  if [ "$MODE" = "lan-http" ]; then SITE="http://$SITE"; fi
+  # Comma-separated addresses in one site block. Caddy binds the port in each address and selects
+  # the site by the Host header's hostname with the port stripped, so a browser asking for the
+  # public port is served by the listener the redirect lands on without any URL carrying it.
+  for EXTRA in ${ALSO_PORTS:-}; do
+    if [ "$MODE" = "lan-http" ]; then SITE="$SITE, http://$HOST:$EXTRA"; else SITE="$SITE, $HOST:$EXTRA"; fi
+  done
   {
     case "$MODE" in
       cert)
@@ -273,7 +323,7 @@ if [ "$WITH_PROXY" -eq 1 ]; then
         printf '%s {\n\treverse_proxy 127.0.0.1:3000\n}\n' "$SITE"
         ;;
       lan-http)
-        printf '{\n\tauto_https off\n}\nhttp://%s {\n\treverse_proxy 127.0.0.1:3000\n}\n' "$SITE"
+        printf '{\n\tauto_https off\n}\n%s {\n\treverse_proxy 127.0.0.1:3000\n}\n' "$SITE"
         ;;
       internal)
         printf '{\n\tauto_https disable_redirects\n\tskip_install_trust\n'
@@ -314,6 +364,16 @@ if [ "$BUILD" -eq 1 ]; then
       note "Confirm from another machine before treating it as broken:  curl -I $ORIGIN/"
       die "Could not verify the proxy locally. Check: journalctl -u caddy -n 30"
     fi
+    # The redirected path, with the Host header a browser actually sends. This is the shape
+    # arriving traffic takes where the network redirects the public port, and the only check that
+    # proves the second address is matched rather than merely bound.
+    for EXTRA in ${ALSO_PORTS:-}; do
+      VIA="$(curl -sk -o /dev/null -w '%{http_code}' --max-time 5 \
+        --connect-to "$HOST:$PORT:127.0.0.1:$EXTRA" "$SCHEME://$HOST:$PORT/" || true)"
+      note "redirected path $PORT via $EXTRA -> $VIA"
+      [ "$VIA" = "200" ] \
+        || warn "WARNING: $EXTRA is bound but did not serve the site for host $HOST."
+    done
   fi
 fi
 

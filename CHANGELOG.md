@@ -6,6 +6,43 @@ Versions mark states worth returning to. Tags are annotated, so `git tag -n` and
 Open defects are tracked as [GitHub issues](https://github.com/roadtrip123/splunky-finance/issues);
 planned work is in [TODO.md](TODO.md).
 
+## v1.1.3: The portal answers whether the port redirect is there or not
+
+A fresh instance came up unreachable again, with `--dport 443 -j REDIRECT --to-ports 8443` live in
+the nat table and saved in `/etc/iptables/rules.v4`. Deleting it is a fix that has to win a race on
+every boot, against something outside the box that keeps putting it back. Serving the destination
+port instead means the rule stops deciding whether the box is reachable.
+
+- **The proxy serves the redirect's destination as well as the public port**, as two addresses in
+  one site block. Caddy binds the port in each address and selects the site by the `Host` header's
+  hostname with the port stripped, so a browser asking for 443 is answered by the listener the
+  redirect lands on. Nothing in any URL changes, and `APP_ORIGIN` keeps no port, so the backend
+  still sees the origin it was told about. Proved against the real rule in a namespace: the same
+  URL returns 200 served from 8443 with the rule present and from 443 with it absent.
+- **`install.sh` reads the destination out of the rule rather than refusing to install.** It used
+  to stop with "this proxy would never receive traffic", which left a lab image with no route in at
+  all. It now reads both the live nat table and the saved file, because a box whose boot-time unit
+  has already deleted the live copy is still one reboot from carrying it again, and defaults to
+  8443 behind a public port of 443 whether or not a rule is there to find. `--also-port <n>` names
+  a different one and `--also-port off` restores the single-address behaviour.
+- **A second port something else already holds is skipped with a warning, not fatal.** The public
+  port still works without it, and taking an install down over a secondary address is the worse
+  trade.
+- **The install's own verification now tests the redirected path**, with the `Host` header a
+  browser sends, into the port the redirect lands on. Binding a port proved nothing about whether
+  the site is matched on it, which is the gap this closes.
+- **`splunky-finance-ports.service` is now insurance rather than the mechanism**, and says so.
+  Keep it: a box serving 443 directly depends on one less rule nobody here controls. But it failing
+  to run no longer takes the portal down, which is what happened on the instance that prompted this.
+- **The docs stop telling you to remove the rule before installing**, and the snapshot checklist
+  checks that the proxy holds both ports rather than that the rule is gone. The local checks name
+  the port they mean, because `PREROUTING` is not traversed by anything the box originates: a
+  loopback curl to 443 passes on a box no browser can reach, which is what made this look
+  intermittent.
+- **Eight guards** in `backend/tests/test_ports.py`, including the destination expression pulled out
+  of `install.sh` and run for real against every spelling of the rule, rather than a copy that would
+  keep passing after the original changed.
+
 ## v1.1.2: The connection is readable at a glance on both portals
 
 Yesterday's fix made a dead link visible in the chat footer. This makes the same reading obvious

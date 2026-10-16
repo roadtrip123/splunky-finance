@@ -13,6 +13,12 @@ Deleting the live rule by hand does not survive a reboot, which is what made thi
 rather than permanent. So this removes the rule from both places: the running nat table, and the
 saved file that would otherwise restore it.
 
+This is no longer the only defence, and is the weaker of the two. scripts/install.sh reads the
+destination out of the rule and has the proxy serve that port as well as 443, so a box answers
+whether the rule is present or not, with nothing to run at boot. Where something outside the box
+restores the rule while it is running, that is the only approach that holds. Removing the rule stays
+worth doing: it means the box does not depend on a rule nobody here controls.
+
     sudo python3 scripts/fix_ports.py              # the live table; report on the saved file
     sudo python3 scripts/fix_ports.py --persist     # also strip it from /etc/iptables/rules.v4
     sudo python3 scripts/fix_ports.py --dry-run      # what it would do, changing nothing

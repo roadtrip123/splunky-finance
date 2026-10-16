@@ -46,17 +46,23 @@ timeout 6 bash -c 'cat < /dev/null > /dev/tcp/<public-ip>/443' && echo open || e
 ```
 
 `blocked` before the security group is opened is expected. `blocked` *after* means the perimeter
-does not publish the port, and a managed lab environment may publish only one — in which case check
-what already owns it, because something is answering on it:
+does not publish the port, and a managed lab environment may publish only one. Check what already
+owns it, because something is answering on it:
 
 ```bash
 sudo ss -ltnp | grep ':443 ' ; sudo iptables-save -t nat | grep -- '--dport 443'
 ```
 
-A listener, or a `REDIRECT`/`DNAT` rule, means the platform's own proxy has that port. A redirect in
-`PREROUTING` catches traffic arriving on *any* interface, so a proxy of your own on 443 would bind
-successfully and never receive a packet. Either remove the rule, if the box is yours to change, or
-pass `--port <n>` and use a high port.
+A listener means the platform's own proxy has that port, and there is nothing to do but pass
+`--port <n>` and use a high port.
+
+A `REDIRECT` rule is a different thing and is handled. It catches traffic arriving on *any*
+interface, so a proxy of your own on 443 binds successfully and never receives a packet. Rather than
+fight it, `install.sh` reads the destination out of the rule and serves that port as well as 443, so
+the box answers whether the rule is present or not. The address participants browse does not change.
+This is the arrangement to prefer on a shared lab image, where the rule is restored on every boot by
+something outside the box. A unit that deletes the rule at boot is installed as well, as insurance
+rather than as the mechanism; see [Update itself on boot](#update-itself-on-boot).
 
 ## Install
 
@@ -194,7 +200,7 @@ Then build, install the units, and terminate TLS:
 sudo python3 scripts/install_service.py --build
 
 IP=<public-ip>
-printf '{\n\tauto_https disable_redirects\n\tdefault_sni %s\n\tskip_install_trust\n}\n%s:443 {\n\ttls internal\n\treverse_proxy 127.0.0.1:3000\n}\n' "$IP" "$IP" | sudo tee /etc/caddy/Caddyfile >/dev/null
+printf '{\n\tauto_https disable_redirects\n\tdefault_sni %s\n\tskip_install_trust\n}\n%s:443, %s:8443 {\n\ttls internal\n\treverse_proxy 127.0.0.1:3000\n}\n' "$IP" "$IP" "$IP" | sudo tee /etc/caddy/Caddyfile >/dev/null
 sudo caddy validate --config /etc/caddy/Caddyfile && sudo systemctl restart caddy
 ```
 
@@ -231,11 +237,15 @@ journal.
 One of the four is not about updates. `splunky-finance-ports.service` runs
 [`scripts/fix_ports.py`](../scripts/fix_ports.py) on every boot to remove a redirect of port 443,
 which shared lab images carry in `/etc/iptables/rules.v4` so that an unprivileged web server can sit
-on 8443. Our proxy binds 443 directly, so the redirect sends every arriving connection to a port
-nothing listens on: the box is healthy by every internal measure and unreachable from a browser. The
-unit is ordered `After=netfilter-persistent.service`, because that is what replays the saved rules at
-boot and would otherwise undo an earlier fix. It only ever deletes, only matches a REDIRECT of 443,
-and exits cleanly when there is nothing to do, so it is inert on a box that does not have the fault.
+on 8443. The unit is ordered `After=netfilter-persistent.service`, because that is what replays the
+saved rules at boot and would otherwise undo an earlier fix. It only ever deletes, only matches a
+REDIRECT of 443, and exits cleanly when there is nothing to do, so it is inert on a box that does
+not have the fault.
+
+**It is insurance rather than the mechanism.** The proxy serves 8443 as well as 443, so the box
+answers whether the rule is removed or not, and this unit failing to run no longer takes the portal
+down. Leave it installed anyway: it is free, and a box that serves 443 directly is one less thing
+depending on a rule nobody here controls.
 
 `sudo python3 scripts/install_service.py --dry-run` prints the units it would write, without root.
 
@@ -318,10 +328,21 @@ sudo systemctl restart splunky-finance
 In this order. Each failure looks like the next one if taken out of order.
 
 ```bash
-sudo ss -ltn | grep ':443 '
+sudo ss -ltn | grep -E ':(443|8443) '
 curl -s  -o /dev/null -w 'stack=%{http_code}\n' http://127.0.0.1:3000/
-curl -sk -o /dev/null -w 'proxy=%{http_code}\n' --connect-to <public-ip>:443:127.0.0.1:443 https://<public-ip>/
+curl -sk -o /dev/null -w 'direct=%{http_code}\n'    --connect-to <public-ip>:443:127.0.0.1:443  https://<public-ip>/
+curl -sk -o /dev/null -w 'redirected=%{http_code}\n' --connect-to <public-ip>:443:127.0.0.1:8443 https://<public-ip>/
 ```
+
+Two listeners is correct, not a conflict. The fourth line is the one that matters on a lab image: it
+sends the `Host` header a browser sends, with no port in it, into the listener the redirect lands on.
+That is the exact shape of arriving traffic there, and it is the only check that proves the second
+address is *matched* rather than merely bound. Both should answer 200.
+
+**A local check cannot see the redirect at all.** It lives in `PREROUTING`, which only traffic
+arriving on an interface traverses; anything this box originates goes through `OUTPUT` and reaches
+443 directly. So `curl https://127.0.0.1/` passes on a box that is unreachable from a browser, which
+is what made this fault look intermittent. Name the port you mean, and finish from somewhere else.
 
 `--connect-to` rather than `--resolve`: curl ignores `--resolve` when the host is already an IP literal
 and quietly tries the real address, which hangs — an EC2 instance cannot reach its own public IP,
@@ -357,23 +378,29 @@ credentials, and that the app still answers on its public address from another m
 ### Check the saved firewall rules before you snapshot
 
 A redirect of port 443 saved in `/etc/iptables/rules.v4` is baked into the image and replayed on
-every clone, which makes each one unreachable from a browser while looking perfectly healthy inside.
-`splunky-finance-ports.service` removes it at boot, so an image carrying the rule still works — but
-confirm the unit is installed and enabled rather than relying on it silently:
+every clone. Serving 8443 as well is what makes that survivable, so what to check before snapshotting
+is that the proxy holds both ports, not that the rule is gone:
 
 ```bash
+sudo ss -ltn | grep -E ':(443|8443) '
+grep ':8443' /etc/caddy/Caddyfile
 systemctl is-enabled splunky-finance-ports
 sudo python3 scripts/fix_ports.py --dry-run
 ```
 
-To prove the healing works on this box before it becomes a hundred boxes, add the rule back and watch
-the unit remove it:
+Then prove it on this box, before it becomes a hundred boxes. Put the rule back and confirm the same
+URL is served with it present and with it absent:
 
 ```bash
+IP=<public-ip>
 sudo iptables -t nat -A PREROUTING -p tcp -m tcp --dport 443 -j REDIRECT --to-ports 8443
-sudo systemctl restart splunky-finance-ports
-sudo iptables -t nat -S PREROUTING | grep 443 || echo HEALED
+curl -sk -o /dev/null -w 'redirected=%{http_code}\n' --connect-to "$IP:443:127.0.0.1:8443" "https://$IP/"
+sudo iptables -t nat -D PREROUTING -p tcp -m tcp --dport 443 -j REDIRECT --to-ports 8443
+curl -sk -o /dev/null -w 'direct=%{http_code}\n'     --connect-to "$IP:443:127.0.0.1:443"  "https://$IP/"
 ```
+
+Two 200s and the image is immune to the rule either way. Leave whichever state you like in the
+snapshot; it no longer decides whether a clone comes up reachable.
 
 ### Then snapshot
 

@@ -55,7 +55,8 @@ host redirects container traffic.
 banking app and the presenter portal to a browser with no certificate warning to explain away, which
 is the only access participants get. Reaching it took finding a redirect of port 443 saved in the
 host image: the box was healthy by every internal measure and unreachable from outside, because
-arriving connections were sent to a port nothing listens on.
+arriving connections were sent to a port nothing listens on. The proxy now serves that destination
+port as well as 443, so an instance answers whether the rule is there or not.
 `splunky-finance-ports.service` now removes that rule on every boot.
 
 **Self-update confirmed on a deployed box.** An instance running `v1.0.4` was restarted and took

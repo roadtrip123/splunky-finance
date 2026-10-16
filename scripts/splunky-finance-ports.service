@@ -13,6 +13,11 @@
 # Runs as root, unlike the other units here, because it edits the nat table. That is not an
 # escalation: the account that owns this repository is already in the docker group and has sudo.
 #
+# Insurance, not the mechanism. The proxy is configured to serve the redirect's destination port as
+# well as 443, so the box answers either way and this unit failing to run does not take the portal
+# down. It is kept because a box serving 443 directly depends on one less rule nobody here controls.
+# The arrangement is described in docs/single-instance.md, under "Before you build".
+#
 #   journalctl -u splunky-finance-ports -b     what it found on this boot
 #   systemctl restart splunky-finance-ports    run it again now
 
