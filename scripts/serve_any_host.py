@@ -57,6 +57,18 @@ def owner():
     return name
 
 
+def backend_understands_wildcards():
+    """Whether the code in this checkout accepts a wildcard origin.
+
+    Run against an older checkout, this script would set a wildcard APP_ORIGIN that the backend
+    accepts at startup and then refuses every request against, because the Origin comparison was
+    string equality. The portal would answer 403 on every login with no obvious cause. Cheaper to
+    refuse than to debug.
+    """
+    config = ROOT / "backend" / "app" / "config.py"
+    return config.exists() and "def origin_allows" in config.read_text()
+
+
 def domain_from_env():
     """The registrable domain under which this box is reached, from the configured origin."""
     env = ROOT / ".env"
@@ -192,6 +204,12 @@ def main():
     account = owner() if not arguments.dry_run else os.environ.get("SUDO_USER", "")
     if not arguments.caddyfile.exists():
         die(f"{arguments.caddyfile} does not exist. This box has no Caddy config to edit.")
+
+    if not backend_understands_wildcards():
+        die("""this checkout predates wildcard origin support, so a wildcard APP_ORIGIN would
+       be accepted at startup and then refuse every request. Update first:
+         sudo systemctl restart splunky-finance     # or: git fetch --tags && git checkout <newest tag>
+       then run this again.""")
 
     say("Working out the domain")
     domain = arguments.domain or domain_from_env()

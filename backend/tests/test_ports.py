@@ -384,3 +384,12 @@ def test_the_installer_verifies_a_wildcard_with_a_name_it_was_never_told():
     assert 'PROBE_HOST="probe.${HOST#\\*.}"' in source
     assert '--connect-to "$PROBE_HOST:$PORT:127.0.0.1:$PORT"' in source
     assert '--connect-to "$PROBE_HOST:$PORT:127.0.0.1:$EXTRA"' in source
+
+
+def test_the_any_host_script_refuses_an_old_checkout():
+    """Setting a wildcard origin against a backend that compares strings would be accepted at
+    startup and then refuse every request, with a 403 on login and no obvious cause."""
+    source = (ROOT / "scripts" / "serve_any_host.py").read_text()
+    assert "def backend_understands_wildcards" in source
+    assert "if not backend_understands_wildcards():" in source
+    assert serve_any_host.backend_understands_wildcards()

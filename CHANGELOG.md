@@ -6,6 +6,16 @@ Versions mark states worth returning to. Tags are annotated, so `git tag -n` and
 Open defects are tracked as [GitHub issues](https://github.com/roadtrip123/splunky-finance/issues);
 planned work is in [TODO.md](TODO.md).
 
+## v1.1.6: serve_any_host refuses to run where it would break logins
+
+Setting a wildcard `APP_ORIGIN` against a backend that compares origins as strings is accepted at
+startup and then refuses every request: a 403 on every login, with nothing in the message pointing
+at the cause. That is the box most likely to run this script, since the whole point of it is fixing
+an instance built from an older image.
+
+- **The script now checks this checkout for wildcard support before touching anything**, and stops
+  with the command to update first. Cheaper to refuse than to debug.
+
 ## v1.1.5: One image, any instance name, nothing configured per box
 
 The lab platform names each instance when it boots, `i-09c3ad076563d756c.splunk.show`, and the
