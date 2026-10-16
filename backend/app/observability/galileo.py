@@ -1,5 +1,6 @@
 import asyncio
 import json
+import logging
 import os
 import time
 from contextlib import suppress
@@ -8,6 +9,10 @@ from typing import ClassVar
 from uuid import uuid4
 
 from pydantic import SecretStr
+
+from app.redaction import redact
+
+logger = logging.getLogger("splunky.telemetry")
 
 
 class Telemetry:
@@ -569,6 +574,17 @@ class Telemetry:
                     log_stream_id=stream_id,
                 )
             except Exception as exc:  # noqa: BLE001 - sanitize credential-bearing SDK errors
+                # Logged as well as mapped. The mapping reads a status code out of the text and
+                # throws the rest away, so a fault it does not recognise used to leave nothing at
+                # all to diagnose from: the generic sentence on screen and no record anywhere of
+                # what the SDK actually said. Key-shaped text is masked, the same as the provider
+                # path, because a log on a shared box outlives the request.
+                logger.warning(
+                    "%s connection failed: %s: %s",
+                    self.backend_name(),
+                    type(exc).__name__,
+                    redact(str(exc))[:800],
+                )
                 self.status.update(
                     state="failed", connection="failed", last_error=self._connection_error(exc)
                 )
@@ -671,7 +687,14 @@ class Telemetry:
         for marker in ("timed out", "Timeout", "Connection", "resolve"):
             if marker in text:
                 return f"{label} could not be reached. Check the realm or console URL and the network."
-        return f"{label} connection failed; check credentials, endpoint, and project permissions"
+        # The class name carries no secret and is usually the whole answer: a certificate error, a
+        # connection reset and a malformed response are three different problems that all used to
+        # read as "check credentials", which sent a presenter looking at the one thing that was
+        # fine. The server log has the detail; see `docker compose logs backend`.
+        return (
+            f"{label} connection failed with {type(exc).__name__}, which is not a rejected "
+            "credential. The backend log has the detail: docker compose logs backend"
+        )
 
     def splunk_ao_mode(self):
         """Which Splunk AO deployment the saved credentials describe.

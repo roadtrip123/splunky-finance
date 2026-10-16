@@ -2,7 +2,6 @@ import asyncio
 import hashlib
 import json
 import logging
-import re
 import time
 from collections import deque
 from dataclasses import dataclass, field
@@ -22,6 +21,7 @@ from app.demo.scenarios import FAULT_METHODS, inject
 from app.llm import model_factory
 from app.observability.protection import BLOCKED
 from app.observability.sdk import stream_id_of
+from app.redaction import SECRET_SHAPED, redact  # noqa: F401 - re-exported; imported from here
 from app.tools import build_tools
 
 
@@ -73,12 +73,6 @@ class ActionGuard(AgentMiddleware):
 
 logger = logging.getLogger("splunky.provider")
 
-# Anything key-shaped: OpenAI and Sharon AI prefixes, and a bearer header the SDK may quote back.
-SECRET_SHAPED = re.compile(r"(sk-[A-Za-z0-9_-]{8,}|tv-pat-[A-Za-z0-9_-]{8,}|Bearer\s+\S+)")
-
-
-def redact(text):
-    return SECRET_SHAPED.sub("<redacted>", text)
 
 
 def provider_error(exc, provider):

@@ -1127,3 +1127,50 @@ def test_the_connection_view_reports_a_credential_length(client, settings):
     assert view["galileo_api_key_length"] == len("gal-key-of-known-length-123456")
     assert view["galileo_api_key_masked"].endswith("3456")
     assert "gal-key-of-known-length" not in str(view), "the key itself must never be echoed"
+
+
+def test_an_unrecognised_connection_failure_names_its_fault_family(settings):
+    """The generic sentence said "check credentials, endpoint, and project permissions" for a
+    failure that was none of those. A certificate error, a connection reset and a malformed
+    response are three different problems, and all three sent a presenter to look at the one thing
+    that was fine. The class name carries no secret and is usually the whole answer."""
+    from app.observability.galileo import Telemetry
+
+    telemetry = Telemetry(settings)
+
+    class SSLCertVerificationError(Exception):
+        pass
+
+    message = telemetry._connection_error(SSLCertVerificationError("unable to get local issuer"))
+    assert "SSLCertVerificationError" in message
+    assert "not a rejected credential" in message
+    assert "docker compose logs backend" in message
+    # Still never the SDK's own text, which can quote part of the credential that was sent.
+    assert "unable to get local issuer" not in message
+
+
+async def test_a_connection_failure_is_logged_with_the_real_cause(settings, caplog, monkeypatch):
+    """Mapped and logged. The mapping reads a status code out of the text and discards the rest, so
+    a fault it does not recognise left nothing anywhere to diagnose from. Key-shaped text is masked
+    because a log on a shared box outlives the request."""
+    import logging as logging_module
+
+    from app.observability.galileo import Telemetry
+
+    telemetry = Telemetry(settings)
+    telemetry.enabled = True
+    settings.galileo_api_key = SecretStr("gal-key-for-this-test-0123456789")
+
+    def explode(self):
+        raise RuntimeError("TLS handshake failed for Bearer sk-abcdefgh12345678")
+
+    monkeypatch.setattr(type(telemetry), "backend", property(explode))
+    with caplog.at_level(logging_module.WARNING, logger="splunky.telemetry"):
+        status = await telemetry.check_connection(force=True)
+
+    assert status["state"] == "failed"
+    logged = "\n".join(record.getMessage() for record in caplog.records)
+    assert "RuntimeError" in logged
+    assert "TLS handshake failed" in logged, "the real cause has to reach the log"
+    assert "sk-abcdefgh12345678" not in logged, "key-shaped text must be masked"
+    assert "<redacted>" in logged

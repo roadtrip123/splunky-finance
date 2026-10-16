@@ -6,6 +6,24 @@ Versions mark states worth returning to. Tags are annotated, so `git tag -n` and
 Open defects are tracked as [GitHub issues](https://github.com/roadtrip123/splunky-finance/issues);
 planned work is in [TODO.md](TODO.md).
 
+## v1.1.11: A connection failure nobody recognised left nothing to diagnose
+
+A rehearsal hit "Galileo connection failed; check credentials, endpoint, and project permissions"
+with a key that was correct. That sentence is the fallback `_connection_error` returns when the
+error matches none of its patterns, so it was reporting the one thing that was fine, and the
+exception was caught, mapped and thrown away. Nothing anywhere recorded what the SDK had said.
+
+- **The exception is now logged**, with its class name and its text, key-shaped content masked by
+  the same `redact` the provider path uses, truncated to 800 characters. `docker compose logs
+  backend` has it. The masking helper moved to `app/redaction.py`, since both paths log what they
+  decline to put on screen.
+- **The fallback sentence names the fault family** and says plainly that it is not a rejected
+  credential. A certificate error, a connection reset and a malformed response are three different
+  problems that all used to read as "check credentials". The class name carries no secret, which
+  is the reasoning `provider_error` already relies on, and it points at the log for the rest.
+- Two guards, both proved failing against the previous code, one of them asserting that a bearer
+  token in the SDK's own text does not reach the log.
+
 ## v1.1.10: The clean script clears the log stream as well
 
 v1.1.8 reset `GALILEO_LOG_STREAM` to `my-bank-agent` rather than clearing it, on the reasoning that
