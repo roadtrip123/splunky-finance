@@ -195,3 +195,21 @@ def test_a_rejected_origin_outranks_bad_credentials(settings):
         )
     assert accepted.status_code == 401
     assert refused.status_code == 403
+
+
+def test_a_blank_setting_in_env_is_not_the_code_default(tmp_path):
+    """reset_for_snapshot.sh blanks GALILEO_LOG_STREAM rather than deleting the line, and the
+    difference is not cosmetic: present and empty overrides the default, while absent restores
+    my-bank-agent and puts a value back into a field the lab asks the participant to type. Anyone
+    tidying that script into a line delete would undo it silently."""
+    common = (
+        "DEMO_PASSWORD=AlexDemo1234!\n"
+        "DEMO_ADMIN_PASSWORD=PresenterDemo1234!\n"
+        f"SESSION_SECRET={'a' * 34}\n"
+    )
+    blank = tmp_path / "blank.env"
+    blank.write_text("GALILEO_LOG_STREAM=\n" + common)
+    absent = tmp_path / "absent.env"
+    absent.write_text(common)
+    assert Settings(_env_file=str(blank)).galileo_log_stream == ""
+    assert Settings(_env_file=str(absent)).galileo_log_stream == "my-bank-agent"

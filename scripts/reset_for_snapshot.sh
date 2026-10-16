@@ -22,12 +22,13 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 # is not theirs.
 SECRETS="OPENAI_API_KEY ANTHROPIC_API_KEY GALILEO_API_KEY SPLUNK_AO_API_KEY
          SPLUNK_AO_O11Y_TOKEN SPLUNK_AO_O11Y_API_TOKEN"
-NAMES="GALILEO_PROJECT AGENT_CONTROL_AGENT_NAME"
+NAMES="GALILEO_PROJECT GALILEO_LOG_STREAM AGENT_CONTROL_AGENT_NAME"
 # Not credentials, but they describe one tenant. Kept unless --blank-urls.
 URLS="GALILEO_CONSOLE_URL GALILEO_API_URL AGENT_CONTROL_URL
       SPLUNK_AO_CONSOLE_URL SPLUNK_AO_API_URL SPLUNK_AO_REALM SPLUNK_AO_AGENT_CONTROL_URL"
-# Restored to the value the lab tells participants to use, rather than blanked.
-STREAM_DEFAULT="my-bank-agent"
+# Blanked rather than deleted, and the difference is not cosmetic. GALILEO_LOG_STREAM present and
+# empty in .env overrides the application default; the line deleted altogether restores
+# "my-bank-agent", which would put a value back into a field the lab asks the participant to type.
 
 say() { printf '\n\033[1m==> %s\033[0m\n' "$*"; }
 note() { printf '    %s\n' "$*"; }
@@ -120,13 +121,6 @@ else
     VALUE="$(grep -m1 "^$FIELD=" "$ROOT/.env" | cut -d= -f2- || true)"
     [ -z "$VALUE" ] || note "kept       $FIELD=$VALUE"
   done
-fi
-# Reset rather than blanked: the lab tells participants to name the stream this, and the field
-# arriving correct saves a step. Blank would also work, since it is the application's own default.
-if ! grep -q "^GALILEO_LOG_STREAM=$STREAM_DEFAULT\$" "$ROOT/.env" 2>/dev/null; then
-  sudo -u "$OWNER" sed -i "s|^GALILEO_LOG_STREAM=.*|GALILEO_LOG_STREAM=$STREAM_DEFAULT|" \
-    "$ROOT/.env" || die "could not edit .env"
-  note "reset      GALILEO_LOG_STREAM=$STREAM_DEFAULT"
 fi
 # The stack is already running by this point, so it is holding the values just cleared.
 say "Restarting so the cleared values are what the application is running"

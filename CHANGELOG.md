@@ -6,6 +6,18 @@ Versions mark states worth returning to. Tags are annotated, so `git tag -n` and
 Open defects are tracked as [GitHub issues](https://github.com/roadtrip123/splunky-finance/issues);
 planned work is in [TODO.md](TODO.md).
 
+## v1.1.10: The clean script clears the log stream as well
+
+v1.1.8 reset `GALILEO_LOG_STREAM` to `my-bank-agent` rather than clearing it, on the reasoning that
+the field arriving correct saves a participant a step. That was the wrong call for the job the
+script actually does: a box reset to walk the lab from the beginning has to arrive at the form the
+lab describes, and step 10 is where the participant types that name.
+
+- **It is blanked with the project and the credentials now.** Blanked rather than deleted, and the
+  difference is not cosmetic: present and empty in `.env` overrides the application default, while
+  deleting the line restores `my-bank-agent` and puts a value back in the field. A guard pins that
+  distinction, since anyone tidying the script into a line delete would undo it silently.
+
 ## v1.1.9: A pasted credential is stripped, and its length is visible
 
 "The settings are exactly the same as this box" and one of them answers 401. The portal could not
@@ -58,9 +70,10 @@ which is nobody's project in a room where the lab has each participant create th
 - **`GALILEO_PROJECT` is cleared too.** Not a credential, but a pre-filled project name is a trap:
   Save and Connect answers "project not found", or it succeeds and a participant's traces land in
   somebody else's project.
-- `GALILEO_LOG_STREAM` is reset to `my-bank-agent`, the application default and what lab step 10
-  says to type, so that field arrives correct rather than cleared. Tenant URLs are kept and
-  reported, with `--blank-urls` for anyone who disagrees.
+- `GALILEO_LOG_STREAM` is blanked with them, so a box reset to test the lab arrives at the form
+  the lab describes, step 10 being where the participant types the name. Blanked rather than
+  deleted: present and empty overrides the application default, while deleting the line restores
+  `my-bank-agent`. Tenant URLs are kept and reported, with `--blank-urls` for anyone who disagrees.
 - The stack is restarted afterwards, so what is running matches what `.env` now says.
 - **Eleven guards**, all proved failing against the previous code.
 

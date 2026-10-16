@@ -443,11 +443,13 @@ the address and the demo passwords, so destroying the volume does not touch it. 
 observability key is blanked, and so is `GALILEO_PROJECT`: not a credential, but the lab has each
 participant create their own project, and a field arriving pre-filled with somebody else's name
 either fails with "project not found" or, worse, succeeds and sends their traces into a project that
-is not theirs. `GALILEO_LOG_STREAM` is reset to `my-bank-agent`, which is the application default
-and what the lab tells participants to type. Tenant URLs are kept and reported, since they are not
-credentials and save the instructor reading them out; `--blank-urls` clears those too. The script
-then re-reads `.env` and **fails** rather than warning if anything is still set, because a warning
-only works if somebody reads it.
+is not theirs. `GALILEO_LOG_STREAM` is blanked with them, so the form arrives as the lab
+describes it, with step 10 telling the participant to type the name. Blanked rather than deleted:
+present and empty overrides the application default, while deleting the line restores
+`my-bank-agent` and puts a value back in the field. Tenant URLs are kept and reported, since they
+are not credentials and save the instructor reading them out; `--blank-urls` clears those too. The
+script then re-reads `.env` and **fails** rather than warning if anything is still set, because a
+warning only works if somebody reads it.
 
 Then confirm by eye: open the portal, check the Setup tab lists no endpoint and no observability
 credentials, and that the app still answers on its public address from another machine.

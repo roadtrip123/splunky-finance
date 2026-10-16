@@ -426,12 +426,14 @@ def test_the_snapshot_reset_clears_the_project_name_too():
     assert "for FIELD in $NAMES; do blank" in source
 
 
-def test_the_snapshot_reset_leaves_the_stream_at_the_name_the_lab_uses():
-    """my-bank-agent is the application default and what lab step 10 tells participants to type,
-    so resetting it saves a step rather than setting a trap."""
+def test_the_snapshot_reset_clears_the_stream_too():
+    """A box being reset to test the lab from the beginning has to arrive at the form the lab
+    describes, and step 10 tells the participant to type the stream name. Blanked rather than
+    deleted: present and empty overrides the application default, while deleting the line restores
+    my-bank-agent and puts a value back in the field."""
     source = snapshot_script()
-    assert 'STREAM_DEFAULT="my-bank-agent"' in source
-    assert "GALILEO_LOG_STREAM=$STREAM_DEFAULT" in source
+    assert "GALILEO_LOG_STREAM" in source.split("NAMES=")[1].split("\n")[0]
+    assert "STREAM_DEFAULT" not in source
 
 
 def test_the_snapshot_reset_refuses_to_pass_with_values_still_set():
