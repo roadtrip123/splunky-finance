@@ -436,8 +436,18 @@ sudo ./scripts/reset_for_snapshot.sh --confirm
 
 Run it without `--confirm` first and it prints exactly what it will delete. It stops the stack,
 destroys the runtime volume, starts clean, then **proves** `galileo-settings.json` is gone rather
-than assuming it, and lists what the image will still carry. It also warns if a provider key is set
-in `.env`, which is not in the volume and would survive.
+than assuming it, and lists what the image will still carry.
+
+It also clears the same values from `.env`, which is not in the volume and is deliberately kept for
+the address and the demo passwords, so destroying the volume does not touch it. Every provider and
+observability key is blanked, and so is `GALILEO_PROJECT`: not a credential, but the lab has each
+participant create their own project, and a field arriving pre-filled with somebody else's name
+either fails with "project not found" or, worse, succeeds and sends their traces into a project that
+is not theirs. `GALILEO_LOG_STREAM` is reset to `my-bank-agent`, which is the application default
+and what the lab tells participants to type. Tenant URLs are kept and reported, since they are not
+credentials and save the instructor reading them out; `--blank-urls` clears those too. The script
+then re-reads `.env` and **fails** rather than warning if anything is still set, because a warning
+only works if somebody reads it.
 
 Then confirm by eye: open the portal, check the Setup tab lists no endpoint and no observability
 credentials, and that the app still answers on its public address from another machine.

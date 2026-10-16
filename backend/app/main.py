@@ -603,7 +603,11 @@ def create_app(settings=None, model_builder=None, protection_adapter=None):
                 raise HTTPException(422, f"{name} must be an http(s) URL")
         values = payload.model_dump()
         telemetry.set_connection(values, clear=values.pop("clear", []))
-        status = await telemetry.check_connection(force=True) if telemetry.enabled else telemetry.status
+        # Always, even when observability is switched off. check_connection answers "disabled" for
+        # that case, which is something the portal can report and act on; returning the status
+        # untouched left it reading "unconfigured" with no reason, which is what made a failed
+        # Save and connect indistinguishable from a successful one.
+        status = await telemetry.check_connection(force=True)
         # The API key is never echoed back; the connection payload reports only whether one is set.
         return envelope(request, {"galileo": dict(status), "connection": telemetry.connection()})
 
@@ -632,8 +636,14 @@ def create_app(settings=None, model_builder=None, protection_adapter=None):
 
     @app.post("/api/demo-admin/galileo/check")
     async def check_galileo(request: Request):
+        """Re-check on demand, and report what happened.
+
+        Forced, unlike the background check: somebody pressing Test connection has usually just
+        changed something at the other end, a project created or a permission granted, and the
+        30-second cache would answer with the stale failure they are trying to clear.
+        """
         session(request, "admin", True)
-        return envelope(request, {"galileo": await telemetry.check_connection()})
+        return envelope(request, {"galileo": await telemetry.check_connection(force=True)})
 
     @app.get("/api/demo-admin/update")
     async def update_status(request: Request):

@@ -44,22 +44,23 @@ type Update = {
   };
   repo: string;
 };
+type Connection = {
+  state: string;
+  enabled: boolean;
+  revision: number;
+  connection: string;
+  last_checked_at: number | null;
+  last_connected_at: number | null;
+  export: string;
+  last_error: string | null;
+};
 type Status = {
   provider: string;
   model: string;
   provider_status: { state: string; last_error?: string | null };
   banking_connection: { state: string; session: string | null };
   preferences: { demo_chip: boolean };
-  galileo: {
-    state: string;
-    enabled: boolean;
-    revision: number;
-    connection: string;
-    last_checked_at: number | null;
-    last_connected_at: number | null;
-    export: string;
-    last_error: string | null;
-  };
+  galileo: Connection;
   project: string;
   log_stream: string;
   console_url: string | null;
@@ -329,6 +330,19 @@ export default function Admin() {
     const interval = setInterval(() => loadUpdate(), 5000);
     return () => clearInterval(interval);
   }, [update?.pending?.requested_at]);
+  // Both connection buttons report the outcome the backend returned rather than the fact that a
+  // request succeeded. The reason is already a sentence a presenter can act on, written by
+  // _connection_error, and it never carries SDK text: the portal is a low-trust surface, since
+  // the presenter password is published in the repository.
+  function report(result: Connection, success: string) {
+    if (result.state === "connected") setNotice(success);
+    else if (result.state === "disabled") setNotice("Observability is switched off.");
+    else
+      setError(
+        result.last_error ||
+          `Not connected (${result.state}). Check the project, the ${activeBackend.stream_label} and the key.`,
+      );
+  }
   async function action(fn: () => Promise<unknown>) {
     setBusy(true);
     setError("");
@@ -494,7 +508,7 @@ export default function Admin() {
                       {status.provider_status.state}
                     </span>
                     {status.provider_status.last_error && (
-                      <small>{status.provider_status.last_error}</small>
+                      <small className="problem">{status.provider_status.last_error}</small>
                     )}
                     <small>
                       {status.provider_status.state === "failed"
@@ -573,7 +587,7 @@ export default function Admin() {
                       Export: {status.galileo.export}
                     </span>
                     {status.galileo.last_error && (
-                      <small>{status.galileo.last_error}</small>
+                      <small className="problem">{status.galileo.last_error}</small>
                     )}
                     {status.console_url && (
                       <a
@@ -1056,7 +1070,13 @@ export default function Admin() {
                         disabled={busy}
                         onClick={() =>
                           action(async () => {
-                            await mutate("demo-admin/galileo/connection", conn, true, "PUT");
+                            // The PUT runs a forced connection check and returns its outcome.
+                            // Saying "saved" regardless is what left a presenter reading a
+                            // success notice with no idea the connection had been refused: the
+                            // reason was already computed, and sat in small text in a card
+                            // further up the page.
+                            const saved = await mutate<{ galileo: Connection }>(
+                              "demo-admin/galileo/connection", conn, true, "PUT");
                             setConn({
                               ...conn,
                               galileo_api_key: "",
@@ -1064,11 +1084,28 @@ export default function Admin() {
                               splunk_ao_o11y_token: "",
                               splunk_ao_o11y_api_token: "",
                             });
-                            setNotice(`${activeBackend.name} connection saved.`);
+                            report(saved.galileo, `${activeBackend.name} connected.`);
                           })
                         }
                       >
                         Save and connect
+                      </button>
+                      {/* The check endpoint existed with nothing wired to it. Re-checking without
+                          re-entering a key is what you want when the fault is at the other end:
+                          a project created a moment ago, or a token just given a permission. */}
+                      <button
+                        className="button outline small"
+                        disabled={busy || !activeBackend.configured}
+                        title="Ask the backend to connect again and report what happened"
+                        onClick={() =>
+                          action(async () => {
+                            const checked = await mutate<{ galileo: Connection }>(
+                              "demo-admin/galileo/check", {}, true);
+                            report(checked.galileo, `${activeBackend.name} connected.`);
+                          })
+                        }
+                      >
+                        Test connection
                       </button>
                       {/* Hidden unless DEMO_SETUP_BUTTON is set: it writes judges, metrics and
                           control bindings into whatever tenant is connected, and in a workshop it

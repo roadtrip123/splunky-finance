@@ -1,3 +1,4 @@
+from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
@@ -1022,3 +1023,44 @@ async def test_clearing_the_gateway_is_not_undone_by_the_next_check(settings):
     assert settings.agent_control_url == ""
     telemetry.apply_agent_control_defaults()
     assert settings.agent_control_url == "", "a cleared gateway must stay cleared"
+
+
+def test_saving_a_connection_always_reports_a_state(client):
+    """The PUT already ran a forced check. What was missing was anyone reading the answer.
+
+    A presenter who saves a connection that cannot work saw "connection saved" and had to find
+    the reason in small text in a card elsewhere on the page. Worse, with observability switched
+    off nothing was checked at all and the response carried a stale "unconfigured" with no reason,
+    so a failure was indistinguishable from a success. Every save now answers with a state the
+    portal can report: here, that the switch is off.
+    """
+    headers = login(client, True)
+    response = client.put(
+        "/api/demo-admin/galileo/connection",
+        headers=headers,
+        json={
+            "galileo_api_key": "gal-key-that-cannot-work-0123456789",
+            "galileo_project": "no-such-project",
+            "galileo_log_stream": "no-such-stream",
+        },
+    )
+    assert response.status_code == 200, response.text
+    galileo = response.json()["galileo"]
+    assert galileo["state"] == "disabled", "observability is off in this fixture; say so"
+    assert galileo["state"] != "connected"
+
+
+def test_test_connection_is_guarded_and_forces_a_fresh_check(client):
+    """Somebody pressing it has usually just changed something at the other end, a project
+    created or a permission granted, so the thirty-second cache would answer with the stale
+    failure they are trying to clear."""
+    route = "/api/demo-admin/galileo/check"
+    assert client.post(route).status_code == 401
+    assert client.post(route, headers=login(client)).status_code == 401
+    headers = login(client, True)
+    assert client.post(route).status_code == 403, "CSRF token required"
+    first = client.post(route, headers=headers)
+    assert first.status_code == 200, first.text
+    assert first.json()["galileo"]["state"]
+    source = (Path(__file__).resolve().parents[1] / "app" / "main.py").read_text()
+    assert "await telemetry.check_connection(force=True)}" in source

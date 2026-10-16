@@ -6,6 +6,45 @@ Versions mark states worth returning to. Tags are annotated, so `git tag -n` and
 Open defects are tracked as [GitHub issues](https://github.com/roadtrip123/splunky-finance/issues);
 planned work is in [TODO.md](TODO.md).
 
+## v1.1.8: The portal says why the connection failed, and the clean script clears the project
+
+Two findings from the first real workshop rehearsal. A Galileo connection was failing with no
+visible reason, and a snapshot-ready box was pre-filling the project field with `splunky-finance`,
+which is nobody's project in a room where the lab has each participant create their own.
+
+**The portal reports what the connection attempt did.**
+
+- **Save and connect reports the outcome, not the request.** The PUT already ran a forced check and
+  returned a state and a sentence written by `_connection_error`; the portal ignored it and
+  announced "connection saved" either way, leaving the reason in muted fine print on a card
+  elsewhere on the page. One `report()` decides now, and both buttons use it.
+- **A new Test connection button.** The `/galileo/check` endpoint existed with nothing wired to it.
+  Re-checking without re-entering a key is what you want when the fault is at the other end: a
+  project created a moment ago, or a token just granted a permission. It forces the check, because
+  the thirty-second cache would otherwise answer with the stale failure being cleared.
+- **Saving now always returns a state.** With observability switched off, no check ran and the
+  response carried a stale `unconfigured` with no reason, so a failure was indistinguishable from a
+  success. It answers `disabled`, and the portal says the switch is off.
+- **A failure reason on a status card reads as a failure**, in red rather than as muted fine print
+  under a badge that already said "failed".
+- Error text is still the curated sentence and never SDK output. The presenter password is
+  published in this repository, so that portal stays a low-trust surface.
+
+**The snapshot reset clears `.env`, rather than warning about it.**
+
+- Destroying the runtime volume never touched `.env`, which is kept on purpose for the address and
+  the demo passwords. Every provider and observability key there is now blanked, and the script
+  re-reads the file afterwards and **fails** rather than warning, because a warning only works if
+  somebody reads it.
+- **`GALILEO_PROJECT` is cleared too.** Not a credential, but a pre-filled project name is a trap:
+  Save and Connect answers "project not found", or it succeeds and a participant's traces land in
+  somebody else's project.
+- `GALILEO_LOG_STREAM` is reset to `my-bank-agent`, the application default and what lab step 10
+  says to type, so that field arrives correct rather than cleared. Tenant URLs are kept and
+  reported, with `--blank-urls` for anyone who disagrees.
+- The stack is restarted afterwards, so what is running matches what `.env` now says.
+- **Eleven guards**, all proved failing against the previous code.
+
 ## v1.1.7: The origin check's own check was proving nothing
 
 On the first real run, `serve_any_host.py` reported `origin check -> 422 (unexpected)`. The

@@ -115,6 +115,11 @@ at. The three URLs come from your instructor and differ per tenant, so copy them
 
 4. Once saved, scroll to the top and verify you can see it is **Connected**
 
+   If it did not connect, the reason now appears at the top of the page as soon as you click
+   **Save and Connect**, and names what to fix: a rejected key, a project or stream that does not
+   exist yet, or a URL that cannot be reached. Fix it in Galileo, then click **Test connection**
+   next to Save and Connect to re-check without re-entering your key.
+
    <img width="1033" height="585" alt="image" src="https://github.com/user-attachments/assets/d53322a1-8785-4f22-b566-0d26d6fe9640" />
 
 ## Step 3: Connect My Bank Agent to your LLM

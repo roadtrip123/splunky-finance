@@ -393,3 +393,68 @@ def test_the_any_host_script_refuses_an_old_checkout():
     assert "def backend_understands_wildcards" in source
     assert "if not backend_understands_wildcards():" in source
     assert serve_any_host.backend_understands_wildcards()
+
+
+def snapshot_script():
+    return (ROOT / "scripts" / "reset_for_snapshot.sh").read_text()
+
+
+def test_the_snapshot_reset_clears_credentials_from_env_rather_than_warning():
+    """Destroying the volume does not touch .env, which is deliberately kept for the address and
+    the demo passwords. A key left there is baked into every clone, and warning about it only
+    works if somebody reads the warning."""
+    source = snapshot_script()
+    for field in (
+        "OPENAI_API_KEY",
+        "ANTHROPIC_API_KEY",
+        "GALILEO_API_KEY",
+        "SPLUNK_AO_API_KEY",
+        "SPLUNK_AO_O11Y_TOKEN",
+        "SPLUNK_AO_O11Y_API_TOKEN",
+    ):
+        assert field in source, field
+    assert 'sed -i "s|^$1=.*|$1=|"' in source
+    assert "for FIELD in $SECRETS; do blank" in source
+
+
+def test_the_snapshot_reset_clears_the_project_name_too():
+    """Not a credential, but the lab has each participant create their own project. A field
+    arriving pre-filled with somebody else's name either fails with "project not found" or, worse,
+    succeeds and sends their traces somewhere that is not theirs."""
+    source = snapshot_script()
+    assert "GALILEO_PROJECT" in source
+    assert "for FIELD in $NAMES; do blank" in source
+
+
+def test_the_snapshot_reset_leaves_the_stream_at_the_name_the_lab_uses():
+    """my-bank-agent is the application default and what lab step 10 tells participants to type,
+    so resetting it saves a step rather than setting a trap."""
+    source = snapshot_script()
+    assert 'STREAM_DEFAULT="my-bank-agent"' in source
+    assert "GALILEO_LOG_STREAM=$STREAM_DEFAULT" in source
+
+
+def test_the_snapshot_reset_refuses_to_pass_with_values_still_set():
+    """The old version warned and carried on, which is how a box reaches an image with a key in
+    it. These were just cleared, so anything left means an edit failed silently."""
+    source = snapshot_script()
+    assert "participant-specific values remain in .env; do not snapshot this box." in source
+    assert "LEFTOVER" in source
+
+
+def test_the_snapshot_reset_restarts_so_the_running_stack_matches_env():
+    """The stack is already up by that point, holding the values just cleared."""
+    source = snapshot_script()
+    cleared = source.index("Clearing participant-specific values from .env")
+    carries = source.index("What this image will carry")
+    assert "Restarting so the cleared values are what the application is running" in source
+    assert cleared < source.index("Restarting so the cleared values") < carries
+
+
+def test_tenant_urls_are_kept_unless_asked_for():
+    """They are not credentials, and an image that carries them saves the instructor reading them
+    out. --blank-urls is there for anyone who disagrees."""
+    source = snapshot_script()
+    assert "--blank-urls) BLANK_URLS=1" in source
+    assert 'if [ "$BLANK_URLS" -eq 1 ]; then' in source
+    assert "kept       $FIELD=$VALUE" in source

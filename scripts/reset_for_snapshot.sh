@@ -10,7 +10,24 @@
 set -euo pipefail
 
 CONFIRM=0
+BLANK_URLS=0
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+
+# Participant-specific values in .env. The volume is destroyed below, but .env is deliberately kept
+# for the address and the demo passwords, so anything here has to be cleared by name.
+#
+# GALILEO_PROJECT is not a credential and is cleared anyway. The lab has each participant create
+# their own project, and a field arriving pre-filled with somebody else's name is a trap: Save and
+# Connect answers "project not found", or worse it succeeds and their traces land in a project that
+# is not theirs.
+SECRETS="OPENAI_API_KEY ANTHROPIC_API_KEY GALILEO_API_KEY SPLUNK_AO_API_KEY
+         SPLUNK_AO_O11Y_TOKEN SPLUNK_AO_O11Y_API_TOKEN"
+NAMES="GALILEO_PROJECT AGENT_CONTROL_AGENT_NAME"
+# Not credentials, but they describe one tenant. Kept unless --blank-urls.
+URLS="GALILEO_CONSOLE_URL GALILEO_API_URL AGENT_CONTROL_URL
+      SPLUNK_AO_CONSOLE_URL SPLUNK_AO_API_URL SPLUNK_AO_REALM SPLUNK_AO_AGENT_CONTROL_URL"
+# Restored to the value the lab tells participants to use, rather than blanked.
+STREAM_DEFAULT="my-bank-agent"
 
 say() { printf '\n\033[1m==> %s\033[0m\n' "$*"; }
 note() { printf '    %s\n' "$*"; }
@@ -20,6 +37,7 @@ die() { printf '\n\033[1;31mFAILED: %s\033[0m\n' "$*" >&2; exit 1; }
 while [ $# -gt 0 ]; do
   case "$1" in
     --confirm) CONFIRM=1; shift ;;
+    --blank-urls) BLANK_URLS=1; shift ;;
     -h|--help) sed -n '2,12p' "${BASH_SOURCE[0]}"; exit 0 ;;
     *) die "Unknown option: $1" ;;
   esac
@@ -33,9 +51,12 @@ This will permanently delete, from this box:
   - every saved observability credential and model endpoint, including API keys
   - the synthetic dataset, and any transfers made during testing
   - all conversations and login sessions
+  - the same credentials from .env, plus GALILEO_PROJECT, which is not a secret but
+    would pre-fill every participant's form with somebody else's project name
 
 It keeps the shared demo passwords, the public address, the TLS certificate and the
-self-update units, because a clone needs those.
+self-update units, because a clone needs those. Tenant URLs are kept and reported;
+pass --blank-urls to clear those too.
 
 Re-run with --confirm to proceed.
 EOF
@@ -78,7 +99,46 @@ if printf '%s' "$LEFT" | grep -q 'galileo-settings.json'; then
 fi
 note "galileo-settings.json is gone: no saved credentials, endpoints or backend selection"
 
-# .env is not in the volume and is deliberately kept, but it should hold nothing participant-specific.
+# .env is not in the volume, so destroying the volume does not touch it. Clearing it by name is the
+# only way these values do not reach a clone.
+say "Clearing participant-specific values from .env"
+# As the owner, not as root: `sed -i` replaces the file rather than editing in place, so running it
+# as root would leave a 0600 root-owned .env that the account running compose cannot read, and the
+# stack would come up with no configuration at all.
+blank() {
+  if grep -q "^$1=." "$ROOT/.env" 2>/dev/null; then
+    sudo -u "$OWNER" sed -i "s|^$1=.*|$1=|" "$ROOT/.env" || die "could not edit .env"
+    note "cleared    $1"
+  fi
+}
+for FIELD in $SECRETS; do blank "$FIELD"; done
+for FIELD in $NAMES; do blank "$FIELD"; done
+if [ "$BLANK_URLS" -eq 1 ]; then
+  for FIELD in $URLS; do blank "$FIELD"; done
+else
+  for FIELD in $URLS; do
+    VALUE="$(grep -m1 "^$FIELD=" "$ROOT/.env" | cut -d= -f2- || true)"
+    [ -z "$VALUE" ] || note "kept       $FIELD=$VALUE"
+  done
+fi
+# Reset rather than blanked: the lab tells participants to name the stream this, and the field
+# arriving correct saves a step. Blank would also work, since it is the application's own default.
+if ! grep -q "^GALILEO_LOG_STREAM=$STREAM_DEFAULT\$" "$ROOT/.env" 2>/dev/null; then
+  sudo -u "$OWNER" sed -i "s|^GALILEO_LOG_STREAM=.*|GALILEO_LOG_STREAM=$STREAM_DEFAULT|" \
+    "$ROOT/.env" || die "could not edit .env"
+  note "reset      GALILEO_LOG_STREAM=$STREAM_DEFAULT"
+fi
+# The stack is already running by this point, so it is holding the values just cleared.
+say "Restarting so the cleared values are what the application is running"
+if systemctl list-unit-files splunky-finance.service >/dev/null 2>&1 \
+  && systemctl cat splunky-finance.service >/dev/null 2>&1; then
+  systemctl restart splunky-finance || die "could not restart; see journalctl -u splunky-finance"
+else
+  sudo -u "$OWNER" docker compose --project-directory "$ROOT" up -d --wait --wait-timeout 240 \
+    || die "could not restart the stack; see docker compose logs"
+fi
+note "running on the cleared configuration"
+
 say "What this image will carry"
 note "APP_ORIGIN       $(grep -m1 '^APP_ORIGIN=' "$ROOT/.env" | cut -d= -f2-)"
 note "DEMO_MODE        $(grep -m1 '^DEMO_MODE=' "$ROOT/.env" | cut -d= -f2- || echo presenter)"
@@ -87,13 +147,19 @@ note "release          $(sudo -u "$OWNER" git -C "$ROOT" describe --tags 2>/dev/
 if [ -f /etc/caddy/tls.crt ]; then
   note "certificate      $(openssl x509 -in /etc/caddy/tls.crt -noout -enddate | cut -d= -f2-) (expires)"
 fi
-for FIELD in OPENAI_API_KEY ANTHROPIC_API_KEY GALILEO_API_KEY SPLUNK_AO_API_KEY; do
+# Checked rather than assumed: these were just cleared, so anything still here means an edit
+# failed silently and the image would carry a credential.
+LEFTOVER=0
+for FIELD in $SECRETS $NAMES; do
   VALUE="$(grep -m1 "^$FIELD=" "$ROOT/.env" | cut -d= -f2- || true)"
   if [ -n "$VALUE" ]; then
-    warn "WARNING: $FIELD is set in .env and WILL be baked into the image."
-    warn "         Blank it before snapshotting if it is yours rather than the demo's."
+    warn "WARNING: $FIELD is still set in .env and WOULD be baked into the image."
+    warn "         Inspect with: grep -n '^$FIELD=' .env"
+    LEFTOVER=1
   fi
 done
+[ "$LEFTOVER" -eq 0 ] || die "participant-specific values remain in .env; do not snapshot this box."
+note "no credentials or project name remain in .env"
 
 cat <<EOF
 

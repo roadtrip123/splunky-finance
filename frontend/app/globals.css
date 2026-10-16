@@ -634,6 +634,11 @@ input[type="checkbox"] {
   border-radius: 6px;
   font-size: 13px;
 }
+/* The reason a status card is not connected. It was ordinary muted fine print, which read as a
+   footnote on a card whose badge already said "failed", so nobody looked at it. */
+.admin-card small.problem {
+  color: var(--red);
+}
 .notice {
   padding: 14px;
   background: #28271e;

@@ -259,3 +259,37 @@ def test_the_banking_disclosure_shows_its_state_without_relying_on_colour():
         assert f".demo-pairing-{tone} summary" in css, f"{tone} has no colour"
     # Equal specificity to the muted default, so source order is what makes these win.
     assert css.index(".demo-pairing summary {") < css.index(".demo-pairing-connected summary")
+
+
+def test_the_portal_reports_what_the_connection_attempt_did():
+    """Save and connect used to announce "connection saved" whether or not it connected, and the
+    reason sat in muted fine print in a card elsewhere on the page. The backend had already
+    computed a sentence a presenter can act on; nobody read it."""
+    root = Path(__file__).resolve().parents[2]
+    admin = (root / "frontend" / "components" / "Admin.tsx").read_text()
+    # One place decides, so both buttons read the same.
+    assert "function report(result: Connection, success: string)" in admin
+    assert "if (result.state === \"connected\") setNotice(success);" in admin
+    assert "setError(" in admin[admin.index("function report("):admin.index("async function action(")]
+    # And the fixed success notice is gone.
+    assert "connection saved.`" not in admin
+
+
+def test_the_portal_can_re_check_without_re_entering_a_key():
+    """The check endpoint existed with nothing wired to it. Re-checking is what you want when the
+    fault is at the other end: a project created a moment ago, or a permission just granted."""
+    root = Path(__file__).resolve().parents[2]
+    admin = (root / "frontend" / "components" / "Admin.tsx").read_text()
+    assert "Test connection" in admin
+    assert '"demo-admin/galileo/check"' in admin
+
+
+def test_a_failure_reason_on_a_status_card_reads_as_a_failure():
+    """It was ordinary muted fine print on a card whose badge already said "failed", so nobody
+    looked at it."""
+    root = Path(__file__).resolve().parents[2]
+    admin = (root / "frontend" / "components" / "Admin.tsx").read_text()
+    css = (root / "frontend" / "app" / "globals.css").read_text()
+    assert admin.count('<small className="problem">') == 2, "both status cards"
+    block = css[css.index(".admin-card small.problem"):]
+    assert "var(--red)" in block[: block.index("}")]
