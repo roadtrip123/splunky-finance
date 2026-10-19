@@ -6,6 +6,34 @@ Versions mark states worth returning to. Tags are annotated, so `git tag -n` and
 Open defects are tracked as [GitHub issues](https://github.com/roadtrip123/splunky-finance/issues);
 planned work is in [TODO.md](TODO.md).
 
+## v1.1.15: The pull prompts name their destination, and the judge names its model
+
+Two unrelated corrections that both came out of running the lab.
+
+**Both cross-customer pull prompts name the destination account.** `to my account` left the agent
+to choose between two accounts and left a presenter unable to say which one it should have used.
+Both now name the Everyday account and its last four digits, which `generator.py` hardcodes, so the
+wording holds under any seed. The guardrail decision is unchanged: the deny pattern matches on Tom,
+Dan, 1234 and 4127, and 1042 is the customer's own account and deliberately absent from that list.
+Verified both prompts still match and both own-account control prompts still pass clean.
+
+**The completeness judge works on `gpt-4.1-mini` and was never measured on anything else.** On
+GPT-5.1 it caught one incomplete answer in three with the fault confirmed present. Every figure on
+record for it, the 8 of 10 included, was measured on `gpt-4.1-mini`, so there was no regression
+against a measured baseline; the comparison that read as judge flakiness was against numbers that
+never applied to the model in use.
+
+- **The lab names the judge model** before the first evaluator is built, and the troubleshooting row
+  no longer promises 90%+ accuracy without naming the model that figure was measured on.
+- **The published prompt requires enumerate-then-quote**: number the parts the question asks for,
+  quote verbatim the text in `candidate_output` answering each, write NONE where none answers it,
+  return false on any NONE. `setup_definitions.py` now carries the same text as the lab's paste
+  block, which had diverged.
+- Model and prompt changed together on the retest, so the prompt's own contribution is unmeasured
+  and nothing here claims it was the fix.
+- Still unverified, and recorded as such: whether the stricter prompt holds on a correct answer.
+  Its failure mode would be a red on a complete answer, which is the contrast the lab is built on.
+
 ## v1.1.14: No named third-party service in the endpoint picker
 
 Sharon AI had a preset in the Setup tab. A preset saves one paste and then has to be maintained,

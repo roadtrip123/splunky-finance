@@ -80,7 +80,16 @@ JUDGES = {
         "Decide whether candidate_output answers every part the question asked for. The question "
         "is the `question` field of the trace output JSON; use that text, never an implied or "
         "reconstructed question, and if it is missing return true rather than guessing. Derive "
-        "the required parts from that question; do not assume a fixed list. Return false when "
+        "the required parts from that question; do not assume a fixed list. "
+        # Enumerate then quote. Without it the judge decides holistically and a borderline call
+        # flips the verdict between runs; requiring a verbatim quote per part makes an omission
+        # something it has to write NONE against rather than reason its way past.
+        "Before deciding, number the parts the question asks for. For each part, quote verbatim "
+        "the text from candidate_output that answers it, and write NONE for any part that no text "
+        "in candidate_output answers. A quote must state the answer, not merely mention the "
+        "subject: text that refers to a figure without giving it, or offers to provide it, counts "
+        "as NONE. Return false if any part is NONE. Return true only when every part has a "
+        "verbatim quote. Return false when "
         "a part of the question is left unanswered. An answer that addresses every part is covered "
         "even when its content is incorrect: whether a stated figure is right, and whether it "
         "describes the right customer, are not this metric's concern. Evaluate candidate_output, "

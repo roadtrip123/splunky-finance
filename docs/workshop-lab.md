@@ -237,6 +237,11 @@ OpenAI: API key from the OpenAI developer portal, plus the Organization ID if yo
    <img width="552" height="310" alt="image" src="https://github.com/user-attachments/assets/e0e51974-fb7a-49aa-87f5-7b9e0ccf13fc" />
 
 
+**Use `gpt-4.1-mini` as the judge model.** Every accuracy figure in this lab was measured on it. A
+reasoning model is not a better judge here: on the same traces, GPT-5.1 caught one incomplete answer
+in three, and `gpt-4.1-mini` caught them. The picker only lists models from the integration you
+configured above, so choose it there first.
+
 **Evaluator SplunkyAnswerWhole Question**
 1. Click on **Evaluators** on the right side menu in Galileo
 
@@ -448,7 +453,7 @@ a metric that only ever fails is not measuring anything.
 | No scores at all | The evaluator is not enabled on this agent stream. Step 5 |
 | Scores on some turns only | Sampling is below 100% on your stream |
 | An evaluator scores everything green | It is enabled but was created against a different stream, or the trace predates enabling it |
-| `SplunkyAnswerWholeQuestion` passes an answer you can see is incomplete | It is 90%+ accurate in testing. Re-run rather than debugging your prompt |
+| `SplunkyAnswerWholeQuestion` passes an answer you can see is incomplete | Check the judge model first. The 90%+ figure is measured on `gpt-4.1-mini` and does not hold for every model. On that model, re-run rather than debugging your prompt |
 | Nothing arrives in Galileo | The answer failed before it was logged. Check the portal says **Connected** |
 | All three Evaluators are marked Failed | Correct behaviour This is because the wrong customer has come back and it fails all three evals |
 

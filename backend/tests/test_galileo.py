@@ -1174,3 +1174,40 @@ async def test_a_connection_failure_is_logged_with_the_real_cause(settings, capl
     assert "TLS handshake failed" in logged, "the real cause has to reach the log"
     assert "sk-abcdefgh12345678" not in logged, "key-shaped text must be masked"
     assert "<redacted>" in logged
+
+
+def test_the_lab_publishes_the_same_completeness_judge_the_code_does():
+    """The judge exists twice: in `setup_definitions` and as a paste block in the lab.
+
+    Participants build it by hand from the lab, so the doc is the one that reaches a workshop and
+    the code is the one `configure_galileo.py` publishes. They diverged once already, which left
+    the repo shipping two different versions of the same judge under one name.
+    """
+    import pathlib
+
+    from app.observability.setup_definitions import judge_prompt
+
+    lab = pathlib.Path(__file__).resolve().parents[2] / "docs" / "workshop-lab.md"
+    after_name = lab.read_text().partition("SplunkyAnswerWholeQuestion-<your initials>")[2]
+    block = after_name.partition("```")[2].partition("```")[0]
+    assert block.strip(), "the lab's paste block was not found"
+    assert " ".join(block.split()) == " ".join(judge_prompt("SplunkyAnswerWholeQuestion").split())
+
+
+def test_the_completeness_judge_must_quote_the_text_answering_each_part():
+    """Enumerate then quote.
+
+    Deciding holistically let a borderline call flip the verdict between runs. Requiring a
+    verbatim quote per part makes an omission something the judge has to write NONE against.
+    """
+    from app.observability.setup_definitions import judge_prompt
+
+    whole = judge_prompt("SplunkyAnswerWholeQuestion")
+    assert "number the parts the question asks for" in whole
+    assert "quote verbatim" in whole
+    assert "write NONE" in whole
+    assert "Return false if any part is NONE" in whole
+    # Scoped to this judge: the other two measure a claim that is present, not one that is absent.
+    for name in ("SplunkyNumericalCorrectness", "SplunkyRightCustomer"):
+        assert "write NONE" not in judge_prompt(name)
+

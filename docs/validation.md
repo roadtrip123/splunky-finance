@@ -527,3 +527,26 @@ the stream as target context, and the server returns the controls bound to that 
 
 The application now registers its agent when the connection check resolves the stream, deriving the
 name from project and stream unless one is set explicitly.
+
+## The judge model decides whether the completeness judge works (2026-10-19)
+
+`SplunkyAnswerWholeQuestion` caught one incomplete answer in three with GPT-5.1 as the judge model.
+The fault was confirmed present on the counted runs, so this was the judge and not an
+`unverified_rewrite` shipping a complete answer. Every figure on record for this judge, including the
+8 of 10, the 6/6 reproduction that established the `question` field, and the version 8 verification,
+was measured on `gpt-4.1-mini`. GPT-5.1 was never one of them, so there was no regression against a
+measured baseline, and the comparison that read as judge flakiness was against numbers that never
+applied to the configuration in use.
+
+Switching the model to `gpt-4.1-mini` resolved it on retest, reported by the presenter rather than
+instrumented here. The published prompt gained an enumerate-then-quote rule in the same change:
+number the parts the question asks for, quote verbatim the text in `candidate_output` answering
+each, write NONE where none answers it, and return false on any NONE. Model and prompt moved
+together, so the prompt's own contribution is unmeasured and the repo does not claim it was the fix.
+
+Still unverified: whether the stricter prompt holds on a **correct** answer. The rule is deliberately
+harsher and its failure mode is a red on a complete answer, which would break the red-against-green
+contrast the lab is built on. Three Normal Answer turns on the same two-part question would close it.
+The lab now names `gpt-4.1-mini` before the first evaluator is built, and the troubleshooting row no
+longer promises 90%+ accuracy without naming the model it was measured on.
+

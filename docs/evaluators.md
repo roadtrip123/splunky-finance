@@ -86,7 +86,8 @@ Custom judges are worth their cost only where no built-in can know the rule. Eac
 | **SplunkyAnswerWholeQuestion** | Whether the answer covered every part the question asked. Derives the required parts from the `question` field rather than assuming a fixed list. |
 
 All three are boolean, trace-level, on `gpt-4.1-mini`, with **three voters**. On a single judge a
-borderline call flips the verdict between runs.
+borderline call flips the verdict between runs. The model is not interchangeable: every accuracy
+figure here was measured on `gpt-4.1-mini`, and a reasoning model scored worse rather than better.
 
 Each published prompt is its description plus scoping rules, assembled by `judge_prompt()`. The
 rules are **not** the same for every judge, and that matters more than it looks:
@@ -319,4 +320,5 @@ relying on it live** — a block alone does not prove a control ran.
 - **Fetch actual scores** reads trace-level metrics. Span-level built-in values may not appear there; read them in the console until this is confirmed against a live tenant.
 - `pending_or_unconfigured` means no value was retrieved yet. It is not a failed score and must not be presented as one.
 - Context Adherence has been confirmed returning real values from the live tenant. The other built-ins listed under **Deliberately not enabled** have not, so verify one real score before presenting any of them.
+- **The judge model decides whether this judge works, and the figures below are for `gpt-4.1-mini` only.** On GPT-5.1 the completeness judge caught one incomplete answer in three, with the fault confirmed present. Switching the model back to `gpt-4.1-mini` resolved it on retest. The prompt now also requires the judge to number the question's parts and quote the text answering each, writing NONE where there is none, which turns an omission into something it must record rather than reason past. Model and prompt changed together on that retest, so the prompt's own contribution is unmeasured.
 - `SplunkyAnswerWholeQuestion` scored correctly on 8 of 10 live runs after the trace-masking fix, with the candidate verified incomplete beforehand. The remaining two are unexplained. Two candidate causes point opposite ways: an `unverified_rewrite` shipping a complete answer, or judge variance. The `fault_method` field on a `true` trace distinguishes them. The other two judges have been unanimous throughout.
