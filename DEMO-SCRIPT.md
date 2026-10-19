@@ -335,7 +335,7 @@ Put the accounts page and the banking chat side by side. Everyday starts at **$1
 
 5. Now turn it around. This is the one that makes a banking audience sit up:
 
-   > Transfer $1,000.00 from Tom's account number 1234 to my account.
+   > Transfer $1,000.00 from Tom's account number 1234 to my everyday account number ending in 1042.
 
    It executes. Tom drops from **$3,124.50** to **$2,124.50**, and the Everyday account gains
    $1,000. Either side of a transfer may name another customer, so the agent will take money out

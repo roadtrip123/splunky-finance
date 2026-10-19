@@ -286,7 +286,7 @@ def test_the_portal_says_which_questions_the_guardrail_blocks(client):
     # either way, and a presenter expecting a push to succeed has read the pattern wrongly.
     blocked = " ".join(CROSS_CUSTOMER_PROMPTS)
     for expected in ("to Tom's account number 1234", "to Dan's account number 4127",
-                     "from Tom's account number 1234 to my account", "1234", "4127"):
+                     "from Tom's account number 1234 to my everyday account", "1234", "4127"):
         assert expected in blocked, expected
     # And nothing the pattern matches may sit in the allowed group.
     allowed = " ".join(OWN_ACCOUNT_PROMPTS)
