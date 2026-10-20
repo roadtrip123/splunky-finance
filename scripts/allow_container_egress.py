@@ -17,6 +17,12 @@ its egress probe fails, and warns that they do not survive a reboot. This persis
 everything else. That mechanism is known to work on these images, because it is what restores the
 redirect itself every boot.
 
+Ahead of it is the whole fix, and presence is not the same as precedence. A lab instance was found
+with both RETURN rules live, both saved, and the backend still reaching our own proxy: the platform
+had inserted its redirect at position 1 after ours, so the bypasses were never read. Writing them
+once cannot win a race against something that re-inserts at the top whenever it likes, which is why
+splunky-finance-egress.timer re-asserts them for as long as the box is up.
+
     sudo python3 scripts/allow_container_egress.py --dry-run     what it would do, changing nothing
     sudo python3 scripts/allow_container_egress.py
 
@@ -66,13 +72,59 @@ def saved_line(bridge, port):
     return f"-A PREROUTING -i {bridge} -p tcp -m tcp --dport {port} -j RETURN\n"
 
 
-def present(bridge, port):
-    return (
-        subprocess.run(
-            ["iptables", "-t", "nat", "-C", *rule(bridge, port)], capture_output=True
-        ).returncode
-        == 0
+def live_chain():
+    """The nat PREROUTING chain as iptables prints it, in order."""
+    result = subprocess.run(
+        ["iptables", "-t", "nat", "-S", "PREROUTING"], capture_output=True, text=True
     )
+    return result.stdout.splitlines() if result.returncode == 0 else []
+
+
+def redirect_at(lines, port):
+    """Where the first REDIRECT of this port sits, or None."""
+    for index, line in enumerate(lines):
+        match = REDIRECT.search(line)
+        if match and int(match.group("dport")) == port:
+            return index
+    return None
+
+
+def bypass_at(lines, bridge, port):
+    """Where this bridge's RETURN sits, or None."""
+    for index, line in enumerate(lines):
+        if f"-i {bridge} " in line and "-j RETURN" in line and f"--dport {port}" in line:
+            return index
+    return None
+
+
+def unprotected(lines, port, bridges=BRIDGES):
+    """The bridges whose traffic still meets the redirect, and why.
+
+    Presence is not the test. A RETURN that exists but sits *below* the REDIRECT is never reached,
+    so a membership check reports a bypassed box that is still hijacked. That is exactly what
+    happened on a lab instance: both rules present, both below a redirect the platform had
+    inserted at position 1 after ours went in, and the backend still reaching our own proxy
+    instead of Galileo. So the chain is read in order and position is compared.
+    """
+    redirect = redirect_at(lines, port)
+    verdicts = {}
+    for bridge in bridges:
+        at = bypass_at(lines, bridge, port)
+        if at is None:
+            verdicts[bridge] = "missing"
+        elif redirect is not None and at > redirect:
+            verdicts[bridge] = "below the redirect"
+    return verdicts
+
+
+def drop(bridge, port):
+    """Remove every copy of this bridge's RETURN, so re-inserting cannot leave a duplicate."""
+    for _ in range(4):
+        result = subprocess.run(
+            ["iptables", "-t", "nat", "-D", *rule(bridge, port)], capture_output=True
+        )
+        if result.returncode:
+            return
 
 
 def insert(bridge, port):
@@ -97,10 +149,28 @@ def persist(port, dry_run, rules=RULES):
         return 0
     lines = rules.read_text().splitlines(keepends=True)
     wanted = [saved_line(bridge, port) for bridge in BRIDGES]
+    # Ordering in the file is checked the same way as in the live table: a line that is present
+    # but sits below the REDIRECT is restored into a chain where it is never reached.
+    saved_redirect = redirect_at(lines, port)
+    stale = [
+        line
+        for line in wanted
+        if line in lines
+        and saved_redirect is not None
+        and lines.index(line) > saved_redirect
+    ]
     missing = [line for line in wanted if line not in lines]
-    if not missing:
-        note(f"{rules} already restores the bypasses")
+    if not missing and not stale:
+        note(f"{rules} already restores the bypasses, ahead of the redirect")
         return 0
+    if stale and not dry_run:
+        for line in stale:
+            lines.remove(line)
+            note(f"moved above the redirect in {rules}: {line.strip()}")
+    missing = [line for line in wanted if line not in lines]
+    if dry_run and stale:
+        for line in stale:
+            note(f"would move above the redirect: {line.strip()}")
     position, in_nat = None, False
     for index, line in enumerate(lines):
         if line.startswith("*nat"):
@@ -178,24 +248,35 @@ def main():
     parser.add_argument("--dry-run", action="store_true", help="report, change nothing")
     parser.add_argument("--port", type=int, default=443, help="the redirected port to bypass")
     parser.add_argument("--rules", type=Path, default=RULES, help="the saved ruleset to edit")
+    parser.add_argument("--unattended", action="store_true",
+                        help="For the timer: no SUDO_USER needed, and the container probe is skipped")
     arguments = parser.parse_args()
 
     if not arguments.dry_run and os.geteuid() != 0:
         die("Needs root to edit the nat table. Re-run with sudo, or use --dry-run.")
     account = os.environ.get("SUDO_USER", "")
-    if not arguments.dry_run and (not account or account == "root"):
+    # The timer runs this as root from systemd, where there is no invoking account. Requiring one
+    # there would fail the unit on every boot, which is the opposite of the point.
+    if not arguments.dry_run and not arguments.unattended and (not account or account == "root"):
         die("Run with sudo from the account that owns this repository, not as root directly.")
 
     say(f"Bypassing the port {arguments.port} redirect for container traffic")
+    verdicts = unprotected(live_chain(), arguments.port)
     added = 0
     for bridge in BRIDGES:
-        if present(bridge, arguments.port):
-            note(f"{bridge:8} already bypassed")
+        reason = verdicts.get(bridge)
+        if not reason:
+            note(f"{bridge:8} already bypassed, ahead of the redirect")
             continue
         if arguments.dry_run:
-            note(f"{bridge:8} would be bypassed")
+            note(f"{bridge:8} {reason}; would be inserted ahead of the redirect")
             added += 1
             continue
+        if reason != "missing":
+            # Re-inserting on its own would leave the dead copy behind, so the existing rule is
+            # removed first and added back at position 1.
+            note(f"{bridge:8} {reason}; moving it ahead")
+            drop(bridge, arguments.port)
         result = insert(bridge, arguments.port)
         if result.returncode:
             # Reported rather than fatal: docker0 exists on every box, br+ is a prefix match that
@@ -213,6 +294,10 @@ def main():
 
     if arguments.dry_run:
         note("--dry-run: nothing was written")
+        return 0
+
+    if arguments.unattended:
+        note("--unattended: skipping the container probe")
         return 0
 
     say("Checking from inside the container")

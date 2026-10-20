@@ -1,0 +1,36 @@
+# Keep container outbound HTTPS off the port 443 redirect, for as long as the box is up.
+#
+#   sudo python3 scripts/install_service.py      installs this with the others, and is the easy route
+#
+# Why a unit at all, when scripts/allow_container_egress.py persists the rules into
+# /etc/iptables/rules.v4: because writing them once does not win. The lab platform inserts its
+# `--dport 443 -j REDIRECT --to-ports 8443` rule at PREROUTING position 1, and it does so after
+# netfilter-persistent has restored the saved ruleset. A RETURN below that REDIRECT is never read,
+# so a box can carry both bypasses, live and saved, and still send the backend's traffic to Galileo
+# into our own proxy. The symptom is a certificate hostname mismatch the portal reports as a
+# connection failure, which reads as a credential problem and is not one.
+#
+# So the bypasses are re-asserted rather than written: the script compares positions, not
+# membership, and moves its rules back above the redirect whenever it finds them below it. Paired
+# with splunky-finance-egress.timer, which runs it shortly after boot and then every few minutes,
+# so it heals a redirect inserted at any point, including mid-workshop.
+#
+# Runs as root, like splunky-finance-ports.service, because it edits the nat table. --unattended
+# because there is no invoking account under systemd and the container probe needs one.
+#
+#   journalctl -u splunky-finance-egress -b     what it found on this boot
+#   systemctl start splunky-finance-egress      run it again now
+
+[Unit]
+Description=Splunky Finance: keep container egress off the port 443 redirect
+Documentation=https://github.com/roadtrip123/splunky-finance/blob/build-splunky-finance/docs/single-instance.md
+After=netfilter-persistent.service docker.service
+Wants=netfilter-persistent.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=/home/ubuntu/splunky-finance
+ExecStart=/usr/bin/python3 scripts/allow_container_egress.py --unattended
+
+[Install]
+WantedBy=multi-user.target

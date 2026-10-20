@@ -1,0 +1,22 @@
+# Re-assert the container egress bypass, shortly after boot and then periodically.
+#
+# Periodically rather than once, because the rule this works around is inserted by something
+# outside this repository, at a time nobody here controls. A single pass at boot loses to a
+# redirect inserted a minute later, and the failure is silent until a participant tries to connect
+# to Galileo. The check itself is one `iptables -t nat -S PREROUTING`, so running it often costs
+# nothing worth measuring.
+#
+#   systemctl list-timers splunky-finance-egress.timer     when it next runs
+#   journalctl -u splunky-finance-egress -f                what each pass decided
+
+[Unit]
+Description=Splunky Finance: re-assert the container egress bypass
+
+[Timer]
+OnBootSec=45s
+OnUnitActiveSec=3min
+AccuracySec=5s
+Unit=splunky-finance-egress.service
+
+[Install]
+WantedBy=timers.target

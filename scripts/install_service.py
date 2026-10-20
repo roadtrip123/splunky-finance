@@ -31,6 +31,8 @@ SHARED_MODE = 0o770
 UNITS = (
     "splunky-finance.service",
     "splunky-finance-ports.service",
+    "splunky-finance-egress.service",
+    "splunky-finance-egress.timer",
     "splunky-finance-update.service",
     "splunky-finance-update.path",
 )
@@ -97,9 +99,15 @@ def main():
     # installed may be carrying the redirect at this moment, and the installer should not leave it.
     subprocess.run(["systemctl", "enable", "--now", "splunky-finance-ports.service"], check=True)
     subprocess.run(["systemctl", "enable", "--now", "splunky-finance-update.path"], check=True)
+    # The timer is what is enabled, not the service it triggers. `--now` starts the timer, which
+    # does not run the service, so the service is started once here as well: a box being installed
+    # may have the redirect above the bypasses at this moment and should not be left that way.
+    subprocess.run(["systemctl", "enable", "--now", "splunky-finance-egress.timer"], check=True)
+    subprocess.run(["systemctl", "start", "splunky-finance-egress.service"], check=False)
     print(
         "\nenabled: splunky-finance.service (on boot), splunky-finance-ports.service (on boot, "
-        "before it), splunky-finance-update.path (watching)"
+        "before it), splunky-finance-egress.timer (boot, then every few minutes), "
+        "splunky-finance-update.path (watching)"
     )
 
     if args.build:
@@ -111,7 +119,8 @@ def main():
     print("\nNext, build and start it with the output visible:")
     print(f"  python3 scripts/selfupdate.py")
     print("Afterwards:")
-    print("  journalctl -u splunky-finance -u splunky-finance-ports -u splunky-finance-update -f")
+    print("  journalctl -u splunky-finance -u splunky-finance-ports -u splunky-finance-egress"
+          " -u splunky-finance-update -f")
     return 0
 
 

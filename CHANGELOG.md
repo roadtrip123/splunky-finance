@@ -6,6 +6,44 @@ Versions mark states worth returning to. Tags are annotated, so `git tag -n` and
 Open defects are tracked as [GitHub issues](https://github.com/roadtrip123/splunky-finance/issues);
 planned work is in [TODO.md](TODO.md).
 
+## v1.1.16: The container egress bypass is re-asserted, not written once
+
+A fresh lab instance reported **Galileo connection failed with ConnectError** with a certificate
+hostname mismatch for `api.multitenant.galileocloud.io`, which is the container-egress hijack v1.1.12
+was supposed to have fixed. It had not: the box was carrying both bypasses, live and saved, and the
+redirect was sitting above them.
+
+```
+-A PREROUTING -p tcp -m tcp --dport 443 -j REDIRECT --to-ports 8443
+-A PREROUTING -i docker0 -p tcp -m tcp --dport 443 -j RETURN
+-A PREROUTING -i br+ -p tcp -m tcp --dport 443 -j RETURN
+```
+
+`iptables` reads the chain in order, so a RETURN below the REDIRECT is never reached. The platform
+inserts its redirect at position 1, after `netfilter-persistent` restores the saved ruleset, so
+writing the rules once loses the race on every boot.
+
+- **Presence is not precedence, and the check tested the wrong one.** `allow_container_egress.py`
+  used `iptables -C`, which passes on a rule that exists anywhere in the chain, and so reported
+  "already bypassed" for a box that was still hijacked. It now reads the chain in order, compares
+  positions, and distinguishes a missing rule from a misplaced one, because the repairs differ: one
+  is inserted, the other deleted and re-inserted at position 1.
+- **The saved ruleset is repaired the same way.** A file listing the RETURN after the REDIRECT
+  restores a chain that is already broken, so fixing only the live table would last until reboot.
+- **`splunky-finance-egress.timer`** runs the script 45 seconds after boot and every three minutes
+  after that, as root, with `--unattended` so it needs no invoking account and skips the container
+  probe. Repeating rather than once, because the rule it works around is inserted by something
+  outside this repository at a time nobody here controls, and a single pass at boot loses to a
+  redirect added a minute later. One `iptables -S` per pass.
+- `install_service.py` installs and enables the timer, starts the service once so an install never
+  leaves a box with the redirect above the bypasses, and `install.sh` picks both up unchanged.
+- The snapshot checklist in `docs/single-instance.md` now checks the chain order and the timer, with
+  a container-side probe, since a status code from inside the container is the only proof that
+  holds. Seven guards, six of them proved failing against the old script.
+
+This is the fault that makes a clone come up with observability broken, and no browser-only
+participant can fix it, so it is the one defect here worth re-imaging for.
+
 ## v1.1.15: The pull prompts name their destination, and the judge names its model
 
 Two unrelated corrections that both came out of running the lab.

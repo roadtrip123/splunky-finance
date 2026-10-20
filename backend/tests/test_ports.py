@@ -546,3 +546,110 @@ def test_a_fresh_install_persists_the_egress_bypass():
     assert "scripts/allow_container_egress.py" in source
     block = source[source.index("exempting Docker's bridges") :]
     assert "allow_container_egress.py" in block[: block.index("say ")]
+
+
+# The chain as a lab instance actually printed it: both bypasses present, both below a redirect the
+# platform had inserted at position 1 after ours went in, and the backend still hijacked.
+HIJACKED_CHAIN = [
+    "-P PREROUTING ACCEPT",
+    "-A PREROUTING -p tcp -m tcp --dport 443 -j REDIRECT --to-ports 8443",
+    "-A PREROUTING -i docker0 -p tcp -m tcp --dport 443 -j RETURN",
+    "-A PREROUTING -i br+ -p tcp -m tcp --dport 443 -j RETURN",
+    "-A PREROUTING -m addrtype --dst-type LOCAL -j DOCKER",
+]
+HEALED_CHAIN = [
+    "-P PREROUTING ACCEPT",
+    "-A PREROUTING -i docker0 -p tcp -m tcp --dport 443 -j RETURN",
+    "-A PREROUTING -i br+ -p tcp -m tcp --dport 443 -j RETURN",
+    "-A PREROUTING -p tcp -m tcp --dport 443 -j REDIRECT --to-ports 8443",
+    "-A PREROUTING -m addrtype --dst-type LOCAL -j DOCKER",
+]
+
+
+def test_a_bypass_below_the_redirect_counts_as_no_bypass_at_all():
+    """Presence is not precedence, and the first version of this check tested the wrong one.
+
+    iptables reads PREROUTING in order, so a RETURN after the REDIRECT is never reached. The script
+    reported "already bypassed" on finding the rules present and left a hijacked box alone.
+    """
+    verdicts = egress().unprotected(HIJACKED_CHAIN, 443)
+    assert set(verdicts) == {"docker0", "br+"}
+    assert all(reason == "below the redirect" for reason in verdicts.values())
+
+
+def test_a_bypass_above_the_redirect_is_left_alone():
+    assert egress().unprotected(HEALED_CHAIN, 443) == {}
+
+
+def test_a_missing_bypass_is_reported_as_missing_not_as_misplaced():
+    """The two need different repairs: one is inserted, the other deleted and re-inserted."""
+    chain = [line for line in HEALED_CHAIN if "docker0" not in line]
+    assert egress().unprotected(chain, 443) == {"docker0": "missing"}
+
+
+def test_a_redirect_on_another_port_does_not_make_the_bypass_look_misplaced():
+    chain = [
+        "-P PREROUTING ACCEPT",
+        "-A PREROUTING -i docker0 -p tcp -m tcp --dport 443 -j RETURN",
+        "-A PREROUTING -i br+ -p tcp -m tcp --dport 443 -j RETURN",
+        "-A PREROUTING -p tcp -m tcp --dport 8080 -j REDIRECT --to-ports 9090",
+    ]
+    assert egress().unprotected(chain, 443) == {}
+
+
+def test_a_saved_bypass_below_the_redirect_is_moved_above_it(tmp_path):
+    """The same fault in the file that restores the rules at boot.
+
+    A file that lists the RETURN after the REDIRECT restores a chain that is already broken, so
+    repairing only the live table would last until the next reboot.
+    """
+    rules = tmp_path / "rules.v4"
+    rules.write_text(
+        "*nat\n"
+        ":PREROUTING ACCEPT [0:0]\n"
+        f"{SAVED}\n"
+        "-A PREROUTING -i docker0 -p tcp -m tcp --dport 443 -j RETURN\n"
+        "-A PREROUTING -i br+ -p tcp -m tcp --dport 443 -j RETURN\n"
+        "COMMIT\n"
+    )
+    assert egress().persist(443, False, rules) == 2
+    lines = rules.read_text().splitlines()
+    returns = [index for index, line in enumerate(lines) if "-j RETURN" in line]
+    redirect = next(index for index, line in enumerate(lines) if "REDIRECT" in line)
+    assert len(returns) == 2, "a copy was left behind rather than moved"
+    assert max(returns) < redirect
+    # And it settles: a second pass has nothing to do.
+    assert egress().persist(443, False, rules) == 0
+
+
+def test_the_egress_unit_runs_unattended_and_the_timer_repeats():
+    """Unattended because systemd has no invoking account, and repeating because the redirect is
+    inserted by something outside this repository at a time nobody here controls."""
+    service = (ROOT / "scripts" / "splunky-finance-egress.service").read_text()
+    timer = (ROOT / "scripts" / "splunky-finance-egress.timer").read_text()
+    assert "ExecStart=/usr/bin/python3 scripts/allow_container_egress.py --unattended" in service
+    assert "After=netfilter-persistent.service" in service
+    # No User=: it edits the nat table, like the ports unit.
+    assert "\nUser=" not in service
+    assert "OnBootSec=" in timer
+    assert "OnUnitActiveSec=" in timer
+    assert "Unit=splunky-finance-egress.service" in timer
+    assert "WantedBy=timers.target" in timer
+
+
+def test_unattended_skips_the_account_check_that_would_fail_the_unit():
+    source = (ROOT / "scripts" / "allow_container_egress.py").read_text()
+    guard = "if not arguments.dry_run and not arguments.unattended and (not account"
+    assert guard in source, "the unit would fail on every boot for want of a SUDO_USER"
+    assert '--unattended: skipping the container probe' in source
+
+
+def test_the_installer_installs_and_enables_the_egress_timer():
+    source = (ROOT / "scripts" / "install_service.py").read_text()
+    assert '"splunky-finance-egress.service",' in source
+    assert '"splunky-finance-egress.timer",' in source
+    # The timer is enabled; the service it triggers is not, but is started once so an install does
+    # not leave a box with the redirect sitting above the bypasses.
+    assert '"enable", "--now", "splunky-finance-egress.timer"' in source
+    assert '"start", "splunky-finance-egress.service"' in source
+

@@ -233,9 +233,35 @@ container. That last part matters: traffic the host originates goes through `OUT
 `PREROUTING`, so a probe run on the host passes whether or not containers are affected, which is
 exactly what made this fault look like a credential problem.
 
-Persisting into the saved ruleset rather than a boot unit is deliberate. `netfilter-persistent` is
-demonstrably running on these images: it is what restores the redirect every boot. Riding the
-mechanism that already works beats adding one that has not been shown to fire.
+Persisting into the saved ruleset rather than a boot unit was the first fix, and it is not enough on
+its own. **Presence is not precedence.** A lab instance was found carrying both bypasses, live and
+saved, with the backend still hijacked:
+
+```
+-A PREROUTING -p tcp -m tcp --dport 443 -j REDIRECT --to-ports 8443
+-A PREROUTING -i docker0 -p tcp -m tcp --dport 443 -j RETURN
+-A PREROUTING -i br+ -p tcp -m tcp --dport 443 -j RETURN
+```
+
+The platform inserts its redirect at position 1, and it does so after `netfilter-persistent` has
+restored the saved ruleset, so both RETURN rules end up below it and are never read. Writing the
+rules once cannot win against something that re-inserts at the top whenever it likes, and the script
+made it worse by reporting "already bypassed" on finding them present.
+
+So the check compares positions rather than membership, repairs by deleting and re-inserting at
+position 1, and runs repeatedly for as long as the box is up:
+
+```bash
+systemctl list-timers splunky-finance-egress.timer
+journalctl -u splunky-finance-egress -b
+sudo iptables -t nat -S PREROUTING        # both RETURNs must print above the REDIRECT
+```
+
+`splunky-finance-egress.timer` runs 45 seconds after boot and every three minutes after that, which
+heals a redirect inserted at any point, mid-workshop included. The check is one `iptables -S`, so
+running it often costs nothing. `netfilter-persistent` is still ridden for the saved file, because it
+demonstrably runs on these images: it is what restores the redirect every boot. The timer is what
+settles the order afterwards.
 
 ### A box that is already running
 
@@ -497,6 +523,19 @@ grep ':8443' /etc/caddy/Caddyfile
 systemctl is-enabled splunky-finance-ports
 sudo python3 scripts/fix_ports.py --dry-run
 ```
+
+And the container's way out, which is a different rule and a different failure. Both RETURNs must
+print **above** the REDIRECT, and the timer that keeps them there must be enabled, or every clone
+comes up with observability broken and no browser-only participant able to fix it:
+
+```bash
+sudo iptables -t nat -S PREROUTING
+systemctl is-enabled splunky-finance-egress.timer
+docker compose exec -T backend python3 -c "import httpx; print(httpx.get('https://api.github.com', timeout=10).status_code)"
+```
+
+A status code from inside the container is the proof. A certificate hostname mismatch there means
+the bypass is below the redirect, whatever `iptables -C` would say about it being present.
 
 Then prove it on this box, before it becomes a hundred boxes. Put the rule back and confirm the same
 URL is served with it present and with it absent:
