@@ -6,6 +6,32 @@ Versions mark states worth returning to. Tags are annotated, so `git tag -n` and
 Open defects are tracked as [GitHub issues](https://github.com/roadtrip123/splunky-finance/issues);
 planned work is in [TODO.md](TODO.md).
 
+## v1.1.17: A one-minute window, and units that update themselves
+
+Host-side only. No application code, so there is no image to rebuild and a running stack is
+unaffected.
+
+- **The egress timer runs every minute rather than every three.** The interval is the window in
+  which a clone shows a connection error that reads as a rejected API key, and across a hundred
+  participants that window is what gets believed. Each pass is one `iptables -t nat -S PREROUTING`.
+- **`splunky-finance.service` refreshes the unit files before it updates the code.** The update path
+  carries the repository and nothing else, so v1.1.16's new timer could not reach a clone without
+  the image being rebuilt: systemd reads `/etc/systemd/system`, and the updater runs as the
+  repository owner and could not write there anyway. `ExecStartPre=-+` runs that one step as root
+  despite `User=`, and non-fatally, because refreshing units must never be why a box fails to
+  update. One honest caveat: systemd has loaded this boot's units by the time it runs, so a changed
+  unit takes effect on the *next* boot.
+- **`install_service.py --units-only`** writes and reloads the units, enables the four that should
+  be enabled, and does nothing else: no directory creation, no chown of the shared state, no
+  services started, no build. At boot there is no `SUDO_USER`, so in that mode the account is taken
+  from whoever owns the checkout. Outside it the refusal to install root-owned units stands.
+- **The snapshot message no longer sends a clone to configure its own address.** The proxy serves by
+  port with no hostname and `APP_ORIGIN` is a wildcard, so that advice has been wrong since v1.1.7.
+  What remains true is the part that matters: every clone shares one `SESSION_SECRET`, nothing runs
+  at boot to change it, and `setup_env.py --rotate-secret` is how to.
+
+Five guards, all proved failing against the previous state.
+
 ## v1.1.16: The container egress bypass is re-asserted, not written once
 
 A fresh lab instance reported **Galileo connection failed with ConnectError** with a certificate

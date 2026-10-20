@@ -257,8 +257,10 @@ journalctl -u splunky-finance-egress -b
 sudo iptables -t nat -S PREROUTING        # both RETURNs must print above the REDIRECT
 ```
 
-`splunky-finance-egress.timer` runs 45 seconds after boot and every three minutes after that, which
-heals a redirect inserted at any point, mid-workshop included. The check is one `iptables -S`, so
+`splunky-finance-egress.timer` runs 45 seconds after boot and every minute after that, which heals a
+redirect inserted at any point, mid-workshop included. The interval is the window in which a clone
+shows a connection error that reads as a rejected API key, which is why it is a minute and not
+longer. The check is one `iptables -S`, so
 running it often costs nothing. `netfilter-persistent` is still ridden for the saved file, because it
 demonstrably runs on these images: it is what restores the redirect every boot. The timer is what
 settles the order afterwards.
@@ -342,6 +344,13 @@ shared wifi; it does not prove the server's identity. For synthetic data that is
 to stop.
 
 ## Update itself on boot
+
+The update path carries the repository and nothing else. systemd reads `/etc/systemd/system`, so a
+release that adds or changes a unit reaches a running box only through `install_service.py`, and
+`selfupdate.py` runs as the repository owner and could not write there in any case. Since v1.1.17
+`splunky-finance.service` refreshes the unit files itself before updating the code, as root and
+non-fatally, so this matters only for the first boot after a unit changes: systemd has already
+loaded this boot's copy, and a changed unit takes effect on the next one.
 
 An instance spun up for a workshop should not be running whatever was baked into the AMI weeks
 earlier, and rebuilding the AMI for every fix is the thing this avoids. Install the unit and the box

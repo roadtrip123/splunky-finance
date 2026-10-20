@@ -653,3 +653,68 @@ def test_the_installer_installs_and_enables_the_egress_timer():
     assert '"enable", "--now", "splunky-finance-egress.timer"' in source
     assert '"start", "splunky-finance-egress.service"' in source
 
+
+def test_the_egress_timer_closes_the_window_to_a_minute():
+    """The interval is the window in which a clone shows a connection error that reads as a bad
+    API key. Three minutes of that across a hundred participants is what gets believed."""
+    timer = (ROOT / "scripts" / "splunky-finance-egress.timer").read_text()
+    assert "OnUnitActiveSec=1min" in timer
+    assert "OnUnitActiveSec=3min" not in timer
+
+
+def test_the_boot_unit_refreshes_the_units_as_root_and_never_fatally():
+    """The update path carries code and nothing else, so a release that adds a unit needed the
+    image rebuilding. `+` runs the refresh as root despite User=; `-` keeps a failure there from
+    being the reason a box does not update."""
+    unit = (ROOT / "scripts" / "splunky-finance.service").read_text()
+    line = next(l for l in unit.splitlines() if l.startswith("ExecStartPre="))
+    assert line.startswith("ExecStartPre=-+"), line
+    assert "install_service.py --units-only" in line
+    # The refresh runs before the update, not instead of it.
+    assert "ExecStart=/usr/bin/python3 scripts/selfupdate.py" in unit
+
+
+def service_installer():
+    import install_service
+
+    return install_service
+
+
+def test_the_boot_refresh_takes_the_account_from_the_checkout(monkeypatch):
+    """At boot there is no SUDO_USER, and refusing there would fail the step that keeps units
+    current. Outside that mode the refusal stays: units must not be installed running as root."""
+    install = service_installer()
+    monkeypatch.delenv("SUDO_USER", raising=False)
+    monkeypatch.setattr(install.os, "getuid", lambda: 0)
+    assert install.owner(units_only=True) == Path(install.ROOT).owner()
+    with pytest.raises(SystemExit):
+        install.owner()
+
+
+def test_units_only_writes_units_and_touches_nothing_else():
+    """It runs at boot under the unit it is refreshing, so it must not create directories, chown
+    the shared state, start services or restart the stack."""
+    source = (ROOT / "scripts" / "install_service.py").read_text()
+    block = source.partition("if args.units_only:")[2].partition("# Must exist and be writable")[0]
+    assert block.strip(), "the units-only branch was not found"
+    for forbidden in ("mkdir", "chown", '"start"', "--build", "selfupdate"):
+        assert forbidden not in block, forbidden
+    assert '"systemctl", "daemon-reload"' in block
+    assert '"systemctl", "enable", unit' in block
+    # And it is reachable without root, so the boot path can be rehearsed with --dry-run.
+    result = subprocess.run(
+        [sys.executable, str(ROOT / "scripts" / "install_service.py"), "--units-only", "--dry-run"],
+        capture_output=True, text=True, check=False,
+    )
+    assert result.returncode == 0, result.stderr
+
+
+def test_the_snapshot_message_no_longer_sends_a_clone_to_set_its_own_address():
+    """The proxy serves by port with no hostname and APP_ORIGIN is a wildcard, so the only thing
+    left per clone is the signing key."""
+    source = (ROOT / "scripts" / "reset_for_snapshot.sh").read_text()
+    assert "--origin <this-clone-address>" not in source
+    assert "rewrite the proxy's site address" not in source
+    assert "scripts/setup_env.py --rotate-secret" in source
+    assert "shares one" in source and "SESSION_SECRET" in source
+

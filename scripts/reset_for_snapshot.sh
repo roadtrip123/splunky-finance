@@ -164,12 +164,12 @@ Before you create the image:
   1. Check the portal shows no endpoint and no observability credentials.
   2. Confirm the app still answers on its public address, from another machine.
 
-Every clone needs its own address and its own cookie signing key. On first boot:
+A clone needs nothing per instance to be reachable: the proxy serves by port with no
+hostname and APP_ORIGIN is a wildcard, so whatever address the platform gives it works.
 
-  python3 scripts/setup_env.py --origin <this-clone-address> --rotate-secret
-  # rewrite the proxy's site address to match, then:
-  sudo systemctl restart caddy && sudo systemctl restart splunky-finance
+The one thing left is the cookie signing key. Every clone of this image shares one
+SESSION_SECRET, so a session cookie minted on one box is valid on all of them. Nothing
+runs at boot to change that. To rotate it on a clone:
 
-Without --rotate-secret every clone shares one SESSION_SECRET, which means a session
-cookie minted on one box is valid on all of them.
+  python3 scripts/setup_env.py --rotate-secret && sudo systemctl restart splunky-finance
 EOF

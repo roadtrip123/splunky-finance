@@ -30,6 +30,14 @@ Type=oneshot
 RemainAfterExit=yes
 User=ubuntu
 WorkingDirectory=/home/ubuntu/splunky-finance
+# Refresh the unit files from the repository before updating the code. `+` runs this one step as
+# root despite User= above, because unit files live outside the repository; `-` makes a failure
+# non-fatal, since refreshing units must never be the reason a box does not update.
+#
+# The update path carries code and nothing else, so a release that adds or changes a unit used to
+# need the image rebuilding. This closes that, with one honest caveat: systemd has already loaded
+# this boot's units by the time it runs, so a changed unit takes effect on the *next* boot.
+ExecStartPre=-+/usr/bin/python3 scripts/install_service.py --units-only
 ExecStart=/usr/bin/python3 scripts/selfupdate.py
 # A cold build on a small instance takes minutes; the default 90 seconds would kill it partway.
 TimeoutStartSec=1800

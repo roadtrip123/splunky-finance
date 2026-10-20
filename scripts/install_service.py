@@ -38,15 +38,25 @@ UNITS = (
 )
 
 
-def owner():
-    """Who should run the units: the user who invoked sudo, not root."""
+def owner(units_only=False):
+    """Who should run the units: the user who invoked sudo, not root.
+
+    At boot there is no invoking account. `splunky-finance.service` refreshes the unit files
+    through `--units-only` as root, so there the account is taken from whoever owns the checkout,
+    which is the same answer by a different route. Refusing there would fail the step that exists
+    to keep the units current.
+    """
     name = os.environ.get("SUDO_USER") or pwd.getpwuid(os.getuid()).pw_name
-    if name == "root":
-        raise SystemExit(
-            "Refusing to install units that run as root. Run this with sudo from the account that "
-            "owns the repository and is in the docker group."
-        )
-    return name
+    if name != "root":
+        return name
+    if units_only:
+        from_checkout = pwd.getpwuid(ROOT.stat().st_uid).pw_name
+        if from_checkout != "root":
+            return from_checkout
+    raise SystemExit(
+        "Refusing to install units that run as root. Run this with sudo from the account that "
+        "owns the repository and is in the docker group."
+    )
 
 
 def substitute(text, user, state_dir):
@@ -61,12 +71,14 @@ def main():
     parser.add_argument("--build", action="store_true",
                         help="Run the first update in the foreground, with the build output visible")
     parser.add_argument("--dry-run", action="store_true", help="Print what would change")
+    parser.add_argument("--units-only", action="store_true",
+                        help="Write and reload the unit files, nothing else. For the boot refresh")
     args = parser.parse_args()
 
     if os.geteuid() != 0 and not args.dry_run:
         raise SystemExit("Needs root to write /etc/systemd/system. Re-run with sudo.")
 
-    user = owner()
+    user = owner(args.units_only)
     state_dir = ROOT / "runtime" / "update"
     print(f"repository  {ROOT}")
     print(f"runs as     {user}")
@@ -76,6 +88,27 @@ def main():
         for unit in UNITS:
             print(f"\n--- {unit} ---")
             print(substitute((ROOT / "scripts" / unit).read_text(), user, state_dir))
+        return 0
+
+    if args.units_only:
+        changed = []
+        for unit in UNITS:
+            target = UNIT_DIR / unit
+            wanted = substitute((ROOT / "scripts" / unit).read_text(), user, state_dir)
+            if not target.exists() or target.read_text() != wanted:
+                target.write_text(wanted)
+                changed.append(unit)
+        if not changed:
+            print("units already current")
+            return 0
+        print("refreshed: " + ", ".join(changed))
+        subprocess.run(["systemctl", "daemon-reload"], check=False)
+        # Enabled, not started: a unit added by a later release is useless unenabled, and a boot
+        # refresh must not restart the stack underneath the update that is about to run.
+        for unit in ("splunky-finance.service", "splunky-finance-ports.service",
+                     "splunky-finance-egress.timer", "splunky-finance-update.path"):
+            subprocess.run(["systemctl", "enable", unit], check=False)
+        print("a changed unit takes effect on the next boot; systemd has already loaded this one")
         return 0
 
     # Must exist and be writable by the container before compose mounts it, or Docker creates it

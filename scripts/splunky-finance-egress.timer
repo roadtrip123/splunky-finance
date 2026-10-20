@@ -6,6 +6,10 @@
 # to Galileo. The check itself is one `iptables -t nat -S PREROUTING`, so running it often costs
 # nothing worth measuring.
 #
+# One minute rather than three: the interval is the window in which a clone shows a connection
+# error that reads as a bad API key, and across a hundred participants that window is what gets
+# believed. Three minutes of it was the only gap left after v1.1.16.
+#
 #   systemctl list-timers splunky-finance-egress.timer     when it next runs
 #   journalctl -u splunky-finance-egress -f                what each pass decided
 
@@ -14,7 +18,7 @@ Description=Splunky Finance: re-assert the container egress bypass
 
 [Timer]
 OnBootSec=45s
-OnUnitActiveSec=3min
+OnUnitActiveSec=1min
 AccuracySec=5s
 Unit=splunky-finance-egress.service
 
