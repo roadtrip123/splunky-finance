@@ -20,8 +20,8 @@ Your instructor gives you one URL, an account number and two passwords. Everythi
 | Your app | the URL your instructor gives you |
 | Customer login | account `12345678`, password `AlexDemo1234!` |
 | Presenter portal | the same URL with `/demo-admin` on the end, password `PresenterDemo1234!` |
-| Galileo console URL | your instructor, shaped like `https://console.<tenant>.galileocloud.io` |
-| Galileo API URL | your instructor, shaped like `https://api.<tenant>.galileocloud.io` |
+| Galileo console URL | your instructor, shaped like `https://console.multitenant.galileocloud.io` |
+| Galileo API URL | your instructor, shaped like `https://api.multitenant.galileocloud.io` |
 | Galileo Agent Control URL | your instructor |
 
 
