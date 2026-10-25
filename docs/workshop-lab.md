@@ -22,7 +22,7 @@ Your instructor gives you one URL, an account number and two passwords. Everythi
 | Presenter portal | the same URL with `/demo-admin` on the end, password `PresenterDemo1234!` |
 | Galileo console URL | `https://console.multitenant.galileocloud.io` |
 | Galileo API URL |  `https://api.multitenant.galileocloud.io` |
-| Galileo Agent Control URL | 'https://agent-control.multitenant.galileocloud.io' |
+| Galileo Agent Control URL | `https://agent-control.multitenant.galileocloud.io` |
 
 
 Open the app, sign in to banking, then open `/demo-admin` in **another tab of the same browser profile**. The two link automatically.
