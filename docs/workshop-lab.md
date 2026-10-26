@@ -596,7 +596,7 @@ In the portal, open the turn and read **action_decisions**:
 | --- | --- |
 | `"verified": true` with your control named | **Working.** Agent Control evaluated and denied |
 | `"decision": "not_covered"` | Nothing was evaluated, so the request went through. No control is scoped to this step: usually a **Step Name** that does not match the tool, or a control that was never attached to this stream |
-| `"decision": "unavailable"` | The app failed closed. The gate never got an answer, which is not a guardrail |
+| `"decision": "unavailable"` | The app failed closed. The gate never got an answer, which is not a guardrail. If the reason mentions a 404, see **A 404 on the token exchange** below |
 | `"decision": "disabled"` | The scenario is not enabled, or the banking tab is not linked |
 | Nothing blocked at all | The control's **Stages** is `post`, not `pre`, its **Step Name** does not match the tool, or its pattern does not match |
 
@@ -623,3 +623,39 @@ That contrast, the same request executing and then refused before the tool runs,
 | Transfer fails with "insufficient funds" | Balance is already reduced. **Reset balance** and retry |
 | Chat says the provider is unconfigured | No model endpoint saved, or its key is missing |
 | Answers are slow | Expected on a self-hosted model; 20 to 40 seconds is normal |
+| Guardrail says `unavailable` with a 404 on `/api/v1/auth/runtime-token-exchange` | The **Agent Control URL** is wrong for your tenant. See below |
+| Guardrail blocks, but `"verified": false` | Nothing was adjudicated. The app refused on its own, which is safe and is not a demonstration |
+
+### A 404 on the token exchange
+
+The gate reports something like this, and the transfer is refused anyway because the application
+fails closed:
+
+```json
+{"decision": "unavailable", "source": "application", "verified": false,
+ "reason": "Protection request failed",
+ "diagnosis": {"cause": "request_failed", "http_status": 404,
+               "path": "/api/v1/auth/runtime-token-exchange"}}
+```
+
+**The usual cause is the Agent Control URL, not the agent name.** The hint in that message mentions
+the agent name first, and that is rarely it: the application registers its own agent when the
+observability connection resolves the log stream, so there is nothing to create by hand. A URL that
+does not host the runtime routes answers 404 whatever the agent is called, and a URL carried over
+from a different Galileo tenant does exactly that.
+
+Fix it in the order below:
+
+1. In the portal's **Setup** tab, check the **Agent Control URL** against your tenant. It is the
+   tenant's API host, the same value as your API URL unless Galileo has told you otherwise. This is
+   step 13 of Step 7.
+2. Press **Test connection**. This is not optional: the agent is registered during that check, and
+   registering against the old URL is what the 404 was. Saving the settings runs the same check.
+3. Arm the guardrail again and retry the cross-customer request.
+4. Read **action_decisions**. `"verified": true` with your control named is a real Agent Control
+   deny. Anything else means the refusal came from the application.
+
+**Agent observability status: connected is a different thing.** It means traces are exporting. It
+says nothing about whether the agent registered with Agent Control, so a box can read connected and
+still 404 on every guarded call.
+

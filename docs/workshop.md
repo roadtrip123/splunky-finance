@@ -418,4 +418,12 @@ testing, with the faulty answer verified faulty beforehand. Expect a few partici
 where they expect red, and tell them to re-run rather than debug their prompt. The other two judges
 were unanimous throughout. [docs/evaluators.md](evaluators.md) has the detail if someone digs.
 
+**A 404 on `/api/v1/auth/runtime-token-exchange` is the Agent Control URL**, not the agent name, and
+the application's own hint misdirects here by naming the agent first. The app registers its own
+agent during the connection check, so after correcting the URL the participant has to press **Test
+connection**, because registration happened against the old one. Expect this from anyone who set up
+a fresh Galileo tenant, and note that **Agent observability status: connected** only means traces
+are exporting; it says nothing about Agent Control. The lab covers it under Troubleshooting,
+"A 404 on the token exchange".
+
 **Resetting the dataset.** Participants use **Reset balance** on the DATASET card, which reuses the current seed and reference date so the figures in the lab sheet keep matching. The fuller reset control lower down allows changing the seed, which moves every number they have been given.
