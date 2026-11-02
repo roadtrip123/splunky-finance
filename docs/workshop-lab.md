@@ -186,7 +186,8 @@ customer has read it.
 
    <img width="375" height="441" alt="image" src="https://github.com/user-attachments/assets/c5c88fed-9abc-487a-ab62-36ce92b125ce" />
 
-2. Select the integration you want to use for your LLM judge for example OpenAI or Custom
+2. Select the integration for your LLM judge: **Custom** for an OpenAI-compatible gateway such as
+   LiteLLM, or your provider's own, such as **OpenAI**
 
    <img width="1488" height="788" alt="image" src="https://github.com/user-attachments/assets/2931097d-4a47-4ce2-8ebd-695e58193fb8" />
 
@@ -194,7 +195,7 @@ customer has read it.
 3. Enter your information, then click **Save**
 
 **Custom LLM:** You'll need your URL Details, Model, Model Name, and API Key. See **example** below:
-<img width="627" height="719" alt="image" src="https://github.com/user-attachments/assets/81b1aacf-b573-49ef-a7b4-6da76a4eea64" />
+<img width="604" height="717" alt="Galileo Integration Settings, Custom: a name for the integration and the Custom Integration box the JSON is pasted into" src="images/lab/galileo-custom-integration.png" />
 
  Code Snippet:
  ```
@@ -251,7 +252,7 @@ configured above, so choose it there first.
 
    <img width="1313" height="245" alt="image" src="https://github.com/user-attachments/assets/08aec3ad-ce9d-44af-a6e6-7cb73ec32243" />
 
-3. Click on the name at the top and call it `SplunkyAnswerWholeQuestion-<your initials>`. Select the **LLM Model** that you configured earlier in this step, **Modality** 'Text', **Apply to** 'trace', and **Input style** 'Full Trace'. The model picker lists the `alias` from your integration, for example 'GPT-4.1 mini', or whatever you called your custom model, rather than the model name. This evaluator checks whether the answer addressed the whole question.
+3. Click on the name at the top and call it `SplunkyAnswerWholeQuestion-<your initials>`. Select the model from the integration you added at the start of this step as the **LLM Model**, **Modality** 'Text', **Apply to** 'trace', and **Input style** 'Full Trace'. The picker lists models by the `alias` from your integration, for example 'GPT-4.1 mini' on OpenAI or whatever alias you gave a custom model, not by the model name. This evaluator checks whether the answer addressed the whole question.
 
    <img width="1135" height="617" alt="image" src="https://github.com/user-attachments/assets/df6fe363-7d99-4446-92c7-671ad7500d44" />
 
@@ -287,7 +288,7 @@ When the property you are judging is correct, return true even if the answer is 
 
    <img width="1313" height="245" alt="image" src="https://github.com/user-attachments/assets/08aec3ad-ce9d-44af-a6e6-7cb73ec32243" />
 
-3. Click on the name at the top and call it `SplunkyNumericalCorrectness-<your initials>`. Select the **LLM Model** that you configured earlier in this step, **Modality** 'Text', **Apply to** 'trace', and **Input style** 'Full Trace'. The model picker lists the `alias` from your integration, for example 'GPT-4.1 mini', or whatever you called your custom model, rather than the model name. This evaluator checks whether the numbers match the ledger.
+3. Click on the name at the top and call it `SplunkyNumericalCorrectness-<your initials>`. Select the model from the integration you added at the start of this step as the **LLM Model**, **Modality** 'Text', **Apply to** 'trace', and **Input style** 'Full Trace'. The picker lists models by the `alias` from your integration, for example 'GPT-4.1 mini' on OpenAI or whatever alias you gave a custom model, not by the model name. This evaluator checks whether the numbers match the ledger.
 
    <img width="1434" height="659" alt="image" src="https://github.com/user-attachments/assets/0fda7777-7102-4675-8cfa-18df79e36556" />
 
@@ -334,7 +335,7 @@ is obviously wrong for some other reason, and say so in your reasoning rather th
 
    <img width="1313" height="245" alt="image" src="https://github.com/user-attachments/assets/08aec3ad-ce9d-44af-a6e6-7cb73ec32243" />
 
-3. Click on the name at the top and call it `SplunkyRightCustomer-<your initials>`. Select the **LLM Model** that you configured earlier in this step, **Modality** 'Text', **Apply to** 'trace', and **Input style** 'Full Trace'. The model picker lists the `alias` from your integration, for example 'GPT-4.1 mini', or whatever you called your custom model, rather than the model name. This evaluator checks whether the answer is about the right customer.
+3. Click on the name at the top and call it `SplunkyRightCustomer-<your initials>`. Select the model from the integration you added at the start of this step as the **LLM Model**, **Modality** 'Text', **Apply to** 'trace', and **Input style** 'Full Trace'. The picker lists models by the `alias` from your integration, for example 'GPT-4.1 mini' on OpenAI or whatever alias you gave a custom model, not by the model name. This evaluator checks whether the answer is about the right customer.
 
    <img width="586" height="609" alt="image" src="https://github.com/user-attachments/assets/8ecf6930-ed40-407b-bd79-8c44561b6825" />
 
@@ -427,6 +428,14 @@ Or
 
 ### Run one fault at a time
 
+**Why the failures are forced.** A well-behaved agent rarely gets these questions wrong, so you
+could wait a long time to see an evaluator catch a real mistake. The **Enable …** buttons in the
+presenter portal (`/demo-admin`) make the agent fail on purpose, each in one specific way: leaving
+part of the question unanswered, getting a total wrong, or answering about the wrong customer. That
+lets you watch each evaluator catch the failure it was built for, then pass again once you switch
+back to **Normal Answer**. Only the answer is forced. The evaluators are not staged: they score
+it exactly as they would a real mistake.
+
 For each row: click **Enable …** in the portal, ask the question in the banking tab, then look at the
 trace in Galileo.
 
@@ -435,6 +444,28 @@ trace in Galileo.
 | **Incomplete Answer** | *How much did I spend on restaurants last month and what was the largest purchase?* | Answers only one half of the question | `SplunkyAnswerWholeQuestion` |
 | **Incorrect Total** | *How much did I spend on restaurants last month?* | States a wrong amount | `SplunkyNumericalCorrectness` |
 | **Wrong Customer** | *How much is in my account?* | Answers as Dan Whitfield and discloses his balance | `SplunkyRightCustomer` |
+
+**A worked example: Incomplete Answer**
+
+1. In the presenter portal (`/demo-admin`), under **Choose what to demonstrate**, click **Enable
+   Incomplete Answer**. The banner confirms it applies to your next message.
+
+   <img width="1114" height="482" alt="The presenter portal's Choose what to demonstrate panel, with Enable Incomplete Answer selected" src="images/lab/fault-incomplete-1-enable.png" />
+
+2. In the banking app, open **My Bank Agent** and ask the question from the **Incomplete Answer**
+   row of the table above. The answer leaves out part of what you asked: here it gives the number
+   of restaurant purchases but not what was spent. Use the table's question rather than the one in
+   the picture; it asks for two things, which makes the gap easier for the judge to see.
+
+   <img width="461" height="803" alt="The My Bank Agent chat: a question about restaurant spending, answered with a purchase count and no amount" src="images/lab/fault-incomplete-2-ask.png" />
+
+3. In Galileo, open your project, then your **Agent Stream**. On the newest row,
+   **SplunkyAnswerWholeQuestion** shows **false** while the other two evaluators stay **true**: only
+   the judge built for this fault catches it.
+
+   <img width="1789" height="228" alt="Galileo's tracing view: SplunkyAnswerWholeQuestion false, SplunkyNumericalCorrectness and SplunkyRightCustomer true" src="images/lab/fault-incomplete-3-galileo.png" />
+
+Do the same for the other two rows, one at a time, each with its own question.
 
 Then set the scenario back to **Normal Answer / Disabled Guardrails** and ask the same questions
 again. The answers are now correct, and the same evaluators should pass. That contrast is the point:
