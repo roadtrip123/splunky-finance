@@ -27,13 +27,33 @@ Your instructor gives you one URL, an account number and two passwords. Everythi
 
 Open the app, sign in to banking, then open `/demo-admin` in **another tab of the same browser profile**. The two link automatically.
 
-Banking App:
+### Three portals, one agent
 
-<img width="1812" height="869" alt="image" src="https://github.com/user-attachments/assets/dd1a734f-248e-4e84-b11f-09c313bb8d54" />
+You will move between three portals in this lab. They all look at the same agent, **My Bank Agent**,
+from different sides, so it helps to know which one you are in before you start.
 
-Demo-Admin:
+| Portal | Where | What you do there |
+| --- | --- | --- |
+| 1. My Bank Agent | your app URL | Use the agent as a bank customer would |
+| 2. My Bank Agent Admin Portal | your app URL with `/demo-admin` on the end | Connect the agent to Splunk and your LLM, and trigger bad answers |
+| 3. Splunk Agent Observability | the Galileo console | Evaluate, observe and control the agent |
 
-<img width="1817" height="654" alt="image" src="https://github.com/user-attachments/assets/640afc6b-f0c8-4f06-bfb7-35c5aff62de1" />
+**1. My Bank Agent.** The end-user portal. Sign in as the customer and chat with My Bank Agent the way
+a customer of the bank would. Every question you ask here is what the other two portals act on.
+
+<img width="1665" height="780" alt="My Bank Agent, the end-user portal: the Splunky Finance home page" src="images/lab/portal-1-my-bank-agent.png" />
+
+**2. My Bank Agent Admin Portal.** Where you run the agent: connect My Bank Agent to Splunk Agent
+Observability and to your LLM, and switch on the faults that make it give bad answers on purpose, so
+you can watch the evaluators catch them.
+
+<img width="1631" height="702" alt="My Bank Agent Admin Portal at /demo-admin: model provider, Agent Observability status, banking connection and dataset" src="images/lab/portal-2-admin.png" />
+
+**3. Splunk Agent Observability Portal.** Where you evaluate, observe and control My Bank Agent: your
+project, the traces of every conversation, the evaluator scores, and the guardrails that stop an
+unsafe action before it happens.
+
+<img width="1798" height="584" alt="Splunk Agent Observability: the project list for your organization" src="images/lab/portal-3-agent-observability.png" />
 
 
 Your instance is yours alone: your own dataset, your own settings. What you do will not affect anyone else.
